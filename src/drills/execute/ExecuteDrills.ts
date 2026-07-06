@@ -2,6 +2,7 @@ import type { DrillDefinition, TrialSpec, SliceDirection, TargetZone } from "@/a
 import { ARES_COLORS } from "@/ares/colors";
 import { pick } from "@/utils/rng";
 import { strikePosition, PERIPHERAL_ZONES } from "../shared/zones";
+import { levels25, lerp25, ilerp25 } from "../shared/levels";
 
 /**
  * EXECUTE — direct ports of the A.R.E.S. Performance Suite drills.
@@ -63,10 +64,9 @@ export const ReactionGrid: DrillDefinition = {
     "4. Keep both hands ready - use whichever hand is closest.",
   ],
   controlsHint: "STRIKE THE LIT TARGET - IT MOVES ON TOUCH",
-  levels: Object.entries(RG_LAYOUT).map(([lvl, cfg]) => ({
-    level: Number(lvl),
-    label: `Level ${lvl} — ${cfg.label}`,
-    parameters: { level: Number(lvl), trials: 40, timeoutMs: 1600 },
+  levels: levels25((i) => ({
+    label: i < 5 ? "Central Cluster" : i < 10 ? "Moderate Spread" : i < 15 ? "Wide Horizontal" : i < 20 ? "Wide H + V" : "Full Board",
+    parameters: { level: i + 1, trials: ilerp25(30, 48, i), timeoutMs: ilerp25(1800, 950, i) },
   })),
   buildTrials: (params, rng) => {
     const p = params as { level: number; trials: number; timeoutMs: number };
@@ -119,13 +119,16 @@ export const EyeHandCoordination: DrillDefinition = {
     "4. Clear as many as you can before the clock runs out.",
   ],
   controlsHint: "CLEAR TARGETS WITH BOTH HANDS - NEW ONES KEEP COMING",
-  levels: [
-    { level: 1, label: "Level 1 — Large / Central", parameters: { scale: 0.1, spreadDeg: 14, streams: 2, perStream: 14, timeoutMs: 2400 } },
-    { level: 2, label: "Level 2 — Medium / Central", parameters: { scale: 0.08, spreadDeg: 16, streams: 2, perStream: 16, timeoutMs: 2200 } },
-    { level: 3, label: "Level 3 — Medium / Wide", parameters: { scale: 0.08, spreadDeg: 26, streams: 3, perStream: 14, timeoutMs: 2000 } },
-    { level: 4, label: "Level 4 — Small / Wide", parameters: { scale: 0.065, spreadDeg: 30, streams: 3, perStream: 16, timeoutMs: 1800 } },
-    { level: 5, label: "Level 5 — Small / Full Field", parameters: { scale: 0.055, spreadDeg: 38, streams: 3, perStream: 18, timeoutMs: 1600 } },
-  ],
+levels: levels25((i) => ({
+    label: `${i < 8 ? "Large" : i < 17 ? "Medium" : "Small"} / ${i < 12 ? "Central" : "Wide"} field`,
+    parameters: {
+      scale: lerp25(0.105, 0.05, i),
+      spreadDeg: lerp25(12, 40, i),
+      streams: i < 8 ? 2 : 3,
+      perStream: ilerp25(12, 20, i),
+      timeoutMs: ilerp25(2500, 1400, i),
+    },
+  })),
   buildTrials: (params, rng) => {
     const p = params as { scale: number; spreadDeg: number; streams: number; perStream: number; timeoutMs: number };
     const trials: TrialSpec[] = [];
@@ -178,15 +181,15 @@ export const RawReaction: DrillDefinition = {
     "4. Central levels: the target is always dead ahead. Spatial levels: it can appear anywhere.",
   ],
   controlsHint: "REACT ONLY TO ONSET - STRIKE INSTANTLY",
-  levels: Array.from({ length: 40 }, (_, i) => {
-    const band = i < 20 ? "Central (Focus)" : "Spatial (Scan)";
-    const j = i % 20;
-    return {
-      level: i + 1,
-      label: `L${i + 1} ${band}`,
-      parameters: { spatial: i >= 20, trials: 15, size: px2scale(RAW_SIZES[j]), minDelay: 500, maxDelay: 1000 + j * 100, showMs: 1500 - j * 30 },
-    };
-  }),
+  levels: levels25((i) => ({
+    label: `${i < 12 ? "Central (Focus)" : "Spatial (Scan)"} — ${Math.round(lerp25(120, 41, i))}px`,
+    parameters: {
+      spatial: i >= 12, trials: 15,
+      size: px2scale(lerp25(120, 41, i)),
+      minDelay: 500, maxDelay: ilerp25(1000, 3000, i),
+      showMs: ilerp25(1500, 800, i),
+    },
+  })),
   buildTrials: (params, rng) => {
     const p = params as { spatial: boolean; trials: number; size: number; minDelay: number; maxDelay: number; showMs: number };
     const trials: TrialSpec[] = [];
@@ -235,15 +238,14 @@ export const ChoiceRT: DrillDefinition = {
     "4. Focus levels show it dead ahead; Scan levels can flash it anywhere.",
   ],
   controlsHint: "TEAL = LEFT PAD - PURPLE = RIGHT PAD",
-  levels: Array.from({ length: 40 }, (_, i) => {
-    const central = i < 20;
-    const j = i % 20;
-    return {
-      level: i + 1,
-      label: `L${i + 1} ${central ? "Central (Focus)" : "Spatial (Scan)"}`,
-      parameters: { central, trials: 16, size: px2scale(150 - j * 4), minDelay: 500, maxDelay: 1000 + j * 100 },
-    };
-  }),
+  levels: levels25((i) => ({
+    label: `${i < 12 ? "Central (Focus)" : "Spatial (Scan)"} — ${Math.round(lerp25(150, 45, i))}px`,
+    parameters: {
+      central: i < 12, trials: 16,
+      size: px2scale(lerp25(150, 45, i)),
+      minDelay: 500, maxDelay: ilerp25(1000, 2900, i),
+    },
+  })),
   buildTrials: (params, rng) => {
     const p = params as { central: boolean; trials: number; size: number; minDelay: number; maxDelay: number };
     const trials: TrialSpec[] = [];
@@ -324,15 +326,15 @@ export const GoNoGo: DrillDefinition = {
     "4. Maintain central fixation on Focus levels; scan the field on Spatial levels.",
   ],
   controlsHint: "STRIKE TEAL/BLUE/ORANGE - NEVER PURPLE",
-  levels: Array.from({ length: 40 }, (_, i) => {
-    const elite = i >= 30;
-    const spatial = (i % 20) >= 10;
-    return {
-      level: i + 1,
-      label: `L${i + 1} ${elite ? "Elite" : spatial ? "Spatial" : "Central"}`,
-      parameters: { trials: 24, elite, spatial, size: px2scale(80 - (i % 20) * 2.5), showMs: 1350 - (i % 20) * 25, isiMin: 450, isiMax: 1100 },
-    };
-  }),
+  levels: levels25((i) => ({
+    label: i < 8 ? "Central" : i < 17 ? "Spatial" : "Elite (white no-go)",
+    parameters: {
+      trials: 24, elite: i >= 17, spatial: i >= 8,
+      size: px2scale(lerp25(80, 30, i)),
+      showMs: ilerp25(1400, 750, i),
+      isiMin: 450, isiMax: ilerp25(1200, 800, i),
+    },
+  })),
   buildTrials: (params, rng) => {
     const p = params as { trials: number; elite: boolean; spatial: boolean; size: number; showMs: number; isiMin: number; isiMax: number };
     const goColors = p.elite ? [CYAN, BLUE, ORANGE] : [TEAL, BLUE, ORANGE];
@@ -385,10 +387,14 @@ export const StopSignal: DrillDefinition = {
     "4. The stop signal comes later and later as you level up - commitment gets harder to cancel.",
   ],
   controlsHint: "STRIKE TEAL FAST - CANCEL IF IT TURNS RED",
-  levels: Array.from({ length: 20 }, (_, i) => ({
-    level: i + 1,
-    label: `L${i + 1} — SSD ~${250 + i * 15}ms`,
-    parameters: { trials: 24, ssd: 250 + i * 15, deadline: 2000, stopProb: 0.25, noGoProb: 0.15, size: px2scale(64 - i * 1.5) },
+  levels: levels25((i) => ({
+    label: `SSD ~${ilerp25(200, 560, i)}ms`,
+    parameters: {
+      trials: 24, ssd: ilerp25(200, 560, i),
+      deadline: ilerp25(2000, 1400, i),
+      stopProb: 0.25, noGoProb: 0.15,
+      size: px2scale(lerp25(64, 34, i)),
+    },
   })),
   buildTrials: (params, rng) => {
     const p = params as { trials: number; ssd: number; deadline: number; stopProb: number; noGoProb: number; size: number };
@@ -442,13 +448,16 @@ export const FocusFrenzy: DrillDefinition = {
     "4. Triage: always clear the most urgent colors first.",
   ],
   controlsHint: "CLEAR TARGETS BEFORE THEY TURN RED",
-  levels: [
-    { level: 1, label: "Level 1 — 2 live / slow", parameters: { streams: 2, perStream: 12, lifeMs: 4200, drift: 0.1, scale: 0.085 } },
-    { level: 2, label: "Level 2 — 3 live", parameters: { streams: 3, perStream: 12, lifeMs: 3800, drift: 0.13, scale: 0.08 } },
-    { level: 3, label: "Level 3 — faster decay", parameters: { streams: 3, perStream: 14, lifeMs: 3200, drift: 0.16, scale: 0.075 } },
-    { level: 4, label: "Level 4 — 4 live", parameters: { streams: 4, perStream: 13, lifeMs: 2900, drift: 0.2, scale: 0.07 } },
-    { level: 5, label: "Level 5 — elite triage", parameters: { streams: 4, perStream: 15, lifeMs: 2500, drift: 0.24, scale: 0.062 } },
-  ],
+levels: levels25((i) => ({
+    label: `${i < 8 ? 2 : i < 17 ? 3 : 4} live — ${(lerp25(4.4, 2.2, i)).toFixed(1)}s decay`,
+    parameters: {
+      streams: i < 8 ? 2 : i < 17 ? 3 : 4,
+      perStream: ilerp25(12, 16, i),
+      lifeMs: ilerp25(4400, 2200, i),
+      drift: lerp25(0.08, 0.3, i),
+      scale: lerp25(0.09, 0.055, i),
+    },
+  })),
   buildTrials: (params, rng) => {
     const p = params as { streams: number; perStream: number; lifeMs: number; drift: number; scale: number };
     const trials: TrialSpec[] = [];
@@ -505,10 +514,9 @@ export const SaccadeSwipe: DrillDefinition = {
     "4. Anti-saccade density rises with level.",
   ],
   controlsHint: "CYAN = WITH THE ARROW - RED = AGAINST IT",
-  levels: Array.from({ length: 10 }, (_, i) => ({
-    level: i + 1,
-    label: `L${i + 1} — ${Math.round(20 + i * 8)}% anti`,
-    parameters: { trials: 20, antiRatio: 0.2 + i * 0.08, showMs: 1700 - i * 80, fixationLoad: true },
+  levels: levels25((i) => ({
+    label: `${ilerp25(15, 85, i)}% anti-saccade`,
+    parameters: { trials: 20, antiRatio: lerp25(0.15, 0.85, i), showMs: ilerp25(1900, 900, i), fixationLoad: true },
   })),
   buildTrials: (params, rng) => {
     const p = params as { trials: number; antiRatio: number; showMs: number };

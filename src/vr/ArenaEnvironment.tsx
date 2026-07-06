@@ -1,6 +1,92 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+
+/** Procedural gradient textures — zero asset downloads, generated once. */
+function makeGradientTexture(stops: [number, string][], vertical = true): THREE.CanvasTexture {
+  const cv = document.createElement("canvas");
+  cv.width = vertical ? 4 : 256;
+  cv.height = vertical ? 256 : 4;
+  const g = cv.getContext("2d")!;
+  const grad = vertical ? g.createLinearGradient(0, 256, 0, 0) : g.createLinearGradient(0, 0, 256, 0);
+  for (const [at, c] of stops) grad.addColorStop(at, c);
+  g.fillStyle = grad;
+  g.fillRect(0, 0, cv.width, cv.height);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function makeRadialTexture(stops: [number, string][]): THREE.CanvasTexture {
+  const cv = document.createElement("canvas");
+  cv.width = 256;
+  cv.height = 256;
+  const g = cv.getContext("2d")!;
+  const grad = g.createRadialGradient(128, 128, 8, 128, 128, 128);
+  for (const [at, c] of stops) grad.addColorStop(at, c);
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 256, 256);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/** Deep-space dome with an Ares-purple horizon band and teal zenith hint. */
+function SkyDome() {
+  const tex = useMemo(
+    () =>
+      makeGradientTexture([
+        [0.0, "#05071c"],
+        [0.32, "#0B0F2A"],
+        [0.46, "#1c1545"],
+        [0.52, "#2D234F"],
+        [0.58, "#151b3d"],
+        [0.8, "#0B0F2A"],
+        [1.0, "#070b22"],
+      ]),
+    [],
+  );
+  return (
+    <mesh>
+      <sphereGeometry args={[46, 24, 18]} />
+      <meshBasicMaterial map={tex} side={THREE.BackSide} fog={false} />
+    </mesh>
+  );
+}
+
+/** Slow-breathing energy floor: radial glow + expanding pulse ring. */
+function EnergyFloor({ tint }: { tint: string }) {
+  const tex = useMemo(
+    () =>
+      makeRadialTexture([
+        [0.0, "rgba(41,152,170,0.32)"],
+        [0.22, "rgba(45,35,79,0.5)"],
+        [0.55, "rgba(17,20,40,0.9)"],
+        [1.0, "rgba(7,10,28,1)"],
+      ]),
+    [],
+  );
+  const pulse = useRef<THREE.Mesh>(null);
+  useFrame(({ clock }) => {
+    if (pulse.current) {
+      const t = (clock.elapsedTime % 6) / 6;
+      pulse.current.scale.setScalar(0.4 + t * 3.4);
+      (pulse.current.material as THREE.MeshBasicMaterial).opacity = 0.28 * (1 - t);
+    }
+  });
+  return (
+    <group>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]}>
+        <circleGeometry args={[16, 48]} />
+        <meshBasicMaterial map={tex} color={tint} />
+      </mesh>
+      <mesh ref={pulse} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>
+        <ringGeometry args={[3.4, 3.5, 48]} />
+        <meshBasicMaterial color="#2998AA" transparent opacity={0.2} depthWrite={false} />
+      </mesh>
+    </group>
+  );
+}
 import { ARES_COLORS, ARES_ACCENTS } from "@/ares/colors";
 import { PHASE_META, ARES_PHASES, type ARESPhase } from "@/ares/phases";
 import { PERF_MODES } from "@/utils/performance";
@@ -142,15 +228,12 @@ export function ArenaEnvironment({ environment = "arena" }: { environment?: Envi
   return (
     <group>
       <color attach="background" args={[ARES_COLORS.nearBlack]} />
-      <fog attach="fog" args={[ARES_COLORS.nearBlack, 12, 42]} />
-      <ambientLight intensity={0.75} />
-      <directionalLight position={[3, 6, 2]} intensity={0.6} />
+      <fog attach="fog" args={[ARES_COLORS.nearBlack, 14, 44]} />
+      <ambientLight intensity={0.8} />
+      <directionalLight position={[3, 6, 2]} intensity={0.55} />
 
-      {/* floor */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
-        <circleGeometry args={[14, 40]} />
-        <meshBasicMaterial color={environment === "baseball" ? "#0A1410" : ARES_COLORS.graphite} />
-      </mesh>
+      <SkyDome />
+      <EnergyFloor tint={environment === "baseball" ? "#1a2e22" : "#EAF0FF"} />
       {/* concentric guide rings */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
         <ringGeometry args={[1.15, 1.18, 40]} />

@@ -18,6 +18,8 @@ export interface PoolSlot {
 export class TargetPool {
   readonly slots: PoolSlot[];
   private byTargetId = new Map<string, PoolSlot>();
+  /** diagnostics: spawns dropped because the pool was full */
+  overflowCount = 0;
 
   constructor(size: number) {
     this.slots = Array.from({ length: size }, (_, i) => ({
@@ -31,7 +33,10 @@ export class TargetPool {
 
   acquire(spec: TrialSpec, clock: number): PoolSlot | null {
     const slot = this.slots.find((s) => !s.active);
-    if (!slot) return null; // pool exhausted — drill plans are sized to avoid this
+    if (!slot) {
+      this.overflowCount++;
+      return null; // pool exhausted — drill plans are sized to avoid this
+    }
     slot.active = true;
     slot.spec = spec;
     slot.pos = [...spec.position];

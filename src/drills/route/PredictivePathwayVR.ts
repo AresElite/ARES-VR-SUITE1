@@ -1,6 +1,7 @@
 import type { DrillDefinition, TrialSpec } from "@/ares/drillTypes";
 import { ARES_COLORS, ARES_ACCENTS } from "@/ares/colors";
 import { EYE_Y } from "../shared/zones";
+import { levels25, lerp25, ilerp25 } from "../shared/levels";
 
 /**
  * ROUTE — Predictive Pathway VR
@@ -100,13 +101,17 @@ export function buildPathwayTrials(p: Params, rng: () => number, idPrefix = "pp"
   return trials;
 }
 
-const levels = [
-  { level: 1, label: "Level 1 — Clear routes", parameters: { decisionCount: 8, objectsPerDecision: 3, windowMs: 3400, gapMs: 1500, lateSwitchRatio: 0, speedSpread: 0.5 } },
-  { level: 2, label: "Level 2 — Tighter races", parameters: { decisionCount: 10, objectsPerDecision: 3, windowMs: 3000, gapMs: 1300, lateSwitchRatio: 0, speedSpread: 0.35 } },
-  { level: 3, label: "Level 3 — Four routes", parameters: { decisionCount: 10, objectsPerDecision: 4, windowMs: 2800, gapMs: 1200, lateSwitchRatio: 0.2, speedSpread: 0.3 } },
-  { level: 4, label: "Level 4 — Late switches", parameters: { decisionCount: 12, objectsPerDecision: 4, windowMs: 2600, gapMs: 1100, lateSwitchRatio: 0.4, speedSpread: 0.25 } },
-  { level: 5, label: "Level 5 — Deception", parameters: { decisionCount: 12, objectsPerDecision: 5, windowMs: 2300, gapMs: 1000, lateSwitchRatio: 0.5, speedSpread: 0.18 } },
-];
+const levels = levels25((i) => ({
+  label: `${3 + Math.floor(i / 9)} routes, ${ilerp25(0, 55, i)}% late switches`,
+  parameters: {
+    decisionCount: ilerp25(8, 14, i),
+    objectsPerDecision: 3 + Math.floor(i / 9),
+    windowMs: ilerp25(3400, 2000, i),
+    gapMs: ilerp25(1500, 900, i),
+    lateSwitchRatio: lerp25(0, 0.55, i),
+    speedSpread: lerp25(0.5, 0.15, i),
+  },
+}));
 
 export const PredictivePathwayVR: DrillDefinition = {
   id: "predictive-pathway",

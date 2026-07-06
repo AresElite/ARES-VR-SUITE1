@@ -1,6 +1,7 @@
 import type { DrillDefinition, SliceDirection, TrialSpec, TargetZone } from "@/ares/drillTypes";
 import { pick } from "@/utils/rng";
 import { strikePosition, PERIPHERAL_ZONES } from "../shared/zones";
+import { levels25, lerp25, ilerp25 } from "../shared/levels";
 
 /**
  * SYNCHRONIZE — direct ports of the A.R.E.S. Performance Suite drills.
@@ -32,10 +33,9 @@ export const NeuralPhaseLock: DrillDefinition = {
     "4. On blackout pulses the ring goes invisible - keep striking on the beat with your internal clock.",
   ],
   controlsHint: "STRIKE AT MAXIMUM SIZE - KEEP THE BEAT IN BLACKOUTS",
-  levels: Array.from({ length: 10 }, (_, i) => ({
-    level: i + 1,
-    label: `L${i + 1} — ${Math.round(1800 - i * 90)}ms pulse, ${Math.round(i * 8)}% blackout`,
-    parameters: { pulses: 24, periodMs: 1800 - i * 90, blackoutRatio: i * 0.08 },
+  levels: levels25((i) => ({
+    label: `${ilerp25(1900, 850, i)}ms pulse, ${ilerp25(0, 60, i)}% blackout`,
+    parameters: { pulses: 24, periodMs: ilerp25(1900, 850, i), blackoutRatio: lerp25(0, 0.6, i) },
   })),
   buildTrials: (params, rng) => {
     const p = params as { pulses: number; periodMs: number; blackoutRatio: number };
@@ -86,10 +86,9 @@ export const DualStreamNeuralCollider: DrillDefinition = {
     "4. RED particles are ANTI-MATTER: do NOT strike the core. Hold completely.",
   ],
   controlsHint: "STRIKE THE CORE AT COLLISION - NEVER ON RED",
-  levels: Array.from({ length: 10 }, (_, i) => ({
-    level: i + 1,
-    label: `L${i + 1} — ${Math.round(2400 - i * 140)}ms approach, ${Math.round(15 + i * 3)}% anti-matter`,
-    parameters: { trials: 16, approachMs: 2400 - i * 140, antiRatio: 0.15 + i * 0.03, windowMs: 320 },
+  levels: levels25((i) => ({
+    label: `${ilerp25(2600, 1100, i)}ms approach, ${ilerp25(12, 42, i)}% anti-matter`,
+    parameters: { trials: 16, approachMs: ilerp25(2600, 1100, i), antiRatio: lerp25(0.12, 0.42, i), windowMs: ilerp25(340, 220, i) },
   })),
   buildTrials: (params, rng) => {
     const p = params as { trials: number; approachMs: number; antiRatio: number; windowMs: number };
@@ -145,10 +144,9 @@ export const PursuitPulse: DrillDefinition = {
     "4. Striking outside a pulse counts against you.",
   ],
   controlsHint: "TRACK THE ORB - STRIKE ON THE GOLD PULSE, MATCH THE ARROW",
-  levels: Array.from({ length: 10 }, (_, i) => ({
-    level: i + 1,
-    label: `L${i + 1} — ${(0.3 + i * 0.06).toFixed(2)} rad/s, ${Math.round(1100 - i * 60)}ms pulse`,
-    parameters: { pulses: 18, speed: 0.3 + i * 0.06, pulseMs: 1100 - i * 60, betweenMs: 1600 },
+  levels: levels25((i) => ({
+    label: `${lerp25(0.28, 0.9, i).toFixed(2)} rad/s, ${ilerp25(1200, 520, i)}ms pulse`,
+    parameters: { pulses: 18, speed: lerp25(0.28, 0.9, i), pulseMs: ilerp25(1200, 520, i), betweenMs: ilerp25(1800, 1200, i) },
   })),
   buildTrials: (params, rng) => {
     const p = params as { pulses: number; speed: number; pulseMs: number; betweenMs: number };
@@ -199,10 +197,9 @@ export const Occlusion: DrillDefinition = {
     "4. Maintain the mental trajectory - do not guess early.",
   ],
   controlsHint: "STRIKE THE GREEN LINE WHEN THE HIDDEN BALL CROSSES",
-  levels: Array.from({ length: 10 }, (_, i) => ({
-    level: i + 1,
-    label: `L${i + 1} — ${(1.6 - i * 0.09).toFixed(2)}s crossing, ${Math.round(35 + i * 4)}% hidden`,
-    parameters: { trials: 16, crossMs: 1600 - i * 90, hiddenFrac: 0.35 + i * 0.04, windowMs: 260 },
+  levels: levels25((i) => ({
+    label: `${(lerp25(1.7, 0.8, i)).toFixed(2)}s crossing, ${ilerp25(30, 72, i)}% hidden`,
+    parameters: { trials: 16, crossMs: ilerp25(1700, 800, i), hiddenFrac: lerp25(0.3, 0.72, i), windowMs: ilerp25(300, 150, i) },
   })),
   buildTrials: (params, rng) => {
     const p = params as { trials: number; crossMs: number; hiddenFrac: number; windowMs: number };
@@ -257,10 +254,12 @@ export const CognitiveCrossfire: DrillDefinition = {
     "5. Both tasks are scored. Accuracy on both beats speed on one. 60 seconds.",
   ],
   controlsHint: "CENTER: TEAL GO / PURPLE NO - PERIPHERY: TAP THE GOLD",
-  levels: Array.from({ length: 10 }, (_, i) => ({
-    level: i + 1,
-    label: `L${i + 1} — ${Math.round(1300 - i * 60)}ms central tempo`,
-    parameters: { durationS: 60, centralMs: 1300 - i * 60, noGoRatio: 0.25, periphCount: 8 + i, periphMs: 1300 - i * 50, eccDeg: 22 + i * 2 },
+  levels: levels25((i) => ({
+    label: `${ilerp25(1400, 750, i)}ms central tempo`,
+    parameters: {
+      durationS: 60, centralMs: ilerp25(1400, 750, i), noGoRatio: 0.25,
+      periphCount: ilerp25(8, 18, i), periphMs: ilerp25(1400, 800, i), eccDeg: ilerp25(20, 38, i),
+    },
   })),
   buildTrials: (params, rng) => {
     const p = params as { durationS: number; centralMs: number; noGoRatio: number; periphCount: number; periphMs: number; eccDeg: number };

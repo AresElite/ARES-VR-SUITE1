@@ -1,5 +1,6 @@
 import { useAppStore } from "@/app/providers/appStore";
 import { xrStore } from "./XRRoot";
+import { sfx } from "@/utils/audio";
 
 /**
  * XREntryButton — DOM button that starts an immersive-vr session.
@@ -13,6 +14,8 @@ export function XREntryButton({ onEnter }: { onEnter?: () => void }) {
     <button
       className="ares-btn ares-btn-primary ares-btn-xl"
       onClick={() => {
+        sfx.unlock();
+        sfx.portal();
         onEnter?.();
         void xrStore.enterVR();
       }}

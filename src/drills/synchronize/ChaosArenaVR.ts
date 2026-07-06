@@ -1,4 +1,5 @@
 import type { DrillDefinition, TrialSpec } from "@/ares/drillTypes";
+import { levels25, lerp25, ilerp25 } from "../shared/levels";
 import { buildPeripheralTrials } from "../acquire/PeripheralFieldVR";
 import { buildReactionTrials } from "../execute/ReactionStrikeVR";
 import { buildDepthSliceTrials } from "../execute/DepthSliceVR";
@@ -40,56 +41,32 @@ export function buildChaosTrials(p: Params, rng: () => number): TrialSpec[] {
   return streams.flat().sort((a, b) => a.spawnAt - b.spawnAt);
 }
 
-const levels = [
-  {
-    level: 1,
-    label: "Level 1 — Dual stream",
-    parameters: {
-      durationScale: 1,
-      peripheral: { trialCount: 12, eccentricityDeg: 22, targetDurationMs: 1500, isiMinMs: 1400, isiMaxMs: 2400, distractorRatio: 0.1, fixationLoad: false, contrast: 1 },
-      reaction: { trialCount: 12, targetDurationMs: 1400, isiMinMs: 1400, isiMaxMs: 2400, noGoRatio: 0.15, handRuleRatio: 0, spreadDeg: 12 },
+const levels = levels25((i) => ({
+  label: `${i < 8 ? "dual" : "triple"} stream${i >= 13 ? `, ${ilerp25(95, 125, i)} BPM` : ""}`,
+  parameters: {
+    durationScale: 1,
+    peripheral: {
+      trialCount: ilerp25(12, 18, i), eccentricityDeg: lerp25(22, 38, i),
+      targetDurationMs: ilerp25(1500, 950, i), isiMinMs: ilerp25(1400, 1100, i), isiMaxMs: ilerp25(2400, 2000, i),
+      distractorRatio: lerp25(0.1, 0.35, i), fixationLoad: i >= 9, contrast: lerp25(1, 0.5, i),
     },
-  },
-  {
-    level: 2,
-    label: "Level 2 — Rules under load",
-    parameters: {
-      durationScale: 1,
-      peripheral: { trialCount: 14, eccentricityDeg: 28, targetDurationMs: 1300, isiMinMs: 1200, isiMaxMs: 2200, distractorRatio: 0.2, fixationLoad: false, contrast: 0.9 },
-      reaction: { trialCount: 14, targetDurationMs: 1200, isiMinMs: 1200, isiMaxMs: 2200, noGoRatio: 0.2, handRuleRatio: 0.4, spreadDeg: 16 },
+    reaction: {
+      trialCount: ilerp25(12, 18, i), targetDurationMs: ilerp25(1400, 900, i),
+      isiMinMs: ilerp25(1400, 1100, i), isiMaxMs: ilerp25(2400, 2000, i),
+      noGoRatio: lerp25(0.15, 0.3, i), handRuleRatio: lerp25(0, 0.7, i), spreadDeg: lerp25(12, 24, i),
     },
+    ...(i >= 8
+      ? {
+          depth: {
+            trialCount: ilerp25(8, 14, i), approachSpeed: lerp25(2.6, 3.4, i), spawnDepth: 8,
+            handRules: i < 13 ? ["either"] : ["left", "right", "both"],
+            directionRatio: lerp25(0, 0.5, i), crossMidlineRatio: lerp25(0, 0.35, i),
+            ...(i >= 13 ? { bpm: ilerp25(95, 125, i) } : {}), isiMs: ilerp25(3200, 2400, i),
+          },
+        }
+      : {}),
   },
-  {
-    level: 3,
-    label: "Level 3 — Triple stream",
-    parameters: {
-      durationScale: 1,
-      peripheral: { trialCount: 14, eccentricityDeg: 30, targetDurationMs: 1200, isiMinMs: 1300, isiMaxMs: 2400, distractorRatio: 0.25, fixationLoad: true, contrast: 0.8 },
-      reaction: { trialCount: 14, targetDurationMs: 1100, isiMinMs: 1300, isiMaxMs: 2400, noGoRatio: 0.22, handRuleRatio: 0.5, spreadDeg: 18 },
-      depth: { trialCount: 10, approachSpeed: 2.6, spawnDepth: 8, handRules: ["either"], directionRatio: 0, crossMidlineRatio: 0, isiMs: 3200 },
-    },
-  },
-  {
-    level: 4,
-    label: "Level 4 — Rhythm chaos",
-    parameters: {
-      durationScale: 1,
-      peripheral: { trialCount: 16, eccentricityDeg: 34, targetDurationMs: 1050, isiMinMs: 1200, isiMaxMs: 2200, distractorRatio: 0.3, fixationLoad: true, contrast: 0.65 },
-      reaction: { trialCount: 16, targetDurationMs: 1000, isiMinMs: 1200, isiMaxMs: 2200, noGoRatio: 0.25, handRuleRatio: 0.6, spreadDeg: 20 },
-      depth: { trialCount: 12, approachSpeed: 3.0, spawnDepth: 8, handRules: ["left", "right"], directionRatio: 0.3, crossMidlineRatio: 0.2, bpm: 100, isiMs: 2800 },
-    },
-  },
-  {
-    level: 5,
-    label: "Level 5 — Full synchronization",
-    parameters: {
-      durationScale: 1,
-      peripheral: { trialCount: 18, eccentricityDeg: 38, targetDurationMs: 950, isiMinMs: 1100, isiMaxMs: 2000, distractorRatio: 0.35, fixationLoad: true, contrast: 0.5 },
-      reaction: { trialCount: 18, targetDurationMs: 900, isiMinMs: 1100, isiMaxMs: 2000, noGoRatio: 0.3, handRuleRatio: 0.7, spreadDeg: 24 },
-      depth: { trialCount: 14, approachSpeed: 3.4, spawnDepth: 9, handRules: ["left", "right", "both"], directionRatio: 0.5, crossMidlineRatio: 0.35, bpm: 120, isiMs: 2400 },
-    },
-  },
-];
+}));
 
 export const ChaosArenaVR: DrillDefinition = {
   id: "chaos-arena",

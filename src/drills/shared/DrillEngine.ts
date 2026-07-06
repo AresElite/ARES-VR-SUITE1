@@ -41,7 +41,7 @@ interface ActiveTarget {
 }
 
 const COUNTDOWN_MS = 3000;
-const DEBUG = import.meta.env.VITE_DEBUG_DRILLS === "true";
+const DEBUG = (import.meta as { env?: Record<string, string> }).env?.VITE_DEBUG_DRILLS === "true";
 
 /**
  * DrillEngine — the shared, framework-free drill state machine.

@@ -2,6 +2,7 @@ import type { DrillDefinition, HandRule, SliceDirection, TrialSpec } from "@/are
 import { ARES_COLORS, ARES_ACCENTS } from "@/ares/colors";
 import { pick } from "@/utils/rng";
 import { EYE_Y } from "../shared/zones";
+import { levels25, lerp25, ilerp25 } from "../shared/levels";
 
 /**
  * EXECUTE — Depth Slice VR
@@ -81,13 +82,19 @@ export function buildDepthSliceTrials(p: Params, rng: () => number, idPrefix = "
   return trials;
 }
 
-const levels = [
-  { level: 1, label: "Level 1 — Either hand", parameters: { trialCount: 20, approachSpeed: 2.2, spawnDepth: 7, handRules: ["either"], directionRatio: 0, crossMidlineRatio: 0, isiMs: 1400 } },
-  { level: 2, label: "Level 2 — Ruled hands", parameters: { trialCount: 24, approachSpeed: 2.6, spawnDepth: 7, handRules: ["left", "right", "either"], directionRatio: 0, crossMidlineRatio: 0, isiMs: 1200 } },
-  { level: 3, label: "Level 3 — 8-way slices", parameters: { trialCount: 26, approachSpeed: 3.0, spawnDepth: 8, handRules: ["left", "right", "either"], directionRatio: 0.5, crossMidlineRatio: 0.15, isiMs: 1100 } },
-  { level: 4, label: "Level 4 — Rhythm 100 BPM", parameters: { trialCount: 28, approachSpeed: 3.4, spawnDepth: 8, handRules: ["left", "right", "either", "both"], directionRatio: 0.6, crossMidlineRatio: 0.3, bpm: 100, isiMs: 1000 } },
-  { level: 5, label: "Level 5 — Cross-midline 120 BPM", parameters: { trialCount: 32, approachSpeed: 3.8, spawnDepth: 9, handRules: ["left", "right", "both"], directionRatio: 0.75, crossMidlineRatio: 0.5, bpm: 120, isiMs: 900 } },
-];
+const levels = levels25((i) => ({
+  label: `${lerp25(2.2, 4.0, i).toFixed(1)} m/s${i >= 13 ? `, ${ilerp25(90, 125, i)} BPM` : ""}`,
+  parameters: {
+    trialCount: ilerp25(20, 32, i),
+    approachSpeed: lerp25(2.2, 4.0, i),
+    spawnDepth: lerp25(7, 9, i),
+    handRules: i < 5 ? ["either"] : i < 13 ? ["left", "right", "either"] : ["left", "right", "either", "both"],
+    directionRatio: lerp25(0, 0.8, i),
+    crossMidlineRatio: lerp25(0, 0.55, i),
+    ...(i >= 13 ? { bpm: ilerp25(90, 125, i) } : {}),
+    isiMs: ilerp25(1400, 900, i),
+  },
+}));
 
 export const DepthSliceVR: DrillDefinition = {
   id: "depth-slice",

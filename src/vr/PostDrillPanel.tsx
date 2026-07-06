@@ -46,25 +46,20 @@ export function PostDrillPanel() {
         title={`${result.drillName} — Results`}
         accent={meta.color}
       >
-        {/* AQ block */}
-        <PanelText
-          position={[-0.86, 0.5, 0]}
-          text={`AQ ${meta.phase}`}
-          size={0.045}
-          color={meta.color}
-        />
-        <PanelText
-          position={[-0.86, 0.33, 0]}
-          text={`${aq ?? "—"}`}
-          size={0.16}
-          color={ARES_COLORS.white}
-        />
-        <PanelText
-          position={[-0.86, 0.17, 0]}
-          text={aqBand(aq)}
-          size={0.045}
-          color={ARES_COLORS.warningGold}
-        />
+        {/* AQ dial */}
+        <group position={[-0.72, 0.33, 0.004]}>
+          <mesh rotation={[0, 0, Math.PI * 0.75]}>
+            <torusGeometry args={[0.155, 0.012, 6, 40, Math.PI * 1.5]} />
+            <meshBasicMaterial color={ARES_COLORS.graphite} />
+          </mesh>
+          <mesh rotation={[0, 0, Math.PI * 0.75]}>
+            <torusGeometry args={[0.155, 0.02, 6, 40, Math.PI * 1.5 * Math.min(1, (aq ?? 0) / 100)]} />
+            <meshBasicMaterial color={meta.color} />
+          </mesh>
+          <PanelText position={[0, 0.02, 0]} text={`${aq ?? "—"}`} size={0.11} color={ARES_COLORS.white} anchorX="center" align="center" />
+          <PanelText position={[0, -0.09, 0]} text={aqBand(aq)} size={0.036} color={ARES_COLORS.warningGold} anchorX="center" align="center" mono />
+          <PanelText position={[0, 0.22, 0]} text={`AQ ${meta.phase.toUpperCase()}`} size={0.034} color={meta.color} anchorX="center" align="center" mono />
+        </group>
 
         {/* metric rows */}
         {rows.map((r, i) => (

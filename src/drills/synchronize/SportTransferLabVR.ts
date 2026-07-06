@@ -2,6 +2,7 @@ import type { DrillDefinition, SportId, TrialSpec } from "@/ares/drillTypes";
 import { ARES_COLORS, ARES_ACCENTS } from "@/ares/colors";
 import { pick } from "@/utils/rng";
 import { EYE_Y, strikePosition } from "../shared/zones";
+import { levels25, lerp25, ilerp25 } from "../shared/levels";
 
 /**
  * SYNCHRONIZE — Sport-Transfer Reality Labs
@@ -198,12 +199,19 @@ export function buildSportTrials(p: Params, rng: () => number): TrialSpec[] {
   return trials.sort((a, b) => a.spawnAt - b.spawnAt);
 }
 
-const levels = [
-  { level: 1, label: "Level 1 — Read the game", parameters: { sport: "baseball", primaryCount: 12, noGoRatio: 0.25, peripheralCount: 3, peripheralEccentricityDeg: 24, peripheralDurationMs: 1500, isiMs: 2600, speedScale: 0.8 } },
-  { level: 2, label: "Level 2 — Game speed", parameters: { sport: "baseball", primaryCount: 14, noGoRatio: 0.3, peripheralCount: 4, peripheralEccentricityDeg: 28, peripheralDurationMs: 1300, isiMs: 2300, speedScale: 1.0 } },
-  { level: 3, label: "Level 3 — Pressure", parameters: { sport: "baseball", primaryCount: 16, noGoRatio: 0.35, peripheralCount: 6, peripheralEccentricityDeg: 32, peripheralDurationMs: 1100, isiMs: 2000, speedScale: 1.15 } },
-  { level: 4, label: "Level 4 — Elite tempo", parameters: { sport: "baseball", primaryCount: 18, noGoRatio: 0.4, peripheralCount: 8, peripheralEccentricityDeg: 36, peripheralDurationMs: 950, isiMs: 1700, speedScale: 1.3 } },
-];
+const levels = levels25((i) => ({
+  label: `${lerp25(0.8, 1.45, i).toFixed(2)}x game speed, ${ilerp25(3, 9, i)} peripheral cues`,
+  parameters: {
+    sport: "baseball",
+    primaryCount: ilerp25(12, 20, i),
+    noGoRatio: lerp25(0.25, 0.45, i),
+    peripheralCount: ilerp25(3, 9, i),
+    peripheralEccentricityDeg: lerp25(24, 38, i),
+    peripheralDurationMs: ilerp25(1500, 900, i),
+    isiMs: ilerp25(2600, 1600, i),
+    speedScale: lerp25(0.8, 1.45, i),
+  },
+}));
 
 export const SportTransferLabVR: DrillDefinition = {
   id: "sport-transfer-lab",

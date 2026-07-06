@@ -2,6 +2,7 @@ import type { DrillDefinition, TrialSpec, TargetZone } from "@/ares/drillTypes";
 import { ARES_COLORS, ARES_ACCENTS } from "@/ares/colors";
 import { pick } from "@/utils/rng";
 import { PERIPHERAL_ZONES, strikePosition } from "../shared/zones";
+import { levels25, lerp25, ilerp25 } from "../shared/levels";
 
 /**
  * ACQUIRE — Peripheral Field VR
@@ -68,13 +69,19 @@ export function buildPeripheralTrials(p: Params, rng: () => number, idPrefix = "
   return trials;
 }
 
-const levels = [
-  { level: 1, label: "Level 1 — Near field", parameters: { trialCount: 16, eccentricityDeg: 15, targetDurationMs: 1600, isiMinMs: 700, isiMaxMs: 1400, distractorRatio: 0, fixationLoad: false, contrast: 1 } },
-  { level: 2, label: "Level 2 — Wider field", parameters: { trialCount: 20, eccentricityDeg: 22, targetDurationMs: 1400, isiMinMs: 600, isiMaxMs: 1200, distractorRatio: 0.1, fixationLoad: false, contrast: 1 } },
-  { level: 3, label: "Level 3 — Fixation load", parameters: { trialCount: 22, eccentricityDeg: 28, targetDurationMs: 1200, isiMinMs: 500, isiMaxMs: 1100, distractorRatio: 0.2, fixationLoad: true, contrast: 0.9 } },
-  { level: 4, label: "Level 4 — Low contrast", parameters: { trialCount: 24, eccentricityDeg: 33, targetDurationMs: 1000, isiMinMs: 450, isiMaxMs: 1000, distractorRatio: 0.3, fixationLoad: true, contrast: 0.55 } },
-  { level: 5, label: "Level 5 — Edge of field", parameters: { trialCount: 26, eccentricityDeg: 40, targetDurationMs: 850, isiMinMs: 400, isiMaxMs: 900, distractorRatio: 0.4, fixationLoad: true, contrast: 0.45 } },
-];
+const levels = levels25((i) => ({
+  label: `${ilerp25(15, 42, i)}° field, ${ilerp25(100, 40, i)}% contrast`,
+  parameters: {
+    trialCount: ilerp25(16, 28, i),
+    eccentricityDeg: lerp25(15, 42, i),
+    targetDurationMs: ilerp25(1650, 800, i),
+    isiMinMs: ilerp25(700, 400, i),
+    isiMaxMs: ilerp25(1400, 850, i),
+    distractorRatio: lerp25(0, 0.45, i),
+    fixationLoad: i >= 9,
+    contrast: lerp25(1, 0.4, i),
+  },
+}));
 
 export const PeripheralFieldVR: DrillDefinition = {
   id: "peripheral-field",

@@ -1,5 +1,6 @@
 import type { DrillDefinition, TrialSpec } from "@/ares/drillTypes";
 import { pick, range } from "@/utils/rng";
+import { levels25, lerp25, ilerp25 } from "../shared/levels";
 
 /**
  * ROUTE — direct ports of the A.R.E.S. Performance Suite cognitive drills.
@@ -71,10 +72,14 @@ function buildSternberg(
 }
 
 function sternbergLevels() {
-  return Array.from({ length: 12 }, (_, i) => ({
-    level: i + 1,
-    label: `L${i + 1} — set of ${2 + Math.floor(i / 3)}, ${Math.round(2600 - i * 120)}ms study`,
-    parameters: { trials: 10, setSize: 2 + Math.floor(i / 3), memorizeMs: 2600 - i * 120, retentionMs: 1000 + i * 150, probeMs: 2400 },
+  return levels25((i) => ({
+    label: `set of ${2 + Math.floor(i / 5)}, ${ilerp25(2800, 1200, i)}ms study`,
+    parameters: {
+      trials: 10, setSize: 2 + Math.floor(i / 5),
+      memorizeMs: ilerp25(2800, 1200, i),
+      retentionMs: ilerp25(800, 2600, i),
+      probeMs: ilerp25(2600, 1500, i),
+    },
   }));
 }
 const sternbergDuration = (params: Record<string, unknown>) => {
@@ -145,10 +150,9 @@ export const FlankerCompatibility: DrillDefinition = {
     "4. Incompatible rows (flankers pointing the other way) are the test. Stay on the center.",
   ],
   controlsHint: "ANSWER THE CENTER ARROW ONLY",
-  levels: Array.from({ length: 10 }, (_, i) => ({
-    level: i + 1,
-    label: `L${i + 1} — ${Math.round(50 + i * 5)}% incompatible, ${2100 - i * 90}ms`,
-    parameters: { trials: 16, incompatibleRatio: 0.5 + i * 0.05, windowMs: 2100 - i * 90 },
+  levels: levels25((i) => ({
+    label: `${ilerp25(50, 90, i)}% incompatible, ${ilerp25(2200, 1100, i)}ms`,
+    parameters: { trials: 16, incompatibleRatio: lerp25(0.5, 0.9, i), windowMs: ilerp25(2200, 1100, i) },
   })),
   buildTrials: (params, rng) => {
     const p = params as { trials: number; incompatibleRatio: number; windowMs: number };
@@ -208,10 +212,9 @@ export const Stroop: DrillDefinition = {
     "4. Respond as fast as possible without sacrificing accuracy.",
   ],
   controlsHint: "ANSWER THE INK COLOR - IGNORE THE WORD",
-  levels: Array.from({ length: 10 }, (_, i) => ({
-    level: i + 1,
-    label: `L${i + 1} — ${2200 - i * 110}ms window`,
-    parameters: { trials: 16, windowMs: 2200 - i * 110, congruentRatio: Math.max(0.1, 0.4 - i * 0.03) },
+  levels: levels25((i) => ({
+    label: `${ilerp25(2300, 1150, i)}ms window`,
+    parameters: { trials: 16, windowMs: ilerp25(2300, 1150, i), congruentRatio: lerp25(0.45, 0.08, i) },
   })),
   buildTrials: (params, rng) => {
     const p = params as { trials: number; windowMs: number; congruentRatio: number };
@@ -261,14 +264,16 @@ export const PatternMemory: DrillDefinition = {
     "4. The round completes when you have found them all - wrong cells count against you.",
   ],
   controlsHint: "REBUILD THE PATTERN - STRIKE THE REMEMBERED CELLS",
-  levels: Array.from({ length: 12 }, (_, i) => ({
-    level: i + 1,
-    label: `L${i + 1} — ${3 + Math.floor(i / 4)}×${3 + Math.floor(i / 4)} grid, ${2 + Math.floor(i / 2)} cells`,
-    parameters: {
-      rounds: 6, gridSize: 3 + Math.floor(i / 4), patternLength: Math.min(2 + Math.floor(i / 2), 7),
-      displayMs: Math.max(1400, 3000 - i * 150), delayMs: 100 + i * 120, recallMs: 4200,
-    },
-  })),
+  levels: levels25((i) => {
+    const grid = i < 8 ? 3 : i < 17 ? 4 : 5;
+    return {
+      label: `${grid}×${grid} grid, ${Math.min(2 + Math.floor(i / 3), 8)} cells`,
+      parameters: {
+        rounds: 6, gridSize: grid, patternLength: Math.min(2 + Math.floor(i / 3), 8),
+        displayMs: ilerp25(3000, 1300, i), delayMs: ilerp25(100, 1600, i), recallMs: ilerp25(4400, 2800, i),
+      },
+    };
+  }),
   buildTrials: (params, rng) => {
     const p = params as { rounds: number; gridSize: number; patternLength: number; displayMs: number; delayMs: number; recallMs: number };
     const trials: TrialSpec[] = [];
@@ -328,10 +333,9 @@ export const RandomNumber: DrillDefinition = {
     "4. Numbers get denser and time gets shorter as you level.",
   ],
   controlsHint: "STRIKE THE NUMBERS SMALLEST TO LARGEST",
-  levels: Array.from({ length: 15 }, (_, i) => ({
-    level: i + 1,
-    label: `L${i + 1} — ${5 + Math.floor(i / 3)} numbers`,
-    parameters: { rounds: 5, count: 5 + Math.floor(i / 3), perNumberMs: 2400 - i * 80 },
+  levels: levels25((i) => ({
+    label: `${5 + Math.floor(i / 4)} numbers`,
+    parameters: { rounds: 5, count: 5 + Math.floor(i / 4), perNumberMs: ilerp25(2500, 1300, i) },
   })),
   buildTrials: (params, rng) => {
     const p = params as { rounds: number; count: number; perNumberMs: number };
@@ -379,12 +383,12 @@ export const MultipleObjectTracking: DrillDefinition = {
     "4. Strike every orb you were tracking. 3 rounds per session.",
   ],
   controlsHint: "TRACK THE FLASHED ORBS - STRIKE THEM AT THE END",
-  levels: Array.from({ length: 12 }, (_, i) => ({
-    level: i + 1,
-    label: `L${i + 1} — track ${1 + Math.floor(i / 3)} of ${4 + Math.floor(i / 2)}`,
+  levels: levels25((i) => ({
+    label: `track ${1 + Math.floor(i / 7)} of ${4 + Math.floor(i / 4)}`,
     parameters: {
-      rounds: 3, balls: 4 + Math.floor(i / 2), track: 1 + Math.floor(i / 3),
-      highlightMs: 2200, trackMs: Math.max(7000, 12000 - i * 450), answerMs: 4200, speed: 0.35 + i * 0.045,
+      rounds: 3, balls: 4 + Math.floor(i / 4), track: 1 + Math.floor(i / 7),
+      highlightMs: 2200, trackMs: ilerp25(12000, 6500, i), answerMs: 4200,
+      speed: lerp25(0.35, 0.95, i),
     },
   })),
   buildTrials: (params, rng) => {

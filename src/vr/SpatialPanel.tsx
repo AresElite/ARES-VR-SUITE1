@@ -1,7 +1,10 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
+import { useFrame } from "@react-three/fiber";
+import * as THREE from "three";
 import { Text } from "@react-three/drei";
 import { ARES_COLORS, ARES_ACCENTS } from "@/ares/colors";
 import { FONT_MONO, FONT_POPPINS_SEMIBOLD } from "@/utils/fonts";
+import { sfx } from "@/utils/audio";
 
 /**
  * SpatialPanel — the core Ares spatial UI surface.
@@ -27,8 +30,31 @@ export function SpatialPanel({
   accent?: string;
   children?: ReactNode;
 }) {
+  const g = useRef<THREE.Group>(null);
+  const phase = position[0] * 3.7 + position[2];
+  useFrame(({ clock }) => {
+    if (g.current) g.current.position.y = position[1] + Math.sin(clock.elapsedTime * 0.7 + phase) * 0.008;
+  });
+  const bracket = 0.09;
   return (
-    <group position={position} rotation={rotation}>
+    <group ref={g} position={position} rotation={rotation}>
+      {/* corner brackets — precision-instrument framing */}
+      {(
+        [
+          [-1, 1], [1, 1], [-1, -1], [1, -1],
+        ] as const
+      ).map(([sx, sy], k) => (
+        <group key={k} position={[(sx * width) / 2, (sy * height) / 2, 0.002]}>
+          <mesh position={[(-sx * bracket) / 2, 0, 0]}>
+            <planeGeometry args={[bracket, 0.008]} />
+            <meshBasicMaterial color={accent} transparent opacity={0.8} />
+          </mesh>
+          <mesh position={[0, (-sy * bracket) / 2, 0]}>
+            <planeGeometry args={[0.008, bracket]} />
+            <meshBasicMaterial color={accent} transparent opacity={0.8} />
+          </mesh>
+        </group>
+      ))}
       {/* backdrop */}
       <mesh position={[0, 0, -0.01]}>
         <planeGeometry args={[width, height]} />
@@ -122,7 +148,10 @@ export function PanelButton({
       <mesh
         onClick={(e) => {
           e.stopPropagation();
-          if (!disabled) onClick();
+          if (!disabled) {
+            sfx.uiClick();
+            onClick();
+          }
         }}
         onPointerOver={(e) => {
           e.stopPropagation();

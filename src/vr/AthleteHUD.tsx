@@ -41,7 +41,7 @@ export function AthleteHUD() {
             snapshot.lastReactionMs ? ` | ${Math.round(snapshot.lastReactionMs)}ms` : ""
           }`}
           size={0.046}
-          color={ARES_COLORS.white}
+          color={snapshot.streak >= 10 ? ARES_COLORS.warningGold : snapshot.streak >= 5 ? ARES_ACCENTS.tealBright : ARES_COLORS.white}
           maxWidth={1.4}
           mono
         />

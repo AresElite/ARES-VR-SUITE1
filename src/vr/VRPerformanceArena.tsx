@@ -7,6 +7,7 @@ import { ARES_PHASES, PHASE_META, type ARESPhase } from "@/ares/phases";
 import { APP_NAME } from "@/ares/constants";
 import { useAppStore } from "@/app/providers/appStore";
 import { SpatialPanel, PanelText } from "./SpatialPanel";
+import { sfx } from "@/utils/audio";
 
 /**
  * VR Performance Arena — the immersive Ares command environment.
@@ -71,10 +72,17 @@ function PhasePortal({ phase }: { phase: ARESPhase }) {
   const selectPhase = useAppStore((s) => s.selectPhase);
   const [hover, setHover] = useState(false);
   const ring = useRef<THREE.Mesh>(null);
+  const outer = useRef<THREE.Group>(null);
+  const beam = useRef<THREE.Mesh>(null);
   useFrame(({ clock }) => {
     if (ring.current) {
       const s = hover ? 1.06 + Math.sin(clock.elapsedTime * 4) * 0.02 : 1;
       ring.current.scale.setScalar(s);
+    }
+    if (outer.current) outer.current.rotation.z = -clock.elapsedTime * 0.5;
+    if (beam.current) {
+      (beam.current.material as THREE.MeshBasicMaterial).opacity =
+        (hover ? 0.16 : 0.07) + Math.sin(clock.elapsedTime * 1.5) * 0.02;
     }
   });
 
@@ -89,6 +97,7 @@ function PhasePortal({ phase }: { phase: ARESPhase }) {
         ref={ring}
         onClick={(e) => {
           e.stopPropagation();
+          sfx.portal();
           selectPhase(phase);
         }}
         onPointerOver={(e) => {
@@ -131,6 +140,31 @@ function PhasePortal({ phase }: { phase: ARESPhase }) {
       >
         {meta.tagline}
       </Text>
+      {/* counter-rotating orbit ring */}
+      <group ref={outer} rotation={[0, Math.PI, 0]}>
+        {Array.from({ length: 8 }, (_, k) => (
+          <mesh key={k} position={[Math.cos((k / 8) * Math.PI * 2) * 0.76, Math.sin((k / 8) * Math.PI * 2) * 0.76, 0]}>
+            <boxGeometry args={[0.035, 0.012, 0.012]} />
+            <meshBasicMaterial color={meta.color} transparent opacity={0.85} />
+          </mesh>
+        ))}
+      </group>
+      {/* rising light beam behind the portal */}
+      <mesh ref={beam} position={[0, 0.4, 0.35]}>
+        <cylinderGeometry args={[0.5, 0.65, 4.2, 12, 1, true]} />
+        <meshBasicMaterial color={meta.color} transparent opacity={0.07} side={THREE.DoubleSide} depthWrite={false} />
+      </mesh>
+      {/* pedestal */}
+      <group position={[0, -1.55, 0]}>
+        <mesh>
+          <cylinderGeometry args={[0.5, 0.62, 0.1, 20]} />
+          <meshStandardMaterial color={ARES_COLORS.graphite} emissive={meta.color} emissiveIntensity={0.12} flatShading />
+        </mesh>
+        <mesh position={[0, 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.42, 0.48, 24]} />
+          <meshBasicMaterial color={meta.color} transparent opacity={hover ? 0.9 : 0.45} />
+        </mesh>
+      </group>
     </group>
   );
 }

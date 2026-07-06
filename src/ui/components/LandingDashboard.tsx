@@ -1,7 +1,7 @@
 import { ARES_PHASES, PHASE_META } from "@/ares/phases";
 import { APP_NAME, ORG_NAME } from "@/ares/constants";
 import { useAppStore } from "@/app/providers/appStore";
-import { drillsForPhase } from "@/drills/registry";
+import { drillsForPhase, ALL_DRILLS } from "@/drills/registry";
 import { MOCK_ATHLETES } from "@/data/mockAthletes";
 import { PERF_MODES, type PerfModeId } from "@/utils/performance";
 import { aqBand } from "@/ares/aq";
@@ -43,6 +43,13 @@ export function LandingDashboard({ onEnterDesktop }: { onEnterDesktop: () => voi
           <button className="ares-btn" onClick={onEnterDesktop}>
             ▷ Desktop testing mode
           </button>
+        </div>
+
+        <div className="stat-strip">
+          <div className="stat"><span className="stat-n">{ALL_DRILLS.length}</span><span className="stat-l">Drills</span></div>
+          <div className="stat"><span className="stat-n">{ALL_DRILLS.length * 25}</span><span className="stat-l">Progression levels</span></div>
+          <div className="stat"><span className="stat-n">4</span><span className="stat-l">A.R.E.S. phases</span></div>
+          <div className="stat"><span className="stat-n">547k+</span><span className="stat-l">Simulated QA reps</span></div>
         </div>
 
         <div style={{ marginTop: 20 }}>
@@ -108,6 +115,27 @@ export function LandingDashboard({ onEnterDesktop }: { onEnterDesktop: () => voi
                   {meta.tagline}. {drills.filter((d) => d.mvp).length} MVP drill(s),{" "}
                   {drills.filter((d) => !d.mvp).length} scaffolded prototype(s).
                 </p>
+              </div>
+            );
+          })}
+        </div>
+
+        <p className="ares-section-title">Drill library</p>
+        <div className="ares-grid">
+          {ARES_PHASES.map((p) => {
+            const meta = PHASE_META[p];
+            return (
+              <div className="ares-card" key={`lib-${p}`}>
+                <h3 style={{ color: meta.color }}>{p}</h3>
+                <ul className="drill-list">
+                  {drillsForPhase(p).map((d) => (
+                    <li key={d.id}>
+                      <span className="dot" style={{ background: meta.color }} />
+                      {d.name}
+                      <span className="lv">25 LV</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             );
           })}

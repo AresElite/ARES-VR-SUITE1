@@ -11,6 +11,7 @@ import { useAppStore } from "@/app/providers/appStore";
 import { handFromPointerEvent, sliceDirectionFromDelta } from "@/drills/shared/InputMapper";
 import type { PoolSlot } from "@/drills/shared/TargetSpawner";
 import { PERF_MODES } from "@/utils/performance";
+import { sfx } from "@/utils/audio";
 import { FONT_MONO } from "@/utils/fonts";
 
 /**
@@ -119,6 +120,12 @@ function StrikeColliders() {
         const reach = slot.spec.scale + STRIKE_ORB_RADIUS + HIT_PADDING;
         if (dx * dx + dy * dy + dz * dz <= reach * reach) {
           stillTouching.add(slot.spec.id);
+          const age = engine.timing.now - slot.spawnClock;
+          if (!t.touching.has(slot.spec.id) && age < 140) {
+            // spawn grace: resting hands don't auto-strike a target that
+            // appears around them — require a deliberate exit + re-entry
+            continue;
+          }
           if (!t.touching.has(slot.spec.id)) {
             let direction: SliceDirection | undefined;
             if (slot.spec.requiredDirection) {
@@ -164,6 +171,72 @@ function StrikeColliders() {
 }
 
 const URGENCY_COLORS = ["#8B5CF6", "#7FD3DE", "#3B82F6", "#F97316", "#EF5A6F"];
+
+/** Pooled hit-spark particles — one draw call, zero allocation per hit. */
+const SPARK_COUNT = 220;
+class SparkPool {
+  positions = new Float32Array(SPARK_COUNT * 3);
+  colors = new Float32Array(SPARK_COUNT * 3);
+  vel = new Float32Array(SPARK_COUNT * 3);
+  life = new Float32Array(SPARK_COUNT);
+  cursor = 0;
+  constructor() {
+    this.positions.fill(9999);
+  }
+  burst(x: number, y: number, z: number, color: THREE.Color, n = 14) {
+    for (let k = 0; k < n; k++) {
+      const i = this.cursor;
+      this.cursor = (this.cursor + 1) % SPARK_COUNT;
+      this.positions[i * 3] = x;
+      this.positions[i * 3 + 1] = y;
+      this.positions[i * 3 + 2] = z;
+      const a = Math.random() * Math.PI * 2;
+      const b = (Math.random() - 0.3) * Math.PI;
+      const sp = 0.7 + Math.random() * 1.3;
+      this.vel[i * 3] = Math.cos(a) * Math.cos(b) * sp;
+      this.vel[i * 3 + 1] = Math.sin(b) * sp;
+      this.vel[i * 3 + 2] = Math.sin(a) * Math.cos(b) * sp * 0.4;
+      this.colors[i * 3] = color.r;
+      this.colors[i * 3 + 1] = color.g;
+      this.colors[i * 3 + 2] = color.b;
+      this.life[i] = 0.5 + Math.random() * 0.25;
+    }
+  }
+  step(dt: number) {
+    for (let i = 0; i < SPARK_COUNT; i++) {
+      if (this.life[i] <= 0) continue;
+      this.life[i] -= dt;
+      if (this.life[i] <= 0) {
+        this.positions[i * 3] = 9999;
+        continue;
+      }
+      this.positions[i * 3] += this.vel[i * 3] * dt;
+      this.positions[i * 3 + 1] += this.vel[i * 3 + 1] * dt - 1.4 * dt * dt;
+      this.positions[i * 3 + 2] += this.vel[i * 3 + 2] * dt;
+      this.vel[i * 3 + 1] -= 2.6 * dt;
+    }
+  }
+}
+
+function HitSparks({ pool }: { pool: SparkPool }) {
+  const geo = useRef<THREE.BufferGeometry>(null);
+  useFrame((_, dt) => {
+    pool.step(dt);
+    if (geo.current) {
+      geo.current.attributes.position.needsUpdate = true;
+      geo.current.attributes.color.needsUpdate = true;
+    }
+  });
+  return (
+    <points frustumCulled={false}>
+      <bufferGeometry ref={geo}>
+        <bufferAttribute attach="attributes-position" args={[pool.positions, 3]} />
+        <bufferAttribute attach="attributes-color" args={[pool.colors, 3]} />
+      </bufferGeometry>
+      <pointsMaterial size={0.02} vertexColors transparent opacity={0.95} sizeAttenuation depthWrite={false} />
+    </points>
+  );
+}
 
 function TargetMesh({
   slot,
@@ -303,6 +376,8 @@ export function DrillRunner() {
   const inSession = useXR((s) => s.session);
   const [poolVersion, setPoolVersion] = useState(0);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const sparks = useMemo(() => new SparkPool(), []);
+  const lastStreakMilestone = useRef(0);
   const hudAccum = useRef(0);
   const phaseColor = engine ? PHASE_META[engine.definition.phase].color : ARES_COLORS.electricTeal;
   const pulseRef = useRef<THREE.MeshBasicMaterial>(null);
@@ -313,8 +388,30 @@ export function DrillRunner() {
     const unsub = engine.subscribe((e) => {
       if (e.type === "spawn" || e.type === "despawn" || e.type === "switched") setPoolVersion((v) => v + 1);
       if (e.type === "spawn") pulseIntensity.current = 1;
-      if (e.type === "stateChange" && (e.state === "complete" || e.state === "aborted")) {
-        setTimeout(() => useAppStore.getState().finishDrill(), 350);
+      if (e.type === "resolved") {
+        const ev = e.event;
+        const pan = ev.targetPosition ? Math.max(-0.8, Math.min(0.8, ev.targetPosition.x * 1.4)) : 0;
+        if (ev.errorType === "correctRejection") {
+          sfx.noGoHold();
+        } else if (ev.correct) {
+          const snap = engine.getSnapshot();
+          sfx.hit(snap.streak, pan);
+          if (snap.streak > 0 && snap.streak % 5 === 0 && snap.streak !== lastStreakMilestone.current) {
+            lastStreakMilestone.current = snap.streak;
+            sfx.streakMilestone();
+          }
+          if (ev.targetPosition) sparks.burst(ev.targetPosition.x, ev.targetPosition.y, ev.targetPosition.z, new THREE.Color("#7FD3DE"));
+        } else {
+          sfx.error(pan);
+          if (ev.targetPosition) sparks.burst(ev.targetPosition.x, ev.targetPosition.y, ev.targetPosition.z, new THREE.Color("#EF5A6F"), 8);
+        }
+      }
+      if (e.type === "stateChange") {
+        if (e.state === "running") sfx.go();
+        if (e.state === "complete") sfx.complete();
+        if (e.state === "complete" || e.state === "aborted") {
+          setTimeout(() => useAppStore.getState().finishDrill(), 350);
+        }
       }
     });
     return unsub;
@@ -327,7 +424,10 @@ export function DrillRunner() {
     const st = engine.getState();
     if (st === "countdown") {
       const c = Math.ceil(engine.countdownRemaining / 1000);
-      setCountdown((prev) => (prev === c ? prev : c));
+      setCountdown((prev) => {
+        if (prev !== c) sfx.countdown();
+        return prev === c ? prev : c;
+      });
     } else if (countdown !== null) {
       setCountdown(null);
     }
@@ -361,6 +461,8 @@ export function DrillRunner() {
       </mesh>
 
       {isAcquireStyle && <FixationMarker />}
+
+      <HitSparks pool={sparks} />
 
       {/* strike interaction (VR): hands/controllers hit targets directly */}
       {inSession && <StrikeColliders />}
