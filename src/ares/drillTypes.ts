@@ -15,7 +15,7 @@ export type TargetZone =
 export type TargetKind = "go" | "noGo" | "distractor";
 export type HandRule = "left" | "right" | "either" | "both";
 export type Hand = "left" | "right" | "both" | "unknown";
-export type TargetShape = "sphere" | "box" | "diamond" | "ring" | "cone";
+export type TargetShape = "sphere" | "box" | "diamond" | "ring" | "cone" | "arc" | "pad";
 
 export type SliceDirection =
   | "up"
@@ -52,6 +52,17 @@ export interface TrialSpec {
   groupId?: string;
   /** decorative stimulus: rendered and animated but cannot be struck */
   decor?: boolean;
+  /** group resolution mode: single (default) = first hit resolves group;
+      all = every go member must be hit; ordered = hit in seq order */
+  groupMode?: "single" | "all" | "ordered";
+  /** position in an ordered group */
+  seq?: number;
+  /** chained spawning: members of a chain spawn when the previous resolves.
+      spawnAt of non-first members is ignored (use -1). */
+  chainId?: string;
+  chainGapMs?: number;
+  /** ms after spawn at which the target visually switches color (with switchKindAt) */
+  switchColor?: string;
   /** ms from drill start at which this target's kind flips (late cue change) */
   switchKindAt?: number;
   switchKindTo?: TargetKind;

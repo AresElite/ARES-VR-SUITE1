@@ -20,7 +20,8 @@ export interface PhaseMeta {
   tagline: string;
   description: string;
   color: string;
-  /** Angle (radians) of this phase's portal around the athlete in the arena. */
+  /** Angle (radians) of the portal in the FRONT arc — the athlete never
+      turns around: all four portals are selectable while facing forward. */
   portalAngle: number;
 }
 
@@ -31,7 +32,7 @@ export const PHASE_META: Record<ARESPhase, PhaseMeta> = {
     description:
       "Target detection, peripheral awareness, contrast, glare, filtering, binocular input, visual search.",
     color: ARES_ACCENTS.tealBright,
-    portalAngle: Math.PI * 0.25,
+    portalAngle: -0.62,
   },
   Route: {
     phase: "Route",
@@ -39,7 +40,7 @@ export const PHASE_META: Record<ARESPhase, PhaseMeta> = {
     description:
       "Visual processing, spatial mapping, working memory, predictive recognition, central-peripheral integration, route selection.",
     color: ARES_ACCENTS.purpleGlow,
-    portalAngle: Math.PI * 0.75,
+    portalAngle: -0.21,
   },
   Execute: {
     phase: "Execute",
@@ -47,7 +48,7 @@ export const PHASE_META: Record<ARESPhase, PhaseMeta> = {
     description:
       "Reaction, choice reaction, motor output, bimanual coordination, inhibition, timing, speed-accuracy control.",
     color: ARES_COLORS.warningGold,
-    portalAngle: Math.PI * 1.25,
+    portalAngle: 0.21,
   },
   Synchronize: {
     phase: "Synchronize",
@@ -55,6 +56,6 @@ export const PHASE_META: Record<ARESPhase, PhaseMeta> = {
     description:
       "Integration under load, fatigue, rhythm, chaos, sport-specific transfer, decision stability.",
     color: ARES_COLORS.errorRed,
-    portalAngle: Math.PI * 1.75,
+    portalAngle: 0.62,
   },
 };

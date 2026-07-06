@@ -1,41 +1,59 @@
 import type { ARESPhase } from "@/ares/phases";
 import type { DrillDefinition } from "@/ares/drillTypes";
+// ---- Direct ports of the A.R.E.S. Performance Suite (exact names) ----
+import { SpeedSearch, SchulteTable, ContrastAssessment, RapidRecognition } from "./acquire/AcquireDrills";
+import { Sternberg, SternbergDigits, SternbergLetters, FlankerCompatibility, Stroop, PatternMemory, RandomNumber, MultipleObjectTracking } from "./route/RouteDrills";
+import { ReactionGrid, EyeHandCoordination, RawReaction, ChoiceRT, GoNoGo, StopSignal, FocusFrenzy, SaccadeSwipe } from "./execute/ExecuteDrills";
+import { NeuralPhaseLock, DualStreamNeuralCollider, PursuitPulse, Occlusion, CognitiveCrossfire } from "./synchronize/SynchronizeDrills";
+// ---- VR-native originals (immersive extensions of the suite) ----
 import { PeripheralFieldVR } from "./acquire/PeripheralFieldVR";
-import { ContrastSignalVR } from "./acquire/ContrastSignalVR";
-import { VisualSearchVR } from "./acquire/VisualSearchVR";
 import { PredictivePathwayVR } from "./route/PredictivePathwayVR";
-import { ChoiceMapVR } from "./route/ChoiceMapVR";
-import { WorkingMemoryGridVR } from "./route/WorkingMemoryGridVR";
-import { ReactionStrikeVR } from "./execute/ReactionStrikeVR";
 import { DepthSliceVR } from "./execute/DepthSliceVR";
-import { InhibitionGateVR } from "./execute/InhibitionGateVR";
 import { ChaosArenaVR } from "./synchronize/ChaosArenaVR";
 import { SportTransferLabVR, sportLabVariant } from "./synchronize/SportTransferLabVR";
 
 /**
- * Drill registry — the single source of truth for every drill in the suite.
- * Migrating a 55" touchscreen drill = adding one DrillDefinition here.
+ * Drill registry — single source of truth.
+ * The touchscreen suite's drills keep their EXACT names, rules, and
+ * progression structure; VR-native drills extend the system in depth.
  */
 export const ALL_DRILLS: DrillDefinition[] = [
-  // Acquire
+  // ================= ACQUIRE =================
+  ReactionGrid, // categorized EXECUTE, ACQUIRE in the suite — listed under Execute below
+  SpeedSearch,
+  SchulteTable,
+  ContrastAssessment,
+  RapidRecognition,
   PeripheralFieldVR,
-  ContrastSignalVR,
-  VisualSearchVR,
-  // Route
+  // ================= ROUTE =================
+  Sternberg,
+  SternbergDigits,
+  SternbergLetters,
+  FlankerCompatibility,
+  Stroop,
+  PatternMemory,
+  RandomNumber,
+  MultipleObjectTracking,
   PredictivePathwayVR,
-  ChoiceMapVR,
-  WorkingMemoryGridVR,
-  // Execute
-  ReactionStrikeVR,
+  // ================= EXECUTE =================
+  EyeHandCoordination,
+  RawReaction,
+  ChoiceRT,
+  GoNoGo,
+  StopSignal,
+  FocusFrenzy,
+  SaccadeSwipe,
   DepthSliceVR,
-  InhibitionGateVR,
-  // Synchronize
+  // ================= SYNCHRONIZE =================
+  CognitiveCrossfire,
+  NeuralPhaseLock,
+  DualStreamNeuralCollider,
+  PursuitPulse,
+  Occlusion,
   ChaosArenaVR,
   SportTransferLabVR,
   sportLabVariant("racing"),
   sportLabVariant("tactical"),
-  sportLabVariant("hockey"),
-  sportLabVariant("soccer"),
 ];
 
 export function drillsForPhase(phase: ARESPhase): DrillDefinition[] {

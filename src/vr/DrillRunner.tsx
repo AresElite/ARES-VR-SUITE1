@@ -52,6 +52,8 @@ interface HandTracker {
   vel: THREE.Vector3;
   hasPrev: boolean;
   pulse: (() => void) | null;
+  /** target ids currently in contact — hits register on entry only */
+  touching: Set<string>;
 }
 
 /**
@@ -70,8 +72,8 @@ function StrikeColliders() {
 
   const trackers = useMemo<HandTracker[]>(
     () => [
-      { hand: "left", object: null, pos: new THREE.Vector3(), prev: new THREE.Vector3(), vel: new THREE.Vector3(), hasPrev: false, pulse: null },
-      { hand: "right", object: null, pos: new THREE.Vector3(), prev: new THREE.Vector3(), vel: new THREE.Vector3(), hasPrev: false, pulse: null },
+      { hand: "left", object: null, pos: new THREE.Vector3(), prev: new THREE.Vector3(), vel: new THREE.Vector3(), hasPrev: false, pulse: null, touching: new Set() },
+      { hand: "right", object: null, pos: new THREE.Vector3(), prev: new THREE.Vector3(), vel: new THREE.Vector3(), hasPrev: false, pulse: null, touching: new Set() },
     ],
     [],
   );
@@ -107,7 +109,8 @@ function StrikeColliders() {
       t.prev.copy(t.pos);
       t.hasPrev = true;
 
-      // Contact test against live targets
+      // Contact test against live targets (edge-triggered: entry only)
+      const stillTouching = new Set<string>();
       for (const slot of engine.pool.slots) {
         if (!slot.active || !slot.spec || slot.spec.decor || slot.spec.meta?.decor) continue;
         const dx = slot.pos[0] - t.pos.x;
@@ -115,18 +118,22 @@ function StrikeColliders() {
         const dz = slot.pos[2] - t.pos.z;
         const reach = slot.spec.scale + STRIKE_ORB_RADIUS + HIT_PADDING;
         if (dx * dx + dy * dy + dz * dz <= reach * reach) {
-          let direction: SliceDirection | undefined;
-          if (slot.spec.requiredDirection) {
-            const speed = Math.hypot(t.vel.x, t.vel.y);
-            direction =
-              speed >= DIRECTION_MIN_SPEED
-                ? sliceDirectionFromDelta(t.vel.x, t.vel.y)
-                : slot.spec.requiredDirection; // slow contact: grace, counts as ruled direction
+          stillTouching.add(slot.spec.id);
+          if (!t.touching.has(slot.spec.id)) {
+            let direction: SliceDirection | undefined;
+            if (slot.spec.requiredDirection) {
+              const speed = Math.hypot(t.vel.x, t.vel.y);
+              direction =
+                speed >= DIRECTION_MIN_SPEED
+                  ? sliceDirectionFromDelta(t.vel.x, t.vel.y)
+                  : slot.spec.requiredDirection;
+            }
+            engine.registerHit(slot.spec.id, t.hand, direction);
+            t.pulse?.();
           }
-          engine.registerHit(slot.spec.id, t.hand, direction);
-          t.pulse?.();
         }
       }
+      t.touching = stillTouching;
     }
   });
 
@@ -156,6 +163,8 @@ function StrikeColliders() {
   );
 }
 
+const URGENCY_COLORS = ["#8B5CF6", "#7FD3DE", "#3B82F6", "#F97316", "#EF5A6F"];
+
 function TargetMesh({
   slot,
   segments,
@@ -168,12 +177,52 @@ function TargetMesh({
   desktopClicks: boolean;
 }) {
   const group = useRef<THREE.Group>(null);
+  const mat = useRef<THREE.MeshStandardMaterial>(null);
   const engine = useAppStore((s) => s.engine);
   const spec = slot.spec;
 
   useFrame(() => {
-    if (group.current && slot.active) {
-      group.current.position.set(slot.pos[0], slot.pos[1], slot.pos[2]);
+    if (!group.current || !slot.active) return;
+    group.current.position.set(slot.pos[0], slot.pos[1], slot.pos[2]);
+    if (!spec || !engine) return;
+    const age = engine.timing.now - slot.spawnClock;
+    // Focus-Frenzy urgency ramp: purple -> teal -> blue -> orange -> red
+    if (spec.meta?.urgency && mat.current) {
+      const frac = Math.min(0.999, age / spec.duration);
+      const c = URGENCY_COLORS[Math.floor(frac * URGENCY_COLORS.length)];
+      mat.current.color.set(c);
+      mat.current.emissive.set(c);
+    }
+    // generic timed color phases (MOT highlight -> track -> answer, etc.)
+    const phases = spec.meta?.paintPhases as { t: number; c: string }[] | undefined;
+    if (phases && mat.current) {
+      let c = spec.color;
+      for (const ph of phases) if (age >= ph.t) c = ph.c;
+      mat.current.color.set(c);
+      mat.current.emissive.set(c);
+    }
+    // full-cycle blackout (Neural Phase Lock internal-clock phases)
+    if (spec.meta?.blackout && mat.current) {
+      mat.current.transparent = true;
+      mat.current.opacity = 0.03;
+    }
+    // repaint after an engine kind-switch (Stop-Signal ring, colliders)
+    if (!phases && spec.switchColor && spec.switchKindAt !== undefined && mat.current) {
+      mat.current.color.set(spec.color);
+      mat.current.emissive.set(spec.emissive ?? spec.color);
+    }
+    // Occlusion: target vanishes mid-flight but keeps moving
+    const hideAfter = spec.meta?.hideAfterMs as number | undefined;
+    if (hideAfter !== undefined && mat.current) {
+      mat.current.opacity = age >= hideAfter ? 0.0 : 1.0;
+      mat.current.transparent = true;
+    }
+    // Neural Phase Lock: expanding/contracting pulse
+    const pulseMs = spec.meta?.pulsePeriodMs as number | undefined;
+    if (pulseMs && group.current) {
+      const ph = (age % pulseMs) / pulseMs;
+      const sc = 0.4 + 1.2 * (ph < 0.5 ? ph * 2 : (1 - ph) * 2);
+      group.current.scale.setScalar(sc);
     }
   });
 
@@ -196,7 +245,8 @@ function TargetMesh({
       }
     : undefined;
 
-  const rotZ = spec.requiredDirection ? DIR_ANGLE[spec.requiredDirection] - Math.PI / 2 : 0;
+  const pointDir = (spec.meta?.pointDir as SliceDirection | undefined) ?? spec.requiredDirection;
+  const rotZ = pointDir ? DIR_ANGLE[pointDir] - Math.PI / 2 : 0;
 
   return (
     <group ref={group} position={spec.position} key={version}>
@@ -206,7 +256,10 @@ function TargetMesh({
         {spec.shape === "diamond" && <octahedronGeometry args={[spec.scale, 0]} />}
         {spec.shape === "ring" && <torusGeometry args={[spec.scale, spec.scale * 0.32, 6, 20]} />}
         {spec.shape === "cone" && <coneGeometry args={[spec.scale * 0.8, spec.scale * 2.2, 8]} />}
+        {spec.shape === "arc" && <torusGeometry args={[spec.scale, spec.scale * 0.28, 6, 24, Math.PI * 1.7]} />}
+        {spec.shape === "pad" && <boxGeometry args={[spec.scale * 2.4, spec.scale * 1.6, spec.scale * 0.4]} />}
         <meshStandardMaterial
+          ref={mat}
           color={spec.color}
           emissive={spec.emissive ?? spec.color}
           emissiveIntensity={spec.emissive ? 0.65 : 0.2}
@@ -258,7 +311,7 @@ export function DrillRunner() {
   useEffect(() => {
     if (!engine) return;
     const unsub = engine.subscribe((e) => {
-      if (e.type === "spawn" || e.type === "despawn") setPoolVersion((v) => v + 1);
+      if (e.type === "spawn" || e.type === "despawn" || e.type === "switched") setPoolVersion((v) => v + 1);
       if (e.type === "spawn") pulseIntensity.current = 1;
       if (e.type === "stateChange" && (e.state === "complete" || e.state === "aborted")) {
         setTimeout(() => useAppStore.getState().finishDrill(), 350);

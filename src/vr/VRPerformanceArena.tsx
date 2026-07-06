@@ -17,7 +17,7 @@ import { SpatialPanel, PanelText } from "./SpatialPanel";
 function ArenaLogo() {
   const tex = useTexture("/brand/aesv-logo.png");
   return (
-    <mesh position={[0, 3.15, -4.4]}>
+    <mesh position={[0, 3.6, -5.2]}>
       <planeGeometry args={[1.15, 1.15]} />
       <meshBasicMaterial map={tex} transparent opacity={0.95} />
     </mesh>
@@ -30,7 +30,7 @@ function FloatingPerformanceLoop() {
     if (group.current) group.current.rotation.y += dt * 0.25;
   });
   return (
-    <group position={[0, 2.15, -2.6]} scale={0.55}>
+    <group position={[0, 2.75, -3.4]} scale={0.5}>
       <group ref={group}>
         {ARES_PHASES.map((phase, i) => (
           <group key={phase} rotation={[0, (i * Math.PI) / 2, 0]}>
@@ -149,7 +149,7 @@ export function VRPerformanceArena() {
 
       {/* welcome / status panel below the loop */}
       <SpatialPanel
-        position={[0, 1.15, -2.2]}
+        position={[0, 0.95, -2.0]}
         width={1.35}
         height={0.5}
         title={APP_NAME}

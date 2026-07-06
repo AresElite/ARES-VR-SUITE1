@@ -30,7 +30,8 @@ export type EngineEvent =
   | { type: "despawn"; targetId: string }
   | { type: "resolved"; event: RawEvent }
   | { type: "stateChange"; state: DrillState }
-  | { type: "beat"; index: number };
+  | { type: "beat"; index: number }
+  | { type: "switched"; targetId: string };
 
 interface ActiveTarget {
   spec: TrialSpec;
@@ -60,6 +61,9 @@ export class DrillEngine {
   private countdownLeft = COUNTDOWN_MS;
   private trials: TrialSpec[];
   private nextTrialIdx = 0;
+  /** chainId -> pending members in order; head spawns on predecessor resolution */
+  private chains = new Map<string, TrialSpec[]>();
+  private orderedProgress = new Map<string, number>(); // groupId -> next seq expected
   private active = new Map<string, ActiveTarget>();
   private events: RawEvent[] = [];
   private listeners = new Set<(e: EngineEvent) => void>();
@@ -80,7 +84,24 @@ export class DrillEngine {
   ) {
     this.definition = definition;
     this.parameters = parameters;
-    this.trials = [...trials].sort((a, b) => a.spawnAt - b.spawnAt);
+    // Chained trials: first member schedules normally, the rest are queued.
+    const scheduled: TrialSpec[] = [];
+    const byChain = new Map<string, TrialSpec[]>();
+    for (const t of trials) {
+      if (t.chainId) {
+        const arr = byChain.get(t.chainId) ?? [];
+        arr.push(t);
+        byChain.set(t.chainId, arr);
+      } else {
+        scheduled.push(t);
+      }
+    }
+    for (const [cid, arr] of byChain) {
+      arr.sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
+      scheduled.push(arr[0]);
+      this.chains.set(cid, arr.slice(1));
+    }
+    this.trials = scheduled.sort((a, b) => a.spawnAt - b.spawnAt);
     this.pool = new TargetPool(poolSize);
     this.timing = new TimingEngine((parameters.bpm as number) || undefined);
     this.totalDurationMs = definition.durationMs(parameters);
@@ -170,14 +191,20 @@ export class DrillEngine {
         slot.pos[1] = y;
         slot.pos[2] = -Math.cos(a) * radius;
       }
-      if (t.spec.switchKindAt !== undefined && t.spec.switchKindTo && now >= t.spec.switchKindAt) {
+      if (t.spec.switchKindAt !== undefined && t.spec.switchKindTo && now >= t.spec.switchKindAt && t.kind !== t.spec.switchKindTo) {
         t.kind = t.spec.switchKindTo;
+        if (t.spec.switchColor) {
+          t.spec.color = t.spec.switchColor;
+          t.spec.emissive = t.spec.switchColor;
+        }
+        this.emit({ type: "switched", targetId: id });
       }
       if (age >= t.spec.duration) this.expire(id, now);
     }
 
-    // Complete when time is up and everything has resolved
-    if (now >= this.totalDurationMs && this.active.size === 0 && this.nextTrialIdx >= this.trials.length) {
+    // Complete as soon as every trial has spawned and resolved (fast athletes
+    // finish early); the duration clock is only the outer bound.
+    if (this.active.size === 0 && this.nextTrialIdx >= this.trials.length && [...this.chains.values()].every((c) => c.length === 0)) {
       this.endedAtISO = new Date().toISOString();
       this.setState("complete");
     }
@@ -218,14 +245,39 @@ export class DrillEngine {
   }
 
   private despawn(targetId: string): void {
+    const t = this.active.get(targetId);
     this.active.delete(targetId);
     this.pool.release(targetId);
     this.emit({ type: "despawn", targetId });
+    // chained spawning: releasing a chain member queues the next one
+    const cid = t?.spec.chainId;
+    if (cid && this.state === "running") {
+      const pending = this.chains.get(cid);
+      if (pending && pending.length > 0) {
+        const next = pending.shift()!;
+        const gap = next.chainGapMs ?? 0;
+        const spec = { ...next, spawnAt: this.timing.now + gap };
+        // insert into schedule keeping order
+        let i = this.nextTrialIdx;
+        while (i < this.trials.length && this.trials[i].spawnAt <= spec.spawnAt) i++;
+        this.trials.splice(i, 0, spec);
+      }
+    }
   }
 
   private expireAllActive(): void {
     const now = this.timing.now;
     for (const id of [...this.active.keys()]) this.expire(id, now);
+  }
+
+  private minSeqInGroup(groupId: string): number {
+    let min = Number.POSITIVE_INFINITY;
+    for (const s of this.active.values()) {
+      if (s.spec.groupId === groupId && !s.resolved && s.kind === "go") {
+        min = Math.min(min, s.spec.seq ?? 0);
+      }
+    }
+    return min === Number.POSITIVE_INFINITY ? 0 : min;
   }
 
   private posOf(targetId: string): { x: number; y: number; z: number } | undefined {
@@ -247,6 +299,29 @@ export class DrillEngine {
 
     let correct = true;
     let errorType: string | undefined;
+
+    // Ordered groups: only the lowest unresolved seq is a valid strike.
+    if (t.spec.groupMode === "ordered" && t.spec.groupId && t.kind === "go") {
+      const expected = this.orderedProgress.get(t.spec.groupId) ?? this.minSeqInGroup(t.spec.groupId);
+      if ((t.spec.seq ?? 0) !== expected) {
+        // wrong order: record error, keep the target alive for retry
+        this.recordEvent({
+          trialId: t.spec.groupId,
+          timestamp: now,
+          targetId,
+          targetPosition: pos,
+          expectedAction: `seq:${expected}`,
+          actualAction: `seq:${t.spec.seq ?? 0}`,
+          correct: false,
+          reactionMs,
+          hand,
+          errorType: "orderError",
+          zone: t.spec.zone,
+        });
+        return;
+      }
+      this.orderedProgress.set(t.spec.groupId, expected + 1);
+    }
 
     if (t.kind === "noGo") {
       correct = false;
@@ -281,15 +356,46 @@ export class DrillEngine {
       zone: t.spec.zone,
     });
 
+    const mode = t.spec.groupMode ?? "single";
+    if (mode === "ordered" && t.spec.groupId && !correct && errorType === undefined) {
+      // handled below
+    }
     t.resolved = true;
     this.despawn(targetId);
 
-    // Group resolution: sibling targets vanish without generating events
     if (t.spec.groupId) {
-      for (const [id, sibling] of [...this.active]) {
-        if (sibling.spec.groupId === t.spec.groupId && !sibling.resolved) {
-          sibling.resolved = true;
-          this.despawn(id);
+      if (mode === "single") {
+        // first hit resolves the whole group
+        for (const [id, sibling] of [...this.active]) {
+          if (sibling.spec.groupId === t.spec.groupId && !sibling.resolved) {
+            sibling.resolved = true;
+            this.despawn(id);
+          }
+        }
+      } else if (mode === "all") {
+        // group completes when no go members remain
+        const goLeft = [...this.active.values()].some(
+          (s) => s.spec.groupId === t.spec.groupId && !s.resolved && s.kind === "go",
+        );
+        if (!goLeft) {
+          for (const [id, sibling] of [...this.active]) {
+            if (sibling.spec.groupId === t.spec.groupId && !sibling.resolved) {
+              sibling.resolved = true;
+              this.despawn(id);
+            }
+          }
+        }
+      } else if (mode === "ordered") {
+        const done = [...this.active.values()].every(
+          (s) => s.spec.groupId !== t.spec.groupId || s.resolved || s.kind !== "go",
+        );
+        if (done) {
+          for (const [id, sibling] of [...this.active]) {
+            if (sibling.spec.groupId === t.spec.groupId && !sibling.resolved) {
+              sibling.resolved = true;
+              this.despawn(id);
+            }
+          }
         }
       }
     }

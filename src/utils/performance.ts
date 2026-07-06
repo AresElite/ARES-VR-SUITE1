@@ -27,7 +27,7 @@ export const PERF_MODES: Record<PerfModeId, PerfMode> = {
     starCount: 120,
     sphereSegments: 12,
     glow: false,
-    maxPooledTargets: 16,
+    maxPooledTargets: 52,
   },
   "quest3s-balanced": {
     id: "quest3s-balanced",
@@ -37,7 +37,7 @@ export const PERF_MODES: Record<PerfModeId, PerfMode> = {
     starCount: 240,
     sphereSegments: 16,
     glow: true,
-    maxPooledTargets: 20,
+    maxPooledTargets: 56,
   },
   "quest3-enhanced": {
     id: "quest3-enhanced",
@@ -47,7 +47,7 @@ export const PERF_MODES: Record<PerfModeId, PerfMode> = {
     starCount: 400,
     sphereSegments: 24,
     glow: true,
-    maxPooledTargets: 24,
+    maxPooledTargets: 60,
   },
 };
 
