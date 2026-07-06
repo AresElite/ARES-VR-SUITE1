@@ -1,7 +1,7 @@
 import type { DrillDefinition, TrialSpec, TargetZone } from "@/ares/drillTypes";
 import { ARES_COLORS, ARES_ACCENTS } from "@/ares/colors";
 import { pick } from "@/utils/rng";
-import { PERIPHERAL_ZONES, zonePosition } from "../shared/zones";
+import { PERIPHERAL_ZONES, strikePosition } from "../shared/zones";
 
 /**
  * ACQUIRE — Peripheral Field VR
@@ -42,7 +42,7 @@ export function buildPeripheralTrials(p: Params, rng: () => number, idPrefix = "
       duration: p.targetDurationMs,
       kind: isDistractor ? "distractor" : "go",
       zone,
-      position: zonePosition(zone, p.eccentricityDeg, 2.2, 0.15, rng),
+      position: strikePosition(zone, p.eccentricityDeg, 0.1, rng),
       color: isDistractor ? ARES_COLORS.graphite : dimmed(ARES_ACCENTS.tealBright, p.contrast),
       emissive: isDistractor ? undefined : dimmed(ARES_COLORS.electricTeal, p.contrast),
       shape: isDistractor ? "box" : "sphere",
@@ -56,7 +56,7 @@ export function buildPeripheralTrials(p: Params, rng: () => number, idPrefix = "
         duration: p.targetDurationMs * 0.9,
         kind: "go",
         zone: "center",
-        position: [0, 1.5, -2.2],
+        position: [0, 1.42, -0.6],
         color: ARES_COLORS.warningGold,
         emissive: ARES_COLORS.warningGold,
         shape: "diamond",
@@ -84,7 +84,15 @@ export const PeripheralFieldVR: DrillDefinition = {
   description:
     "Hold central fixation on the Ares marker while acquiring targets across the peripheral field. Distractors and low-contrast targets load the Acquire stream.",
   purpose: "Peripheral target acquisition under central fixation.",
-  interaction: "ray",
+  interaction: "touch",
+  instructions: [
+    "1. Stand tall. Keep your EYES LOCKED on the white diamond straight ahead the entire drill.",
+    "2. Teal orbs will light up around the edge of your vision — REACH OUT AND TAP them with either hand.",
+    "3. Do NOT look at the orbs. Find them with your peripheral vision, strike, and return to center.",
+    "4. Ignore the dark gray boxes — they are decoys. Striking one counts against you.",
+    "5. At higher levels a GOLD diamond flashes at center — tap it too, without losing your rhythm.",
+  ],
+  controlsHint: "EYES ON THE DIAMOND - TAP PERIPHERAL ORBS WITH YOUR HANDS",
   environment: "arena",
   mvp: true,
   levels,

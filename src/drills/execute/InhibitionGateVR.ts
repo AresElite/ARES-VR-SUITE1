@@ -14,7 +14,13 @@ export const InhibitionGateVR: DrillDefinition = {
   description:
     "Fast go reps build the trigger habit — then red rings flood in. Withhold. False starts and no-go failures decide the score.",
   purpose: "Response inhibition and impulse control under prepotency.",
-  interaction: "ray",
+  interaction: "touch",
+  instructions: [
+    "1. Fast teal reps build your trigger habit — strike every teal orb immediately.",
+    "2. Red rings flood in without warning. DO NOT STRIKE THEM. Freeze the hand.",
+    "3. The score is won on what you DON'T hit. False starts and red strikes decide everything.",
+  ],
+  controlsHint: "STRIKE TEAL FAST - FREEZE ON RED",
   environment: "arena",
   mvp: false,
   levels: [

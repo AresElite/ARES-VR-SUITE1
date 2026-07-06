@@ -1,24 +1,32 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Text } from "@react-three/drei";
+import { useXR, useXRInputSourceState } from "@react-three/xr";
 import * as THREE from "three";
-import { ARES_COLORS } from "@/ares/colors";
+import { ARES_COLORS, ARES_ACCENTS } from "@/ares/colors";
 import { PHASE_META } from "@/ares/phases";
 import { HUD_REFRESH_HZ } from "@/ares/constants";
-import type { SliceDirection } from "@/ares/drillTypes";
+import type { Hand, SliceDirection } from "@/ares/drillTypes";
 import { useAppStore } from "@/app/providers/appStore";
 import { handFromPointerEvent, sliceDirectionFromDelta } from "@/drills/shared/InputMapper";
 import type { PoolSlot } from "@/drills/shared/TargetSpawner";
 import { PERF_MODES } from "@/utils/performance";
+import { FONT_MONO } from "@/utils/fonts";
 
 /**
  * DrillRunner — the live drill runtime.
  *
+ * INTERACTION MODEL (eye-hand coordination first):
+ * In VR the athlete physically REACHES OUT AND STRIKES targets with their
+ * hands or controllers — no laser pointers. Each hand carries a glowing
+ * strike orb; contact between the orb and a target registers the hit, the
+ * striking hand, and the strike direction (from hand velocity). Controllers
+ * fire a haptic pulse on contact. The desktop fallback uses mouse clicks.
+ *
  * Performance contract:
- *  - The engine advances on the XR frame clock (useFrame), not React state.
- *  - Target meshes are pooled; spawn/despawn only re-renders slot visibility.
- *  - Positions are written directly to mesh transforms every frame.
- *  - The HUD snapshot is throttled to HUD_REFRESH_HZ.
+ *  - Engine advances on the XR frame clock (useFrame), never React state.
+ *  - Target meshes are pooled; spawn/despawn only re-renders visibility.
+ *  - Collision checks are plain distance math on pooled slots — no physics.
  */
 
 const DIR_ANGLE: Record<SliceDirection, number> = {
@@ -32,14 +40,132 @@ const DIR_ANGLE: Record<SliceDirection, number> = {
   downRight: (7 * Math.PI) / 4,
 };
 
+const STRIKE_ORB_RADIUS = 0.045;
+const HIT_PADDING = 0.075; // generous contact window around the target surface
+const DIRECTION_MIN_SPEED = 0.6; // m/s of hand motion needed to read a slice direction
+
+interface HandTracker {
+  hand: Hand;
+  object: THREE.Object3D | null;
+  pos: THREE.Vector3;
+  prev: THREE.Vector3;
+  vel: THREE.Vector3;
+  hasPrev: boolean;
+  pulse: (() => void) | null;
+}
+
+/**
+ * StrikeColliders — tracks both hands (controller or tracked hand), renders
+ * their strike orbs, and performs per-frame contact tests against live
+ * targets. This is the whole "no laser pointers" system.
+ */
+function StrikeColliders() {
+  const engine = useAppStore((s) => s.engine);
+  const leftCtl = useXRInputSourceState("controller", "left");
+  const rightCtl = useXRInputSourceState("controller", "right");
+  const leftHand = useXRInputSourceState("hand", "left");
+  const rightHand = useXRInputSourceState("hand", "right");
+  const orbL = useRef<THREE.Mesh>(null);
+  const orbR = useRef<THREE.Mesh>(null);
+
+  const trackers = useMemo<HandTracker[]>(
+    () => [
+      { hand: "left", object: null, pos: new THREE.Vector3(), prev: new THREE.Vector3(), vel: new THREE.Vector3(), hasPrev: false, pulse: null },
+      { hand: "right", object: null, pos: new THREE.Vector3(), prev: new THREE.Vector3(), vel: new THREE.Vector3(), hasPrev: false, pulse: null },
+    ],
+    [],
+  );
+
+  useFrame((_, dt) => {
+    if (!engine) return;
+    // Resolve current input objects (controller grip preferred, else hand)
+    trackers[0].object = leftCtl?.object ?? leftHand?.object ?? null;
+    trackers[1].object = rightCtl?.object ?? rightHand?.object ?? null;
+    trackers[0].pulse = leftCtl
+      ? () => leftCtl.inputSource.gamepad?.hapticActuators?.[0]?.pulse?.(0.7, 40)
+      : null;
+    trackers[1].pulse = rightCtl
+      ? () => rightCtl.inputSource.gamepad?.hapticActuators?.[0]?.pulse?.(0.7, 40)
+      : null;
+
+    for (let i = 0; i < 2; i++) {
+      const t = trackers[i];
+      const orb = i === 0 ? orbL.current : orbR.current;
+      if (!t.object) {
+        if (orb) orb.visible = false;
+        t.hasPrev = false;
+        continue;
+      }
+      t.object.getWorldPosition(t.pos);
+      if (orb) {
+        orb.visible = true;
+        orb.position.copy(t.pos);
+      }
+      if (t.hasPrev && dt > 0) {
+        t.vel.copy(t.pos).sub(t.prev).divideScalar(dt);
+      }
+      t.prev.copy(t.pos);
+      t.hasPrev = true;
+
+      // Contact test against live targets
+      for (const slot of engine.pool.slots) {
+        if (!slot.active || !slot.spec || slot.spec.decor || slot.spec.meta?.decor) continue;
+        const dx = slot.pos[0] - t.pos.x;
+        const dy = slot.pos[1] - t.pos.y;
+        const dz = slot.pos[2] - t.pos.z;
+        const reach = slot.spec.scale + STRIKE_ORB_RADIUS + HIT_PADDING;
+        if (dx * dx + dy * dy + dz * dz <= reach * reach) {
+          let direction: SliceDirection | undefined;
+          if (slot.spec.requiredDirection) {
+            const speed = Math.hypot(t.vel.x, t.vel.y);
+            direction =
+              speed >= DIRECTION_MIN_SPEED
+                ? sliceDirectionFromDelta(t.vel.x, t.vel.y)
+                : slot.spec.requiredDirection; // slow contact: grace, counts as ruled direction
+          }
+          engine.registerHit(slot.spec.id, t.hand, direction);
+          t.pulse?.();
+        }
+      }
+    }
+  });
+
+  return (
+    <>
+      <mesh ref={orbL} visible={false}>
+        <sphereGeometry args={[STRIKE_ORB_RADIUS, 12, 12]} />
+        <meshStandardMaterial
+          color={ARES_ACCENTS.purpleGlow}
+          emissive={ARES_ACCENTS.purpleGlow}
+          emissiveIntensity={0.9}
+          transparent
+          opacity={0.85}
+        />
+      </mesh>
+      <mesh ref={orbR} visible={false}>
+        <sphereGeometry args={[STRIKE_ORB_RADIUS, 12, 12]} />
+        <meshStandardMaterial
+          color={ARES_COLORS.warningGold}
+          emissive={ARES_COLORS.warningGold}
+          emissiveIntensity={0.9}
+          transparent
+          opacity={0.85}
+        />
+      </mesh>
+    </>
+  );
+}
+
 function TargetMesh({
   slot,
   segments,
   version,
+  desktopClicks,
 }: {
   slot: PoolSlot;
   segments: number;
   version: number;
+  desktopClicks: boolean;
 }) {
   const group = useRef<THREE.Group>(null);
   const engine = useAppStore((s) => s.engine);
@@ -52,24 +178,23 @@ function TargetMesh({
   });
 
   if (!slot.active || !spec) return null;
+  const isDecor = Boolean(spec.decor || spec.meta?.decor);
 
-  const onHit = (e: { stopPropagation(): void; nativeEvent?: unknown }) => {
-    e.stopPropagation();
-    const hand = handFromPointerEvent(e);
-    let direction: SliceDirection | undefined;
-    if (spec.requiredDirection) {
-      const ne = e.nativeEvent as { movementX?: number; movementY?: number } | undefined;
-      const mx = ne?.movementX ?? 0;
-      const my = ne?.movementY ?? 0;
-      // Derive slice direction from pointer motion when measurable;
-      // a still-pointer trigger counts as the ruled direction (MVP).
-      direction =
-        Math.abs(mx) + Math.abs(my) > 4
-          ? sliceDirectionFromDelta(mx, -my)
-          : spec.requiredDirection;
-    }
-    engine?.registerHit(spec.id, hand, direction);
-  };
+  const onHit = desktopClicks && !isDecor
+    ? (e: { stopPropagation(): void; nativeEvent?: unknown }) => {
+        e.stopPropagation();
+        const hand = handFromPointerEvent(e);
+        let direction: SliceDirection | undefined;
+        if (spec.requiredDirection) {
+          const ne = e.nativeEvent as { movementX?: number; movementY?: number } | undefined;
+          const mx = ne?.movementX ?? 0;
+          const my = ne?.movementY ?? 0;
+          direction =
+            Math.abs(mx) + Math.abs(my) > 4 ? sliceDirectionFromDelta(mx, -my) : spec.requiredDirection;
+        }
+        engine?.registerHit(spec.id, hand, direction);
+      }
+    : undefined;
 
   const rotZ = spec.requiredDirection ? DIR_ANGLE[spec.requiredDirection] - Math.PI / 2 : 0;
 
@@ -86,31 +211,34 @@ function TargetMesh({
           emissive={spec.emissive ?? spec.color}
           emissiveIntensity={spec.emissive ? 0.65 : 0.2}
           flatShading
+          transparent={isDecor}
+          opacity={isDecor ? 0.8 : 1}
         />
       </mesh>
       {spec.label && (
         <Text
-          position={[0, spec.scale + 0.09, 0]}
-          fontSize={0.05}
+          position={[0, spec.scale + 0.07, 0]}
+          fontSize={0.038}
           color={ARES_COLORS.softGray}
           anchorX="center"
+          font={FONT_MONO}
         >
-          {spec.label}
+          {spec.label.toUpperCase()}
         </Text>
       )}
     </group>
   );
 }
 
-/** Central fixation marker for Acquire-phase drills. */
+/** Central fixation marker for Acquire-phase drills (visual anchor). */
 function FixationMarker() {
   const ref = useRef<THREE.Mesh>(null);
   useFrame(({ clock }) => {
     if (ref.current) ref.current.rotation.z = clock.elapsedTime * 0.8;
   });
   return (
-    <mesh ref={ref} position={[0, 1.5, -2.2]}>
-      <ringGeometry args={[0.028, 0.042, 4]} />
+    <mesh ref={ref} position={[0, 1.5, -1.2]}>
+      <ringGeometry args={[0.024, 0.036, 4]} />
       <meshBasicMaterial color={ARES_COLORS.white} />
     </mesh>
   );
@@ -119,6 +247,7 @@ function FixationMarker() {
 export function DrillRunner() {
   const engine = useAppStore((s) => s.engine);
   const perf = PERF_MODES[useAppStore((s) => s.perfModeId)];
+  const inSession = useXR((s) => s.session);
   const [poolVersion, setPoolVersion] = useState(0);
   const [countdown, setCountdown] = useState<number | null>(null);
   const hudAccum = useRef(0);
@@ -126,14 +255,12 @@ export function DrillRunner() {
   const pulseRef = useRef<THREE.MeshBasicMaterial>(null);
   const pulseIntensity = useRef(0);
 
-  // Re-render pooled slots on spawn/despawn; finish on completion.
   useEffect(() => {
     if (!engine) return;
     const unsub = engine.subscribe((e) => {
       if (e.type === "spawn" || e.type === "despawn") setPoolVersion((v) => v + 1);
       if (e.type === "spawn") pulseIntensity.current = 1;
       if (e.type === "stateChange" && (e.state === "complete" || e.state === "aborted")) {
-        // defer: let the frame finish before React tears the scene down
         setTimeout(() => useAppStore.getState().finishDrill(), 350);
       }
     });
@@ -144,7 +271,6 @@ export function DrillRunner() {
     if (!engine) return;
     engine.update(delta * 1000);
 
-    // countdown display
     const st = engine.getState();
     if (st === "countdown") {
       const c = Math.ceil(engine.countdownRemaining / 1000);
@@ -153,11 +279,9 @@ export function DrillRunner() {
       setCountdown(null);
     }
 
-    // Neural Arena phase pulse decay
     pulseIntensity.current = Math.max(0, pulseIntensity.current - delta * 2.2);
     if (pulseRef.current) pulseRef.current.opacity = 0.15 + pulseIntensity.current * 0.4;
 
-    // throttled HUD snapshot
     hudAccum.current += delta;
     if (hudAccum.current >= 1 / HUD_REFRESH_HZ) {
       hudAccum.current = 0;
@@ -177,7 +301,7 @@ export function DrillRunner() {
 
   return (
     <group>
-      {/* Neural Arena — phase stress ring behind the target field */}
+      {/* Neural Arena — phase stress ring behind the strike field */}
       <mesh position={[0, 1.5, -4.5]}>
         <ringGeometry args={[2.4, 2.55, 40]} />
         <meshBasicMaterial ref={pulseRef} color={phaseColor} transparent opacity={0.2} />
@@ -185,37 +309,50 @@ export function DrillRunner() {
 
       {isAcquireStyle && <FixationMarker />}
 
-      {/* background press catcher — false starts (inward-facing shell) */}
-      <mesh
-        onPointerDown={(e) => {
-          engine.registerBackgroundPress(handFromPointerEvent(e));
-        }}
-      >
-        <sphereGeometry args={[9, 12, 12]} />
-        <meshBasicMaterial side={THREE.BackSide} transparent opacity={0} depthWrite={false} />
-      </mesh>
+      {/* strike interaction (VR): hands/controllers hit targets directly */}
+      {inSession && <StrikeColliders />}
 
-      {/* pooled targets */}
+      {/* desktop-only false-start catcher */}
+      {!inSession && (
+        <mesh
+          onPointerDown={(e) => {
+            engine.registerBackgroundPress(handFromPointerEvent(e));
+          }}
+        >
+          <sphereGeometry args={[9, 12, 12]} />
+          <meshBasicMaterial side={THREE.BackSide} transparent opacity={0} depthWrite={false} />
+        </mesh>
+      )}
+
+      {/* pooled targets — clickable only in desktop fallback */}
       {engine.pool.slots.map((slot) => (
         <TargetMesh
           key={slot.slotIndex}
           slot={slot}
           segments={perf.sphereSegments}
           version={poolVersion}
+          desktopClicks={!inSession}
         />
       ))}
 
-      {/* countdown */}
+      {/* countdown + control reminder */}
       {countdown !== null && countdown > 0 && (
-        <Text
-          position={[0, 1.7, -2.4]}
-          fontSize={0.5}
-          color={phaseColor}
-          anchorX="center"
-          anchorY="middle"
-        >
-          {String(countdown)}
-        </Text>
+        <group>
+          <Text position={[0, 1.72, -2.4]} fontSize={0.5} color={phaseColor} anchorX="center" anchorY="middle">
+            {String(countdown)}
+          </Text>
+          <Text
+            position={[0, 1.28, -2.4]}
+            fontSize={0.065}
+            color={ARES_COLORS.white}
+            anchorX="center"
+            anchorY="middle"
+            maxWidth={2.4}
+            textAlign="center"
+          >
+            {engine.definition.controlsHint}
+          </Text>
+        </group>
       )}
     </group>
   );

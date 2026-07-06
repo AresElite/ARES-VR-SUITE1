@@ -14,7 +14,13 @@ export const ContrastSignalVR: DrillDefinition = {
   description:
     "Detect and strike low-contrast signals as they fade into the arena. Contrast falls with every level.",
   purpose: "Contrast sensitivity and signal detection under visual noise.",
-  interaction: "ray",
+  interaction: "touch",
+  instructions: [
+    "1. Faint signals fade in around your reach zone — each level they get dimmer.",
+    "2. The moment you detect one, TAP it with either hand.",
+    "3. Ignore the dark decoy boxes. If you are not sure, trust your first detection and commit.",
+  ],
+  controlsHint: "DETECT THE FAINT SIGNALS - TAP ON DETECTION",
   environment: "arena",
   mvp: false,
   levels: [

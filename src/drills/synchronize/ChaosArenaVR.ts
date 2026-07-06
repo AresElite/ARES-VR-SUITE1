@@ -99,7 +99,15 @@ export const ChaosArenaVR: DrillDefinition = {
   description:
     "Everything at once — peripheral acquisition, choice rules, no-go inhibition, and depth timing interleaved on one clock. Controlled chaos: every event is still a scoreable A.R.E.S. rep.",
   purpose: "Full-system integration under multi-sensory, multi-rule load.",
-  interaction: "ray",
+  interaction: "touch",
+  instructions: [
+    "1. Everything at once. Every rule you have trained still applies.",
+    "2. Peripheral orbs: keep your eyes forward, tap them with your hands.",
+    "3. Strike targets: TEAL either hand, PURPLE left, GOLD right.",
+    "4. RED RINGS: do not strike. Depth targets: strike through them as they arrive.",
+    "5. There is no pattern to chase — process each event as it comes. Stay accurate first, fast second.",
+  ],
+  controlsHint: "ALL RULES LIVE - HANDS UP, EYES FORWARD",
   environment: "arena",
   mvp: true,
   levels,

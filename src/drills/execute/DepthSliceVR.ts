@@ -62,7 +62,7 @@ export function buildDepthSliceTrials(p: Params, rng: () => number, idPrefix = "
     trials.push({
       id: `${idPrefix}-${i}`,
       spawnAt,
-      duration: travelMs + 350, // grace window after arrival
+      duration: travelMs + 450, // contact window after arrival
       kind: "go",
       zone: x < -0.2 ? "left" : x > 0.2 ? "right" : "center",
       position: [x, EYE_Y + (rng() - 0.5) * 0.5, -p.spawnDepth],
@@ -97,7 +97,15 @@ export const DepthSliceVR: DrillDefinition = {
   description:
     "Targets fly at you through depth. Strike in the contact window — purple = LEFT hand, gold = RIGHT hand, teal = either, gray = both. Cones demand an 8-way directional slice. Rhythm levels lock to the beat.",
   purpose: "Depth timing, slicing, bimanual coordination, cross-midline control.",
-  interaction: "ray",
+  interaction: "touch",
+  instructions: [
+    "1. Targets fly toward you through depth. Let them come into range, then STRIKE THROUGH them.",
+    "2. PURPLE = LEFT hand. GOLD = RIGHT hand. TEAL = either hand. GRAY = both hands.",
+    "3. CONES must be sliced in the direction they point — swing your hand THROUGH the cone along its arrow.",
+    "4. Time your contact for the moment the target reaches you. Too early or too late is a miss.",
+    "5. Rhythm levels lock targets to a beat — find the tempo and stay on it.",
+  ],
+  controlsHint: "STRIKE THROUGH TARGETS AS THEY ARRIVE - MATCH HAND COLORS",
   environment: "arena",
   mvp: true,
   levels,

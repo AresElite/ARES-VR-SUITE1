@@ -1,7 +1,7 @@
 import type { DrillDefinition, HandRule, TrialSpec, TargetZone } from "@/ares/drillTypes";
 import { ARES_COLORS, ARES_ACCENTS } from "@/ares/colors";
 import { pick } from "@/utils/rng";
-import { zonePosition } from "../shared/zones";
+import { strikePosition } from "../shared/zones";
 
 /**
  * EXECUTE — Reaction Strike VR
@@ -53,7 +53,7 @@ export function buildReactionTrials(p: Params, rng: () => number, idPrefix = "rs
       duration: p.targetDurationMs,
       kind: isNoGo ? "noGo" : "go",
       zone,
-      position: zonePosition(zone, (p.spreadDeg * (0.4 + rng() * 0.6)) | 0 || 5, 1.9, 0.2, rng),
+      position: strikePosition(zone, (p.spreadDeg * (0.4 + rng() * 0.6)) | 0 || 5, 0.14, rng),
       requiredHand,
       color,
       emissive,
@@ -81,7 +81,15 @@ export const ReactionStrikeVR: DrillDefinition = {
   description:
     "Strike targets the instant they appear. Teal = either hand. Purple = LEFT hand only. Gold = RIGHT hand only. Red ring = do NOT strike. False starts and no-go failures are tracked.",
   purpose: "Raw reaction, choice reaction, inhibition, motor accuracy.",
-  interaction: "ray",
+  interaction: "touch",
+  instructions: [
+    "1. Targets pop up within arm's reach. STRIKE them the instant they appear.",
+    "2. TEAL orb = strike with EITHER hand, as fast as you can.",
+    "3. PURPLE orb = LEFT hand only. GOLD orb = RIGHT hand only.",
+    "4. RED RING = DO NOT STRIKE. Hold completely still until it disappears.",
+    "5. Striking early, striking red, or using the wrong hand all count against you.",
+  ],
+  controlsHint: "PUNCH THE ORBS - PURPLE=LEFT GOLD=RIGHT RED=DON'T",
   environment: "arena",
   mvp: true,
   levels,

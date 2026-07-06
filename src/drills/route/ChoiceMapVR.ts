@@ -15,7 +15,13 @@ export const ChoiceMapVR: DrillDefinition = {
   description:
     "Every target carries a rule — purple LEFT, gold RIGHT, red withhold. Slow tempo, total rule density: train the route from cue to correct response.",
   purpose: "Stimulus-response mapping and route selection.",
-  interaction: "ray",
+  interaction: "touch",
+  instructions: [
+    "1. Every target carries a rule. Slow tempo — train the mapping, not the speed.",
+    "2. PURPLE = LEFT hand. GOLD = RIGHT hand. TEAL = either. RED RING = do not strike.",
+    "3. Say the rule in your head before you move. Accuracy over speed at every level.",
+  ],
+  controlsHint: "MATCH THE RULE - PURPLE=LEFT GOLD=RIGHT RED=DON'T",
   environment: "arena",
   mvp: false,
   levels: [

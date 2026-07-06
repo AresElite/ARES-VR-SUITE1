@@ -25,7 +25,14 @@ export const WorkingMemoryGridVR: DrillDefinition = {
   description:
     "A gold cue flashes on the grid, disappears, and the full grid lights up after a delay. Strike only the remembered cell.",
   purpose: "Spatial working memory under retention delay.",
-  interaction: "ray",
+  interaction: "touch",
+  instructions: [
+    "1. A GOLD diamond flashes on one cell of the grid — burn its position into memory.",
+    "2. The grid goes dark. Hold the position in your mind through the delay.",
+    "3. When the full grid lights up purple, TAP the cell where the gold diamond was.",
+    "4. One tap only — your first touch is your answer.",
+  ],
+  controlsHint: "REMEMBER THE GOLD CELL - TAP IT WHEN THE GRID RETURNS",
   environment: "arena",
   mvp: false,
   levels: [
@@ -37,7 +44,7 @@ export const WorkingMemoryGridVR: DrillDefinition = {
     const p = params as Params;
     const trials: TrialSpec[] = [];
     let t = 1500;
-    const cell = 0.28;
+    const cell = 0.17;
     const origin = -((p.gridSize - 1) * cell) / 2;
     for (let r = 0; r < p.rounds; r++) {
       const cueIdx = Math.floor(rng() * p.gridSize * p.gridSize);
@@ -45,8 +52,8 @@ export const WorkingMemoryGridVR: DrillDefinition = {
       const cy = Math.floor(cueIdx / p.gridSize);
       const posOf = (x: number, y: number): [number, number, number] => [
         origin + x * cell,
-        EYE_Y - 0.3 + y * cell,
-        -2.0,
+        EYE_Y - 0.35 + y * cell,
+        -0.62,
       ];
       // Cue flash (not interactive-scored: distractor kind, brief)
       trials.push({

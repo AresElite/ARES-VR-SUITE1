@@ -1,7 +1,7 @@
 import type { DrillDefinition, TrialSpec, TargetZone } from "@/ares/drillTypes";
 import { ARES_COLORS, ARES_ACCENTS } from "@/ares/colors";
 import { pick } from "@/utils/rng";
-import { PERIPHERAL_ZONES, zonePosition } from "../shared/zones";
+import { PERIPHERAL_ZONES, strikePosition } from "../shared/zones";
 
 /**
  * ACQUIRE — Visual Search VR (scaffolded prototype)
@@ -24,7 +24,13 @@ export const VisualSearchVR: DrillDefinition = {
   description:
     "A field of decoys floods the arena — find the single teal sphere among graphite boxes before the field collapses.",
   purpose: "Visual search speed, filtering, and target discrimination.",
-  interaction: "ray",
+  interaction: "touch",
+  instructions: [
+    "1. A field of gray boxes floods your reach zone. Exactly ONE teal sphere hides among them.",
+    "2. Scan fast, find it, and TAP IT with either hand before the field disappears.",
+    "3. Striking a gray decoy counts against you — search with your eyes, not your hands.",
+  ],
+  controlsHint: "FIND THE ONE TEAL SPHERE - TAP IT FAST",
   environment: "arena",
   mvp: false,
   levels: [
@@ -48,7 +54,7 @@ export const VisualSearchVR: DrillDefinition = {
           duration: p.exposureMs,
           kind: isTarget ? "go" : "distractor",
           zone: isTarget ? zone : zone,
-          position: zonePosition(zone, 8 + rng() * 26, 2.3, 0.35, rng),
+          position: strikePosition(zone, 8 + rng() * 26, 0.22, rng, 0.78),
           color: isTarget ? ARES_ACCENTS.tealBright : ARES_COLORS.graphite,
           emissive: isTarget ? ARES_COLORS.electricTeal : undefined,
           shape: isTarget ? "sphere" : "box",

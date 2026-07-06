@@ -50,6 +50,8 @@ export interface TrialSpec {
   label?: string;
   /** targets sharing a groupId form one decision — hitting any member resolves the group */
   groupId?: string;
+  /** decorative stimulus: rendered and animated but cannot be struck */
+  decor?: boolean;
   /** ms from drill start at which this target's kind flips (late cue change) */
   switchKindAt?: number;
   switchKindTo?: TargetKind;
@@ -89,6 +91,10 @@ export interface DrillDefinition {
   levels: ProgressionLevel[];
   /** true = shipped MVP drill; false = scaffolded prototype config */
   mvp: boolean;
+  /** Clear, numbered athlete-facing directions shown before the drill */
+  instructions: string[];
+  /** One-line control reminder shown during the countdown */
+  controlsHint: string;
   /** deterministic trial plan for a given level (rng is seeded) */
   buildTrials(params: Record<string, unknown>, rng: () => number): TrialSpec[];
   /** total run length in ms (HUD countdown) */

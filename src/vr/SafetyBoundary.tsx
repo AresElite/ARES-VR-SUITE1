@@ -4,9 +4,11 @@ import { drillById } from "@/drills/registry";
 import { SpatialPanel, PanelButton, PanelText } from "./SpatialPanel";
 
 /**
- * Safety & calibration flow — shown before every drill.
- * Athletes move in VR: clear play space, arm's-reach interactions only,
- * no artificial locomotion, world-locked targets, instant trainer stop.
+ * Calibration, safety, and DRILL BRIEFING — shown before every drill.
+ * The athlete gets clear, numbered directions for exactly how this drill
+ * runs and how to strike, plus the play-space safety check. Athletes move
+ * their arms in VR: clear space, no steps, world-locked targets, instant
+ * trainer stop.
  */
 export function SafetyBoundary() {
   const drillId = useAppStore((s) => s.drillId);
@@ -18,53 +20,95 @@ export function SafetyBoundary() {
 
   return (
     <group>
+      {/* Drill briefing — clear directions, one panel */}
       <SpatialPanel
-        position={[0, 1.6, -1.9]}
-        width={1.6}
-        height={1.3}
+        position={[-0.92, 1.62, -1.85]}
+        rotation={[0, 0.26, 0]}
+        width={1.5}
+        height={1.5}
+        title={`How to run: ${def.shortName}`}
+        accent={ARES_ACCENTS.tealBright}
+      >
+        <PanelText
+          position={[-0.68, 0.56, 0]}
+          text={`${def.name} — Level ${level}`}
+          size={0.05}
+          color={ARES_COLORS.white}
+          maxWidth={1.38}
+        />
+        {def.instructions.map((line, i) => (
+          <PanelText
+            key={i}
+            position={[-0.68, 0.4 - i * 0.17, 0]}
+            text={line}
+            size={0.04}
+            color={ARES_COLORS.softGray}
+            maxWidth={1.38}
+          />
+        ))}
+        <PanelText
+          position={[-0.68, 0.4 - def.instructions.length * 0.17, 0]}
+          text={def.controlsHint}
+          size={0.038}
+          color={ARES_ACCENTS.tealBright}
+          maxWidth={1.38}
+          mono
+        />
+      </SpatialPanel>
+
+      {/* Safety + start */}
+      <SpatialPanel
+        position={[0.92, 1.62, -1.85]}
+        rotation={[0, -0.26, 0]}
+        width={1.35}
+        height={1.5}
         title="Calibration & Safety"
         accent={ARES_COLORS.warningGold}
       >
         <PanelText
-          position={[-0.72, 0.45, 0]}
-          text={`${def.name} — Level ${level}`}
-          size={0.052}
-          color={ARES_COLORS.white}
-          maxWidth={1.45}
-        />
-        <PanelText
-          position={[-0.72, 0.26, 0]}
-          text={"• Confirm a clear play space around the athlete (arm's reach + one step).\n• All targets stay within arm's reach or controlled torso rotation — no large steps.\n• The world never moves. If anything feels wrong, the athlete lowers the headset."}
+          position={[-0.6, 0.5, 0]}
+          text={"- Confirm clear space around the athlete: full arm swing in every direction, plus one step."}
           size={0.04}
-          maxWidth={1.45}
+          maxWidth={1.22}
         />
         <PanelText
-          position={[-0.72, -0.05, 0]}
-          text={def.description}
-          size={0.038}
-          color={ARES_ACCENTS.tealBright}
-          maxWidth={1.45}
+          position={[-0.6, 0.32, 0]}
+          text={"- Strike with your HANDS or CONTROLLERS. There are no pointers - reach out and make contact."}
+          size={0.04}
+          maxWidth={1.22}
+        />
+        <PanelText
+          position={[-0.6, 0.13, 0]}
+          text={"- All targets stay within arm's reach. Never step or lunge. The world never moves."}
+          size={0.04}
+          maxWidth={1.22}
+        />
+        <PanelText
+          position={[-0.6, -0.05, 0]}
+          text={"- If anything feels wrong, the athlete lowers the headset. The trainer can stop at any time."}
+          size={0.04}
+          maxWidth={1.22}
         />
         <PanelButton
-          position={[-0.4, -0.32, 0]}
-          width={0.66}
+          position={[-0.33, -0.28, 0]}
+          width={0.58}
           height={0.11}
           label={seated ? "Mode: SEATED" : "Mode: STANDING"}
           onClick={() => setSeated(!seated)}
         />
         <PanelButton
-          position={[0.4, -0.32, 0]}
-          width={0.66}
+          position={[0.33, -0.28, 0]}
+          width={0.58}
           height={0.11}
-          label="← Back to setup"
+          label="Back to setup"
           color={ARES_COLORS.graphite}
           onClick={() => selectPhase(def.phase)}
         />
         <PanelButton
           position={[0, -0.5, 0]}
-          width={1.4}
-          height={0.15}
-          label="ATHLETE READY — START DRILL"
+          width={1.2}
+          height={0.16}
+          label="ATHLETE READY - START DRILL"
           color={ARES_ACCENTS.goSignal}
           textColor={ARES_COLORS.nearBlack}
           onClick={startDrill}

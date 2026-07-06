@@ -1,7 +1,7 @@
 import type { DrillDefinition, SportId, TrialSpec } from "@/ares/drillTypes";
 import { ARES_COLORS, ARES_ACCENTS } from "@/ares/colors";
 import { pick } from "@/utils/rng";
-import { EYE_Y, zonePosition } from "../shared/zones";
+import { EYE_Y, strikePosition } from "../shared/zones";
 
 /**
  * SYNCHRONIZE — Sport-Transfer Reality Labs
@@ -163,7 +163,7 @@ export function buildSportTrials(p: Params, rng: () => number): TrialSpec[] {
       duration: travelMs + 320,
       kind: isNoGo ? "noGo" : "go",
       zone: "center",
-      position: [(rng() - 0.5) * 2 * pr.xSpread, y, -pr.depth],
+      position: [(rng() - 0.5) * 2 * Math.min(pr.xSpread, 0.5), y, -pr.depth],
       velocity: [0, 0, speed],
       color: isNoGo ? pr.noGoColor : pr.goColor,
       emissive: isNoGo ? pr.noGoColor : pr.goColor,
@@ -185,7 +185,7 @@ export function buildSportTrials(p: Params, rng: () => number): TrialSpec[] {
       duration: p.peripheralDurationMs,
       kind: "go",
       zone,
-      position: zonePosition(zone, p.peripheralEccentricityDeg, 2.4, 0.2, rng),
+      position: strikePosition(zone, p.peripheralEccentricityDeg, 0.15, rng, 0.75),
       color: ARES_COLORS.warningGold,
       emissive: ARES_COLORS.warningGold,
       shape: "diamond",
@@ -213,7 +213,15 @@ export const SportTransferLabVR: DrillDefinition = {
   description:
     "A.R.E.S. drills inside sport pressure. The primary decision stream (pitch / signal / threat / puck / lane) runs go/no-go discrimination through depth while sport-relevant peripheral cues load the Acquire system. Same engine, same metrics — real transfer.",
   purpose: "Sport-specific transfer of the full A.R.E.S. Performance Loop.",
-  interaction: "ray",
+  interaction: "touch",
+  instructions: [
+    "1. This is your sport, compressed. The primary object (pitch / signal / threat) comes to YOU through depth.",
+    "2. TEAL/GO color in the zone = STRIKE THROUGH IT with either hand at the moment it arrives.",
+    "3. RED/off-zone = LAY OFF. Do not swing. Discipline is scored.",
+    "4. GOLD diamonds flash in your peripheral field (runner / hazard / flank) — tap them without losing the primary read.",
+    "5. Play at game intent: commit to every strike like a rep on the field.",
+  ],
+  controlsHint: "STRIKE THE GO SIGNAL - LAY OFF RED - TAP GOLD IN YOUR PERIPHERY",
   environment: "baseball",
   mvp: true,
   levels,
