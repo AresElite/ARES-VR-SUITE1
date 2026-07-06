@@ -1,0 +1,272 @@
+/* A.R.E.S. VR Performance Suite — Ares Elite Sports Vision brand */
+:root {
+  --ares-deep-purple: #221461;
+  --ares-royal-purple: #2d234f;
+  --ares-electric-teal: #2998aa;
+  --ares-teal-bright: #3fd4ea;
+  --ares-near-black: #05050a;
+  --ares-graphite: #141421;
+  --ares-white: #ffffff;
+  --ares-soft-gray: #d9d9e3;
+  --ares-warning-gold: #c9a646;
+  --ares-error-red: #ff4d4d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background: var(--ares-near-black);
+  color: var(--ares-white);
+  font-family: "Segoe UI", "Inter", system-ui, -apple-system, sans-serif;
+}
+
+.ares-overlay {
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  background:
+    radial-gradient(1200px 500px at 50% -10%, rgba(34, 20, 97, 0.55), transparent 70%),
+    radial-gradient(800px 400px at 85% 110%, rgba(41, 152, 170, 0.12), transparent 60%),
+    var(--ares-near-black);
+  z-index: 10;
+}
+
+.ares-shell {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 48px 24px 96px;
+}
+
+.ares-kicker {
+  color: var(--ares-teal-bright);
+  letter-spacing: 0.35em;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin: 0 0 12px;
+}
+
+.ares-title {
+  font-size: clamp(34px, 6vw, 58px);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  margin: 0;
+  line-height: 1.05;
+}
+
+.ares-title .accent {
+  color: var(--ares-teal-bright);
+}
+
+.ares-loopline {
+  margin: 14px 0 0;
+  color: var(--ares-soft-gray);
+  font-size: 15px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.ares-loopline b {
+  color: var(--ares-warning-gold);
+  font-weight: 600;
+}
+
+.ares-sub {
+  color: var(--ares-soft-gray);
+  max-width: 640px;
+  line-height: 1.6;
+  margin: 18px 0 0;
+}
+
+.ares-cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 32px 0 8px;
+  align-items: center;
+}
+
+.ares-btn {
+  border: 1px solid var(--ares-royal-purple);
+  background: var(--ares-deep-purple);
+  color: var(--ares-white);
+  border-radius: 10px;
+  padding: 12px 22px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition:
+    transform 0.12s ease,
+    background 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+.ares-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 24px rgba(41, 152, 170, 0.25);
+}
+
+.ares-btn-primary {
+  background: linear-gradient(135deg, var(--ares-electric-teal), #1f6f7c);
+  border-color: var(--ares-electric-teal);
+  color: #04141a;
+}
+
+.ares-btn-xl {
+  font-size: 18px;
+  padding: 16px 30px;
+}
+
+.ares-btn-ghost {
+  background: transparent;
+  border-color: var(--ares-graphite);
+  color: var(--ares-soft-gray);
+}
+
+.ares-btn-danger {
+  background: transparent;
+  border-color: var(--ares-error-red);
+  color: var(--ares-error-red);
+}
+
+.ares-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 14px;
+  margin-top: 28px;
+}
+
+.ares-card {
+  background: rgba(20, 20, 33, 0.85);
+  border: 1px solid rgba(45, 35, 79, 0.9);
+  border-radius: 14px;
+  padding: 18px 20px;
+}
+
+.ares-card h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.ares-card p {
+  margin: 0;
+  color: var(--ares-soft-gray);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.ares-card .big {
+  font-size: 30px;
+  font-weight: 800;
+  margin: 4px 0 6px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  border: 1px solid var(--ares-graphite);
+  margin: 0 8px 8px 0;
+}
+
+.badge.ok {
+  color: #6cf2b8;
+  border-color: rgba(108, 242, 184, 0.35);
+  background: rgba(108, 242, 184, 0.07);
+}
+
+.badge.bad {
+  color: var(--ares-error-red);
+  border-color: rgba(255, 77, 77, 0.35);
+  background: rgba(255, 77, 77, 0.06);
+}
+
+.badge.warn {
+  color: var(--ares-warning-gold);
+  border-color: rgba(201, 166, 70, 0.4);
+  background: rgba(201, 166, 70, 0.07);
+}
+
+.ares-section-title {
+  margin: 44px 0 6px;
+  font-size: 13px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--ares-teal-bright);
+}
+
+.ares-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+  font-size: 13.5px;
+}
+
+.ares-table th {
+  text-align: left;
+  color: var(--ares-soft-gray);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 11px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--ares-royal-purple);
+}
+
+.ares-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid rgba(45, 35, 79, 0.45);
+  color: var(--ares-white);
+}
+
+.ares-table .phase {
+  font-weight: 700;
+}
+
+.select,
+select {
+  background: var(--ares-graphite);
+  color: var(--ares-white);
+  border: 1px solid var(--ares-royal-purple);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+label.ares-label {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ares-soft-gray);
+  margin: 0 0 6px;
+}
+
+.exit-chip {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 20;
+}
+
+.footer-note {
+  margin-top: 56px;
+  color: rgba(217, 217, 227, 0.5);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+}

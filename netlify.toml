@@ -1,0 +1,22 @@
+# A.R.E.S. VR Performance Suite — Netlify configuration
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[dev]
+  command = "npm run dev"
+  port = 5173
+
+# SPA fallback so deep links resolve to the app shell
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# WebXR needs a secure context (Netlify serves HTTPS by default).
+# These headers keep the app permission-clean in Meta Quest Browser.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Permissions-Policy = "xr-spatial-tracking=(self)"
+    X-Content-Type-Options = "nosniff"

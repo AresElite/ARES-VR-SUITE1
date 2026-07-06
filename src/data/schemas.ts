@@ -1,0 +1,79 @@
+import type { ARESPhase } from "@/ares/phases";
+import type { RawEvent } from "@/ares/drillTypes";
+
+export type { ARESPhase };
+
+export type HeadsetKind = "Quest 2" | "Quest 3S" | "Quest 3" | "Desktop" | "Unknown";
+
+export interface DeviceInfo {
+  headset: HeadsetKind;
+  browser: string;
+  webXRSupported: boolean;
+  handTrackingSupported?: boolean;
+  controllerTrackingSupported?: boolean;
+}
+
+export interface SessionMetrics {
+  trials: number;
+  correct: number;
+  incorrect: number;
+  accuracyPct: number;
+  avgReactionMs?: number;
+  medianReactionMs?: number;
+  fastestReactionMs?: number;
+  slowestReactionMs?: number;
+  choiceReactionMs?: number;
+  falseStarts?: number;
+  noGoFailures?: number;
+  peripheralMisses?: number;
+  wrongHandErrors?: number;
+  leftRightAsymmetryPct?: number;
+  upperLowerAsymmetryPct?: number;
+  centralPeripheralSplitPct?: number;
+  fatigueDriftPct?: number;
+  timingConsistencyMs?: number;
+  speedAccuracyIndex?: number;
+}
+
+export interface AQBlock {
+  acquire?: number;
+  route?: number;
+  execute?: number;
+  synchronize?: number;
+  overall?: number;
+  notes?: string[];
+  recommendation?: string;
+}
+
+/**
+ * Standardized session result. Every VR drill produces exactly this shape.
+ * EMR-ready: flat, typed, serializable — the placeholder API layer in
+ * `src/data/api.ts` will ship these objects unchanged when EMR sync lands.
+ */
+export interface ARESDrillSessionResult {
+  sessionId: string;
+  athleteId?: string;
+  athleteName?: string;
+  drillId: string;
+  drillName: string;
+  phase: ARESPhase;
+  startedAt: string;
+  endedAt: string;
+  device: DeviceInfo;
+  progression: {
+    level: number;
+    label: string;
+    parameters: Record<string, unknown>;
+  };
+  metrics: SessionMetrics;
+  aq: AQBlock;
+  rawEvents: RawEvent[];
+}
+
+export interface Athlete {
+  id: string;
+  name: string;
+  sport: string;
+  position?: string;
+  notes?: string;
+}
