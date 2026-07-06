@@ -29,19 +29,21 @@ export function AthleteHUD() {
       >
         <PanelText
           position={[-0.68, 0.08, 0]}
-          text={`${engine.definition.shortName}   •   ${meta.phase.toUpperCase()}`}
-          size={0.045}
+          text={`${engine.definition.shortName}  |  ${meta.phase.toUpperCase()}`}
+          size={0.042}
+          mono
           color={meta.color}
           maxWidth={1.4}
         />
         <PanelText
           position={[-0.68, -0.05, 0]}
-          text={`⏱ ${secondsLeft}s    ✓ ${snapshot.hits}    ✗ ${snapshot.errors}    ${snapshot.accuracyPct}%    streak ${snapshot.streak}${
-            snapshot.lastReactionMs ? `    last ${Math.round(snapshot.lastReactionMs)}ms` : ""
+          text={`${secondsLeft}s | HIT ${snapshot.hits} | ERR ${snapshot.errors} | ${snapshot.accuracyPct}% | STK ${snapshot.streak}${
+            snapshot.lastReactionMs ? ` | ${Math.round(snapshot.lastReactionMs)}ms` : ""
           }`}
-          size={0.048}
+          size={0.046}
           color={ARES_COLORS.white}
           maxWidth={1.4}
+          mono
         />
         <PanelButton
           position={[0.52, 0.07, 0]}

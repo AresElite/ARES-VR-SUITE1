@@ -82,7 +82,7 @@ export function XRRoot() {
       camera={{ position: [0, 1.6, 0.01], fov: 70 }}
       gl={{ antialias: true, powerPreference: "high-performance" }}
       dpr={[1, 1.5]}
-      style={{ position: "fixed", inset: 0, background: "#05050A" }}
+      style={{ position: "fixed", inset: 0, background: "#0B0F2A" }}
     >
       <XR store={xrStore}>
         <Suspense fallback={null}>

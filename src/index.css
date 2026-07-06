@@ -1,15 +1,52 @@
-/* A.R.E.S. VR Performance Suite — Ares Elite Sports Vision brand */
+/* A.R.E.S. VR Performance Suite — Ares Elite Sports Vision brand
+   Tokens from the Ares Brand Guide: dark-first only, Poppins + JetBrains
+   Mono, Teal acts / Purple glows. */
+
+@font-face {
+  font-family: "Poppins";
+  src: url("/fonts/Poppins-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Poppins";
+  src: url("/fonts/Poppins-SemiBold.ttf") format("truetype");
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/JetBrainsMono-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-display: swap;
+}
+
 :root {
-  --ares-deep-purple: #221461;
-  --ares-royal-purple: #2d234f;
-  --ares-electric-teal: #2998aa;
-  --ares-teal-bright: #3fd4ea;
-  --ares-near-black: #05050a;
-  --ares-graphite: #141421;
-  --ares-white: #ffffff;
-  --ares-soft-gray: #d9d9e3;
-  --ares-warning-gold: #c9a646;
-  --ares-error-red: #ff4d4d;
+  /* Base & surfaces */
+  --ares-bg: #0b0f2a;
+  --ares-charcoal: #111428;
+  --ares-panel: #1a1e3d;
+  --ares-indigo: #2d234f;
+  --ares-border: rgba(45, 35, 79, 0.5);
+  /* Action & brand */
+  --ares-teal: #2998aa; /* primary action — only */
+  --ares-teal-200: #7fd3de;
+  --ares-purple: #8b5cf6; /* ambient glow — never acts */
+  --ares-purple-200: #c4b5fd;
+  /* Text */
+  --ares-white: #eaf0ff;
+  --ares-text: #c3cbe6;
+  --ares-muted: #9aa3c7;
+  --ares-dim: #6b749c;
+  /* Semantic */
+  --success: #22c55e;
+  --warning: #f5b648;
+  --danger: #ef5a6f;
+  /* Gradients & glows */
+  --grad-brand: linear-gradient(90deg, #8b5cf6, #2998aa);
+  --glow-purple: 0 0 24px rgba(139, 92, 246, 0.6);
+  --glow-teal: 0 0 18px rgba(41, 152, 170, 0.35);
+  --mono: "JetBrains Mono", monospace;
 }
 
 * {
@@ -22,9 +59,10 @@ body,
   margin: 0;
   padding: 0;
   min-height: 100%;
-  background: var(--ares-near-black);
+  background: var(--ares-bg);
   color: var(--ares-white);
-  font-family: "Segoe UI", "Inter", system-ui, -apple-system, sans-serif;
+  font-family: "Poppins", sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
 .ares-overlay {
@@ -32,9 +70,9 @@ body,
   inset: 0;
   overflow-y: auto;
   background:
-    radial-gradient(1200px 500px at 50% -10%, rgba(34, 20, 97, 0.55), transparent 70%),
+    radial-gradient(1200px 520px at 50% -10%, rgba(139, 92, 246, 0.16), transparent 70%),
     radial-gradient(800px 400px at 85% 110%, rgba(41, 152, 170, 0.12), transparent 60%),
-    var(--ares-near-black);
+    var(--ares-bg);
   z-index: 10;
 }
 
@@ -44,44 +82,57 @@ body,
   padding: 48px 24px 96px;
 }
 
+.ares-logo {
+  width: 84px;
+  height: 84px;
+  display: block;
+  margin-bottom: 18px;
+  filter: drop-shadow(var(--glow-purple));
+}
+
 .ares-kicker {
-  color: var(--ares-teal-bright);
+  color: var(--ares-purple-200);
   letter-spacing: 0.35em;
   font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
   margin: 0 0 12px;
+  font-family: var(--mono);
 }
 
 .ares-title {
   font-size: clamp(34px, 6vw, 58px);
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.02em;
   margin: 0;
-  line-height: 1.05;
+  line-height: 1.08;
 }
 
 .ares-title .accent {
-  color: var(--ares-teal-bright);
+  background: var(--grad-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .ares-loopline {
   margin: 14px 0 0;
-  color: var(--ares-soft-gray);
-  font-size: 15px;
+  color: var(--ares-muted);
+  font-size: 14px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
+  font-family: var(--mono);
 }
 
 .ares-loopline b {
-  color: var(--ares-warning-gold);
-  font-weight: 600;
+  color: var(--ares-teal-200);
+  font-weight: 400;
 }
 
 .ares-sub {
-  color: var(--ares-soft-gray);
+  color: var(--ares-text);
   max-width: 640px;
-  line-height: 1.6;
+  line-height: 1.65;
   margin: 18px 0 0;
 }
 
@@ -94,13 +145,14 @@ body,
 }
 
 .ares-btn {
-  border: 1px solid var(--ares-royal-purple);
-  background: var(--ares-deep-purple);
+  border: 1px solid var(--ares-indigo);
+  background: var(--ares-panel);
   color: var(--ares-white);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 12px 22px;
   font-size: 15px;
   font-weight: 600;
+  font-family: "Poppins", sans-serif;
   letter-spacing: 0.04em;
   cursor: pointer;
   transition:
@@ -111,13 +163,14 @@ body,
 
 .ares-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 24px rgba(41, 152, 170, 0.25);
+  box-shadow: var(--glow-teal);
 }
 
 .ares-btn-primary {
-  background: linear-gradient(135deg, var(--ares-electric-teal), #1f6f7c);
-  border-color: var(--ares-electric-teal);
+  background: var(--ares-teal);
+  border-color: var(--ares-teal);
   color: #04141a;
+  box-shadow: var(--glow-teal);
 }
 
 .ares-btn-xl {
@@ -127,14 +180,14 @@ body,
 
 .ares-btn-ghost {
   background: transparent;
-  border-color: var(--ares-graphite);
-  color: var(--ares-soft-gray);
+  border-color: var(--ares-border);
+  color: var(--ares-muted);
 }
 
 .ares-btn-danger {
   background: transparent;
-  border-color: var(--ares-error-red);
-  color: var(--ares-error-red);
+  border-color: var(--danger);
+  color: var(--danger);
 }
 
 .ares-grid {
@@ -145,69 +198,74 @@ body,
 }
 
 .ares-card {
-  background: rgba(20, 20, 33, 0.85);
-  border: 1px solid rgba(45, 35, 79, 0.9);
-  border-radius: 14px;
+  background: var(--ares-charcoal);
+  border: 1px solid var(--ares-border);
+  border-radius: 16px;
   padding: 18px 20px;
 }
 
 .ares-card h3 {
   margin: 0 0 6px;
-  font-size: 14px;
+  font-size: 13px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
+  font-family: var(--mono);
+  font-weight: 400;
 }
 
 .ares-card p {
   margin: 0;
-  color: var(--ares-soft-gray);
+  color: var(--ares-text);
   font-size: 13px;
   line-height: 1.55;
 }
 
 .ares-card .big {
   font-size: 30px;
-  font-weight: 800;
+  font-weight: 600;
   margin: 4px 0 6px;
+  font-family: var(--mono);
 }
 
 .badge {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  border-radius: 999px;
+  border-radius: 9999px;
   padding: 6px 14px;
-  font-size: 12.5px;
-  font-weight: 600;
+  font-size: 11.5px;
+  font-family: var(--mono);
+  text-transform: uppercase;
   letter-spacing: 0.05em;
-  border: 1px solid var(--ares-graphite);
+  border: 1px solid var(--ares-border);
   margin: 0 8px 8px 0;
 }
 
 .badge.ok {
-  color: #6cf2b8;
-  border-color: rgba(108, 242, 184, 0.35);
-  background: rgba(108, 242, 184, 0.07);
+  color: var(--success);
+  border-color: rgba(34, 197, 94, 0.35);
+  background: rgba(34, 197, 94, 0.1);
 }
 
 .badge.bad {
-  color: var(--ares-error-red);
-  border-color: rgba(255, 77, 77, 0.35);
-  background: rgba(255, 77, 77, 0.06);
+  color: var(--danger);
+  border-color: rgba(239, 90, 111, 0.35);
+  background: rgba(239, 90, 111, 0.1);
 }
 
 .badge.warn {
-  color: var(--ares-warning-gold);
-  border-color: rgba(201, 166, 70, 0.4);
-  background: rgba(201, 166, 70, 0.07);
+  color: var(--warning);
+  border-color: rgba(245, 182, 72, 0.4);
+  background: rgba(245, 182, 72, 0.1);
 }
 
 .ares-section-title {
   margin: 44px 0 6px;
-  font-size: 13px;
+  font-size: 12px;
   letter-spacing: 0.3em;
   text-transform: uppercase;
-  color: var(--ares-teal-bright);
+  color: var(--ares-purple-200);
+  font-family: var(--mono);
 }
 
 .ares-table {
@@ -219,41 +277,46 @@ body,
 
 .ares-table th {
   text-align: left;
-  color: var(--ares-soft-gray);
-  font-weight: 600;
+  color: var(--ares-dim);
+  font-family: var(--mono);
+  font-weight: 400;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  font-size: 11px;
+  font-size: 10.5px;
   padding: 8px 10px;
-  border-bottom: 1px solid var(--ares-royal-purple);
+  border-bottom: 1px solid var(--ares-indigo);
 }
 
 .ares-table td {
   padding: 9px 10px;
-  border-bottom: 1px solid rgba(45, 35, 79, 0.45);
-  color: var(--ares-white);
+  border-bottom: 1px solid var(--ares-border);
+  color: var(--ares-text);
+  font-family: var(--mono);
+  font-size: 12.5px;
 }
 
 .ares-table .phase {
-  font-weight: 700;
+  font-weight: 400;
 }
 
 .select,
 select {
-  background: var(--ares-graphite);
+  background: var(--ares-charcoal);
   color: var(--ares-white);
-  border: 1px solid var(--ares-royal-purple);
-  border-radius: 8px;
+  border: 1px solid var(--ares-indigo);
+  border-radius: 10px;
   padding: 10px 12px;
   font-size: 14px;
+  font-family: "Poppins", sans-serif;
 }
 
 label.ares-label {
   display: block;
-  font-size: 11px;
+  font-size: 10.5px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--ares-soft-gray);
+  color: var(--ares-dim);
+  font-family: var(--mono);
   margin: 0 0 6px;
 }
 
@@ -266,7 +329,7 @@ label.ares-label {
 
 .footer-note {
   margin-top: 56px;
-  color: rgba(217, 217, 227, 0.5);
+  color: var(--ares-dim);
   font-size: 12px;
   letter-spacing: 0.06em;
 }

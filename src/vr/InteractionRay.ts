@@ -14,7 +14,7 @@ export function pointerStoreOptions(frameBufferScaling: number, foveation: numbe
     foveation,
     frameBufferScaling,
     // Defaults: controllers + hands rendered with ray/pinch pointers.
-    hand: { rayPointer: { rayModel: { color: "#3FD4EA", opacity: 0.6 } } },
-    controller: { rayPointer: { rayModel: { color: "#3FD4EA", opacity: 0.7 } } },
+    hand: { rayPointer: { rayModel: { color: "#7FD3DE", opacity: 0.6 } } },
+    controller: { rayPointer: { rayModel: { color: "#7FD3DE", opacity: 0.7 } } },
   };
 }

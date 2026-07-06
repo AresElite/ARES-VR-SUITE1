@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Text } from "@react-three/drei";
+import { Text, useTexture } from "@react-three/drei";
 import * as THREE from "three";
 import { ARES_COLORS } from "@/ares/colors";
 import { ARES_PHASES, PHASE_META, type ARESPhase } from "@/ares/phases";
@@ -13,6 +13,16 @@ import { SpatialPanel, PanelText } from "./SpatialPanel";
  * A central floating A.R.E.S. Performance Loop and four training portals
  * (Acquire / Route / Execute / Synchronize) arranged around the athlete.
  */
+
+function ArenaLogo() {
+  const tex = useTexture("/brand/aesv-logo.png");
+  return (
+    <mesh position={[0, 3.15, -4.4]}>
+      <planeGeometry args={[1.15, 1.15]} />
+      <meshBasicMaterial map={tex} transparent opacity={0.95} />
+    </mesh>
+  );
+}
 
 function FloatingPerformanceLoop() {
   const group = useRef<THREE.Group>(null);
@@ -131,6 +141,7 @@ export function VRPerformanceArena() {
 
   return (
     <group>
+      <ArenaLogo />
       <FloatingPerformanceLoop />
       {ARES_PHASES.map((p) => (
         <PhasePortal key={p} phase={p} />

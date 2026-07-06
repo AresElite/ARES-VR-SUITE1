@@ -82,7 +82,7 @@ export function PostDrillPanel() {
           <PanelText
             key={`n-${i}`}
             position={[-0.86, -0.02 - i * 0.075, 0]}
-            text={`• ${n}`}
+            text={`- ${n}`}
             size={0.034}
             color={ARES_COLORS.softGray}
             maxWidth={1.7}

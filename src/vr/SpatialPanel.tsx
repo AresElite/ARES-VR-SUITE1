@@ -1,11 +1,13 @@
 import { useState, type ReactNode } from "react";
 import { Text } from "@react-three/drei";
 import { ARES_COLORS, ARES_ACCENTS } from "@/ares/colors";
+import { FONT_MONO, FONT_POPPINS_SEMIBOLD } from "@/utils/fonts";
 
 /**
  * SpatialPanel — the core Ares spatial UI surface.
- * Large, readable, world-locked panels 1.5–2.5m from the athlete.
- * Deliberately flat-shaded and cheap: two planes and troika text.
+ * Brand rules applied: Panel (#1A1E3D) surfaces on Deep Navy, Poppins for
+ * words, JetBrains Mono for labels/tags, Electric Teal as the only action
+ * color. Two planes + troika text — cheap on Quest 2.
  */
 
 export function SpatialPanel({
@@ -30,7 +32,7 @@ export function SpatialPanel({
       {/* backdrop */}
       <mesh position={[0, 0, -0.01]}>
         <planeGeometry args={[width, height]} />
-        <meshBasicMaterial color={ARES_COLORS.graphite} transparent opacity={0.92} />
+        <meshBasicMaterial color={ARES_COLORS.panel} transparent opacity={0.94} />
       </mesh>
       {/* accent frame line */}
       <mesh position={[0, height / 2 - 0.012, 0]}>
@@ -40,11 +42,12 @@ export function SpatialPanel({
       {title && (
         <Text
           position={[-width / 2 + 0.06, height / 2 - 0.075, 0.002]}
-          fontSize={0.062}
-          color={ARES_COLORS.white}
+          fontSize={0.05}
+          color={ARES_ACCENTS.purpleLight}
           anchorX="left"
           anchorY="middle"
-          letterSpacing={0.08}
+          letterSpacing={0.14}
+          font={FONT_MONO}
         >
           {title.toUpperCase()}
         </Text>
@@ -62,6 +65,7 @@ export function PanelText({
   maxWidth = 1.05,
   align = "left",
   anchorX = "left",
+  mono = false,
 }: {
   position: [number, number, number];
   text: string;
@@ -70,6 +74,7 @@ export function PanelText({
   maxWidth?: number;
   align?: "left" | "center" | "right";
   anchorX?: "left" | "center" | "right";
+  mono?: boolean;
 }) {
   return (
     <Text
@@ -81,6 +86,7 @@ export function PanelText({
       maxWidth={maxWidth}
       textAlign={align}
       lineHeight={1.35}
+      font={mono ? FONT_MONO : undefined}
     >
       {text}
     </Text>
@@ -95,7 +101,7 @@ export function PanelButton({
   height = 0.11,
   color = ARES_COLORS.deepPurple,
   textColor = ARES_COLORS.white,
-  accent = ARES_ACCENTS.tealBright,
+  accent = ARES_COLORS.electricTeal,
   disabled = false,
   fontSize = 0.042,
 }: {
@@ -129,18 +135,19 @@ export function PanelButton({
         <meshBasicMaterial
           color={disabled ? ARES_COLORS.graphite : hover ? accent : color}
           transparent
-          opacity={disabled ? 0.4 : 0.95}
+          opacity={disabled ? 0.4 : 0.96}
         />
       </mesh>
       <Text
         position={[0, 0, 0.004]}
         fontSize={fontSize}
-        color={disabled ? ARES_COLORS.softGray : hover ? ARES_COLORS.nearBlack : textColor}
+        color={disabled ? ARES_ACCENTS.dim : hover ? ARES_COLORS.nearBlack : textColor}
         anchorX="center"
         anchorY="middle"
         letterSpacing={0.04}
         maxWidth={width * 0.95}
         textAlign="center"
+        font={FONT_POPPINS_SEMIBOLD}
       >
         {label}
       </Text>

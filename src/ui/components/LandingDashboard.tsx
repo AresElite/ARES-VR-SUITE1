@@ -24,6 +24,7 @@ export function LandingDashboard({ onEnterDesktop }: { onEnterDesktop: () => voi
   return (
     <div className="ares-overlay">
       <div className="ares-shell">
+        <img className="ares-logo" src="/brand/aesv-logo.png" alt="Ares Elite Sports Vision" />
         <p className="ares-kicker">{ORG_NAME}</p>
         <h1 className="ares-title">
           A.R.E.S. <span className="accent">VR</span> Performance Suite
