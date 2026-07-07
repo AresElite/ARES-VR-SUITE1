@@ -94,8 +94,16 @@ export const DualStreamNeuralCollider: DrillDefinition = {
     const p = params as { trials: number; approachMs: number; antiRatio: number; windowMs: number };
     const trials: TrialSpec[] = [];
     let t = 1800;
+    // deck-based anti-matter allocation: go-trial count is exact per level,
+    // never RNG-starved (standardized scoreable volume)
+    const antiCount = Math.min(p.trials - 9, Math.round(p.trials * p.antiRatio));
+    const deck = Array.from({ length: p.trials }, (_, k) => k < antiCount);
+    for (let k = deck.length - 1; k > 0; k--) {
+      const j = Math.floor(rng() * (k + 1));
+      [deck[k], deck[j]] = [deck[j], deck[k]];
+    }
     for (let i = 0; i < p.trials; i++) {
-      const anti = rng() < p.antiRatio;
+      const anti = deck[i];
       const c = anti ? RED : TEAL;
       const speed = 0.55 / (p.approachMs / 1000);
       for (const side of [-1, 1]) {

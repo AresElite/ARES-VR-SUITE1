@@ -52,16 +52,40 @@ export const SpeedSearch: DrillDefinition = {
     for (let s = 0; s < p.searches; s++) {
       const groupId = `sps-g${s}`;
       const targetIdx = Math.floor(rng() * p.fieldSize);
+      // golden-angle spiral lattice: geometric guarantee that every shape in
+      // the field keeps clean strike separation, however dense the level
+      const maxR = 0.18 + (p.spreadDeg / 36) * 0.42;
+      const minSep = p.scale * 2.6 + 0.02;
+      const lattice: [number, number][] = [];
+      const GA = Math.PI * (3 - Math.sqrt(5));
+      const spin = rng() * Math.PI * 2;
+      for (let k = 0; lattice.length < p.fieldSize && k < 80; k++) {
+        const r = maxR * Math.sqrt((k + 0.5) / p.fieldSize);
+        const a = spin + k * GA;
+        const px = Math.cos(a) * r * 1.15;
+        const py = 1.42 + Math.sin(a) * r * 0.75;
+        if (py < 0.98 || py > 1.88 || Math.abs(px) > 0.88) continue;
+        if (lattice.every(([qx, qy]) => Math.hypot(px - qx, py - qy) >= minSep)) lattice.push([px, py]);
+      }
+      while (lattice.length < p.fieldSize) {
+        lattice.push([(rng() - 0.5) * 1.4, 1.1 + rng() * 0.7]);
+      }
+      // shuffle so the target's lattice slot is unpredictable
+      for (let k = lattice.length - 1; k > 0; k--) {
+        const j = Math.floor(rng() * (k + 1));
+        [lattice[k], lattice[j]] = [lattice[j], lattice[k]];
+      }
       for (let i = 0; i < p.fieldSize; i++) {
         const zone = pick(rng, PERIPHERAL_ZONES.concat(["center"]) as TargetZone[]);
         const isTarget = i === targetIdx;
+        const pos: [number, number, number] = [lattice[i][0], lattice[i][1], -0.68];
         trials.push({
           id: `${groupId}-${i}`,
           spawnAt: t,
           duration: p.exposureMs,
           kind: isTarget ? "go" : "distractor",
           zone,
-          position: strikePosition(zone, 4 + rng() * p.spreadDeg, 0.2, rng, 0.75),
+          position: pos,
           color: isTarget ? TEAL_L : "#38406B",
           emissive: isTarget ? TEAL : undefined,
           shape: isTarget ? "cone" : pick(rng, decoyShapes),

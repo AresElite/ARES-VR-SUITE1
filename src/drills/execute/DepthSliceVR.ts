@@ -47,8 +47,15 @@ export function buildDepthSliceTrials(p: Params, rng: () => number, idPrefix = "
   const travelMs = (p.spawnDepth / p.approachSpeed) * 1000;
   const beatMs = p.bpm ? 60000 / p.bpm : undefined;
   let t = 1500;
+  // balanced hand deck: equal counts of each rule, shuffled (no L/R skew)
+  const deck: HandRule[] = [];
+  for (let i = 0; i < p.trialCount; i++) deck.push(p.handRules[i % p.handRules.length]);
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
   for (let i = 0; i < p.trialCount; i++) {
-    const hand = pick(rng, p.handRules);
+    const hand = deck[i];
     // Lateral spawn side; cross-midline rule flips the required hand's side
     let x = (rng() - 0.5) * 1.2;
     if (hand === "left" || hand === "right") {

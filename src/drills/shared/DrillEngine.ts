@@ -168,6 +168,7 @@ export class DrillEngine {
     // Spawn due trials
     while (this.nextTrialIdx < this.trials.length && this.trials[this.nextTrialIdx].spawnAt <= now) {
       const spec = this.trials[this.nextTrialIdx++];
+      this.resolveSpawnOverlap(spec);
       const slot = this.pool.acquire(spec, now);
       if (slot) {
         this.active.set(spec.id, { spec, spawnClock: now, kind: spec.kind, resolved: false });
@@ -277,6 +278,88 @@ export class DrillEngine {
   private expireAllActive(): void {
     const now = this.timing.now;
     for (const id of [...this.active.keys()]) this.expire(id, now);
+  }
+
+  /**
+   * Athlete fairness: a new target must never spawn overlapping a live one
+   * (striking one would clip the other). Static, ungrouped, scoreable spawns
+   * are nudged to the clearest nearby offset. Grid/pad sets (groupId) and
+   * moving stimuli are left exactly where their drill placed them.
+   */
+  private resolveSpawnOverlap(spec: TrialSpec): void {
+    if (spec.decor || spec.meta?.decor || spec.groupId || spec.velocity || spec.lane) return;
+    const minDist = (other: TrialSpec) => (spec.scale + other.scale) * 1.6 + 0.02;
+    const clear = (px: number, py: number): number => {
+      let worst = Number.POSITIVE_INFINITY;
+      for (const t of this.active.values()) {
+        if (t.resolved || t.spec.decor || t.spec.meta?.decor || t.spec.velocity || t.spec.lane) continue;
+        const slot = this.pool.get(t.spec.id);
+        const ox = slot ? slot.pos[0] : t.spec.position[0];
+        const oy = slot ? slot.pos[1] : t.spec.position[1];
+        const d = Math.hypot(px - ox, py - oy) - minDist(t.spec);
+        worst = Math.min(worst, d);
+      }
+      return worst;
+    };
+    if (clear(spec.position[0], spec.position[1]) >= 0) return;
+    const offsets: [number, number][] = [
+      [0.16, 0], [-0.16, 0], [0, 0.13], [0, -0.13],
+      [0.16, 0.13], [-0.16, 0.13], [0.16, -0.13], [-0.16, -0.13],
+    ];
+    let best: [number, number] = [spec.position[0], spec.position[1]];
+    let bestClear = clear(best[0], best[1]);
+    for (const [dx, dy] of offsets) {
+      const px = Math.max(-0.9, Math.min(0.9, spec.position[0] + dx));
+      const py = Math.max(0.95, Math.min(1.9, spec.position[1] + dy));
+      const c = clear(px, py);
+      if (c > bestClear) {
+        bestClear = c;
+        best = [px, py];
+      }
+    }
+    // fallback: push directly away from the nearest offender until clear
+    if (bestClear < 0) {
+      let nx = 0;
+      let ny = 0;
+      let nd = Number.POSITIVE_INFINITY;
+      let nSpec: TrialSpec | null = null;
+      for (const t of this.active.values()) {
+        if (t.resolved || t.spec.decor || t.spec.meta?.decor || t.spec.velocity || t.spec.lane) continue;
+        const slot = this.pool.get(t.spec.id);
+        const ox = slot ? slot.pos[0] : t.spec.position[0];
+        const oy = slot ? slot.pos[1] : t.spec.position[1];
+        const d = Math.hypot(spec.position[0] - ox, spec.position[1] - oy);
+        if (d < nd) {
+          nd = d;
+          nx = ox;
+          ny = oy;
+          nSpec = t.spec;
+        }
+      }
+      if (nSpec) {
+        const need = minDist(nSpec) + 0.015;
+        let vx = spec.position[0] - nx;
+        let vy = spec.position[1] - ny;
+        const len = Math.hypot(vx, vy) || 1;
+        vx /= len;
+        vy /= len;
+        for (const dir of [
+          [vx, vy],
+          [-vy, vx],
+          [vy, -vx],
+          [-vx, -vy],
+        ] as const) {
+          const px = Math.max(-0.9, Math.min(0.9, nx + dir[0] * need));
+          const py = Math.max(0.95, Math.min(1.9, ny + dir[1] * need));
+          if (clear(px, py) >= 0) {
+            best = [px, py];
+            bestClear = 0;
+            break;
+          }
+        }
+      }
+    }
+    spec.position = [best[0], best[1], spec.position[2]];
   }
 
   private minSeqInGroup(groupId: string): number {

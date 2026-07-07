@@ -29,15 +29,17 @@ const px2scale = (px: number) => Math.max(0.035, Math.min(0.13, px * 0.00085));
 function rgPositions(level: number, zoneMode: string): [number, number, number][] {
   const f = (level - 1) / 24;
   const zoneMul = zoneMode === "inner" ? 0.55 : zoneMode === "outer" ? 1.35 : 1.0;
-  const dx = (0.08 + (0.42 - 0.08) * f) * 1.5 * zoneMul;
+  const dx = Math.min(0.88, (0.08 + (0.42 - 0.08) * f) * 1.5 * zoneMul);
   const dy = (0.15 + (0.42 - 0.15) * f) * 1.1 * zoneMul;
+  const hi = Math.min(1.9, 1.45 + dy);
+  const lo = Math.max(0.98, 1.45 - dy);
   return [
-    [-dx, 1.45 + dy, Z],
-    [dx, 1.45 + dy, Z],
+    [-dx, hi, Z],
+    [dx, hi, Z],
     [-dx, 1.45, Z],
     [dx, 1.45, Z],
-    [-dx, 1.45 - dy, Z],
-    [dx, 1.45 - dy, Z],
+    [-dx, lo, Z],
+    [dx, lo, Z],
   ];
 }
 
@@ -472,11 +474,22 @@ export const StopSignal: DrillDefinition = {
     const p = params as { trials: number; ssd: number; deadline: number; stopProb: number; noGoProb: number; size: number };
     const trials: TrialSpec[] = [];
     let t = 1200;
+    let lastX = 99;
+    let lastY = 99;
     for (let i = 0; i < p.trials; i++) {
       const r = rng();
       const isNoGo = r < p.noGoProb;
       const isStop = !isNoGo && r < p.noGoProb + p.stopProb;
       const ssd = p.ssd + (rng() - 0.5) * 80;
+      // never co-locate with the previous (possibly still-live) trial
+      let px = (rng() - 0.5) * 0.5;
+      let py = 1.4 + (rng() - 0.5) * 0.3;
+      for (let a = 0; a < 6 && Math.hypot(px - lastX, py - lastY) < p.size * 3.4; a++) {
+        px = (rng() - 0.5) * 0.5;
+        py = 1.4 + (rng() - 0.5) * 0.3;
+      }
+      lastX = px;
+      lastY = py;
       trials.push({
         id: `ss-${i}`,
         spawnAt: t,
@@ -484,7 +497,7 @@ export const StopSignal: DrillDefinition = {
         kind: isNoGo ? "noGo" : "go",
         ...(isStop ? { switchKindAt: t + ssd, switchKindTo: "noGo" as const, switchColor: RED } : {}),
         zone: "center",
-        position: [(rng() - 0.5) * 0.5, 1.4 + (rng() - 0.5) * 0.3, Z],
+        position: [px, py, Z],
         color: isNoGo ? PURPLE : TEAL,
         emissive: isNoGo ? PURPLE : TEAL,
         shape: isNoGo ? "ring" : "sphere",

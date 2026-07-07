@@ -37,7 +37,8 @@ export function buildReactionTrials(p: Params, rng: () => number, idPrefix = "rs
       color = ARES_COLORS.errorRed;
       emissive = ARES_COLORS.errorRed;
     } else if (rng() < p.handRuleRatio) {
-      if (rng() < 0.5) {
+      // alternate the deck instead of independent coin flips (L/R balance)
+      if (i % 2 === 0) {
         requiredHand = "left";
         color = ARES_ACCENTS.purpleGlow;
         emissive = ARES_COLORS.deepPurple;

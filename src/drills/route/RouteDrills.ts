@@ -347,11 +347,27 @@ export const RandomNumber: DrillDefinition = {
       while (values.size < p.count) values.add(1 + Math.floor(rng() * 89));
       const sorted = [...values].sort((a, b) => a - b);
       const roundMs = p.count * p.perNumberMs;
+      const placed: [number, number][] = [];
+      const scatter = (): [number, number] => {
+        for (let a = 0; a < 30; a++) {
+          const px = (rng() - 0.5) * 1.1;
+          const py = 1.12 + rng() * 0.68;
+          if (placed.every(([qx, qy]) => Math.hypot(px - qx, py - qy) >= 0.17)) {
+            placed.push([px, py]);
+            return [px, py];
+          }
+        }
+        const fx = (rng() - 0.5) * 1.1;
+        const fy = 1.12 + rng() * 0.68;
+        placed.push([fx, fy]);
+        return [fx, fy];
+      };
       sorted.forEach((v, k) => {
+        const [px, py] = scatter();
         trials.push({
           id: `${groupId}-${k}`, spawnAt: t, duration: roundMs, kind: "go",
           zone: "center",
-          position: [(rng() - 0.5) * 1.0, 1.16 + rng() * 0.6, Z],
+          position: [px, py, Z],
           color: GRAY, emissive: TEAL, shape: "pad", scale: 0.055,
           label: String(v), groupId, groupMode: "ordered", seq: k,
         });
@@ -386,7 +402,8 @@ export const MultipleObjectTracking: DrillDefinition = {
   levels: levels25((i) => ({
     label: `track ${1 + Math.floor(i / 7)} of ${4 + Math.floor(i / 4)}`,
     parameters: {
-      rounds: 3, balls: 4 + Math.floor(i / 4), track: 1 + Math.floor(i / 7),
+      rounds: 1 + Math.floor(i / 7) <= 2 ? 5 : 3,
+      balls: 4 + Math.floor(i / 4), track: 1 + Math.floor(i / 7),
       highlightMs: 2200, trackMs: ilerp25(12000, 6500, i), answerMs: 4200,
       speed: lerp25(0.35, 0.95, i),
     },
