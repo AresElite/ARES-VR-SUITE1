@@ -15,23 +15,35 @@ import { sfx } from "@/utils/audio";
  * (Acquire / Route / Execute / Synchronize) arranged around the athlete.
  */
 
-function ArenaLogo() {
-  const tex = useTexture("/brand/aesv-logo.png");
-  return (
-    <mesh position={[0, 3.6, -5.2]}>
-      <planeGeometry args={[1.15, 1.15]} />
-      <meshBasicMaterial map={tex} transparent opacity={0.95} />
-    </mesh>
-  );
-}
-
 function FloatingPerformanceLoop() {
   const group = useRef<THREE.Group>(null);
-  useFrame((_, dt) => {
+  const halo = useRef<THREE.Mesh>(null);
+  const logoTex = useTexture("/brand/aesv-logo.png");
+  useFrame(({ clock }, dt) => {
     if (group.current) group.current.rotation.y += dt * 0.25;
+    if (halo.current) {
+      (halo.current.material as THREE.MeshBasicMaterial).opacity =
+        0.22 + Math.sin(clock.elapsedTime * 1.6) * 0.08;
+    }
   });
   return (
     <group position={[0, 2.75, -3.4]} scale={0.5}>
+      {/* Ares Elite Sports Vision logo — the heart of the Performance Loop.
+          It stays facing the athlete while the four phases orbit around it. */}
+      <group>
+        <mesh ref={halo} position={[0, 0, -0.02]}>
+          <circleGeometry args={[0.62, 32]} />
+          <meshBasicMaterial color="#8B5CF6" transparent opacity={0.22} depthWrite={false} />
+        </mesh>
+        <mesh>
+          <circleGeometry args={[0.5, 32]} />
+          <meshBasicMaterial color="#0B0F2A" transparent opacity={0.85} />
+        </mesh>
+        <mesh position={[0, 0, 0.01]}>
+          <planeGeometry args={[0.85, 0.85]} />
+          <meshBasicMaterial map={logoTex} transparent />
+        </mesh>
+      </group>
       <group ref={group}>
         {ARES_PHASES.map((phase, i) => (
           <group key={phase} rotation={[0, (i * Math.PI) / 2, 0]}>
@@ -52,16 +64,6 @@ function FloatingPerformanceLoop() {
             </Text>
           </group>
         ))}
-        {/* core */}
-        <mesh>
-          <icosahedronGeometry args={[0.22, 1]} />
-          <meshStandardMaterial
-            color={ARES_COLORS.deepPurple}
-            emissive={ARES_COLORS.electricTeal}
-            emissiveIntensity={0.7}
-            flatShading
-          />
-        </mesh>
       </group>
     </group>
   );
@@ -194,7 +196,6 @@ export function VRPerformanceArena() {
 
   return (
     <group>
-      <ArenaLogo />
       <FloatingPerformanceLoop />
       {ARES_PHASES.map((p) => (
         <PhasePortal key={p} phase={p} />
