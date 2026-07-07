@@ -3,6 +3,12 @@ export const APP_NAME = "A.R.E.S. VR Performance Suite";
 export const ENGINE_NAME = "A.R.E.S. Immersive Performance Engine";
 export const ORG_NAME = "Ares Elite Sports Vision";
 
+/**
+ * Version stamp — visible in the site footer and the VR arena so anyone can
+ * instantly tell which build is live. Bump on every deploy.
+ */
+export const APP_VERSION = "v0.10.0 — audited build";
+
 /** Spatial UI distances (meters) — panels live 1.5–2.5m from the athlete. */
 export const PANEL_NEAR = 1.6;
 export const PANEL_MID = 2.0;

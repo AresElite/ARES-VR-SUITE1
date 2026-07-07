@@ -1,5 +1,5 @@
 import { ARES_PHASES, PHASE_META } from "@/ares/phases";
-import { APP_NAME, ORG_NAME } from "@/ares/constants";
+import { APP_NAME, APP_VERSION, ORG_NAME } from "@/ares/constants";
 import { useAppStore } from "@/app/providers/appStore";
 import { drillsForPhase, ALL_DRILLS } from "@/drills/registry";
 import { MOCK_ATHLETES } from "@/data/mockAthletes";
@@ -163,8 +163,9 @@ export function LandingDashboard({ onEnterDesktop }: { onEnterDesktop: () => voi
         <HistoryTable />
 
         <p className="footer-note">
-          {APP_NAME} · A.R.E.S. Immersive Performance Engine · WebXR requires HTTPS — use the
-          Netlify deploy URL in the Meta Quest Browser. Results stored locally, EMR-sync ready.
+          {APP_NAME} · <b style={{ color: "var(--ares-teal-200)", fontWeight: 600 }}>{APP_VERSION}</b> ·
+          A.R.E.S. Immersive Performance Engine · WebXR requires HTTPS — use the Netlify deploy URL
+          in the Meta Quest Browser. Results stored locally, EMR-sync ready.
         </p>
       </div>
     </div>

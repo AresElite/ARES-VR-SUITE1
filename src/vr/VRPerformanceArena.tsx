@@ -4,7 +4,7 @@ import { Text, useTexture } from "@react-three/drei";
 import * as THREE from "three";
 import { ARES_COLORS } from "@/ares/colors";
 import { ARES_PHASES, PHASE_META, type ARESPhase } from "@/ares/phases";
-import { APP_NAME } from "@/ares/constants";
+import { APP_NAME, APP_VERSION } from "@/ares/constants";
 import { useAppStore } from "@/app/providers/appStore";
 import { SpatialPanel, PanelText } from "./SpatialPanel";
 import { sfx } from "@/utils/audio";
@@ -220,6 +220,14 @@ export function VRPerformanceArena() {
           text="Select a phase portal to begin. Acquire. Route. Execute. Synchronize."
           size={0.042}
           maxWidth={1.25}
+        />
+        <PanelText
+          position={[-0.6, -0.19, 0]}
+          text={APP_VERSION.toUpperCase()}
+          size={0.028}
+          color="#6B749C"
+          maxWidth={1.25}
+          mono
         />
       </SpatialPanel>
     </group>
