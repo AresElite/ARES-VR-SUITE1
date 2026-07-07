@@ -148,12 +148,13 @@ export const EyeHandCoordination: DrillDefinition = {
   name: "Eye-Hand Coordination",
   shortName: "Eye-Hand Coordination",
   phase: "Execute",
-  description: "Multiple targets live at once across the strike wall. Clear them as they appear — each strike spawns the next. Central/peripheral distribution, stimulus size, and color/hand rules are trainer-selectable.",
+  description: "60 seconds. Multiple targets live at once across the strike wall — clear them as they appear; each strike spawns the next. Central/peripheral distribution, stimulus size, and color/hand rules are trainer-selectable.",
   purpose: "Continuous eye-hand mapping, bimanual coverage, scan-and-strike speed.",
   interaction: "touch",
   responseMode: "strike",
   environment: "arena",
   mvp: true,
+  hardStop: true,
   options: [
     {
       id: "colorMode",
@@ -193,32 +194,32 @@ export const EyeHandCoordination: DrillDefinition = {
     },
   ],
   instructions: [
-    "1. Up to three targets are live at once on the strike wall at full arm's reach.",
+    "1. 60 seconds on the clock. Up to three targets live at once on the strike wall at full arm's reach.",
     "2. STRIKE any live target - a new one appears elsewhere the moment you do.",
     "3. Color rules: PURPLE = RIGHT hand. TEAL = LEFT hand. BLUE = either. Purple-only = any hand.",
     "4. The central/peripheral mix follows the selected distribution.",
-    "5. Use BOTH hands - left covers left field, right covers right.",
+    "5. Use BOTH hands - left covers left field, right covers right. Clear as many as you can before time expires.",
   ],
-  controlsHint: "CLEAR THE WALL - PURPLE=R TEAL=L BLUE=ANY",
+  controlsHint: "60s - CLEAR THE WALL - PURPLE=R TEAL=L BLUE=ANY",
   levels: levels25((i) => ({
-    label: `${i < 8 ? 2 : 3} streams — ${(ilerp25(2500, 1400, i) / 1000).toFixed(1)}s windows`,
+    label: `${i < 8 ? 2 : 3} live targets — ${(ilerp25(2500, 1400, i) / 1000).toFixed(1)}s windows`,
     parameters: {
       spreadDeg: lerp25(14, 42, i),
       streams: i < 8 ? 2 : 3,
-      perStream: ilerp25(12, 20, i),
       timeoutMs: ilerp25(2500, 1400, i),
     },
   })),
   buildTrials: (params, rng) => {
     const p = params as {
-      spreadDeg: number; streams: number; perStream: number; timeoutMs: number;
+      spreadDeg: number; streams: number; timeoutMs: number;
       colorMode?: string; distribution?: string; sizeOpt?: string;
     };
     const scale = EHC_SIZES[p.sizeOpt ?? "m"] ?? 0.078;
     const centralFrac = EHC_DIST[p.distribution ?? "50-50"] ?? 0.5;
+    const perStream = Math.ceil(62000 / 480); // ~130 members/stream: never drains in 60s
     const trials: TrialSpec[] = [];
     for (let sIdx = 0; sIdx < p.streams; sIdx++) {
-      for (let i = 0; i < p.perStream; i++) {
+      for (let i = 0; i < perStream; i++) {
         const central = rng() < centralFrac;
         const zone = central ? "center" : (pick(rng, PERIPHERAL_ZONES) as TargetZone);
         const ecc = central ? 2 + rng() * 9 : 16 + rng() * Math.max(10, p.spreadDeg - 16);
@@ -243,10 +244,7 @@ export const EyeHandCoordination: DrillDefinition = {
     }
     return trials;
   },
-  durationMs: (params) => {
-    const p = params as { perStream: number; timeoutMs: number };
-    return 1400 + p.perStream * (p.timeoutMs + 80) + 2500;
-  },
+  durationMs: () => 61500,
 };
 
 // ============================== RAW-REACTION ==============================
