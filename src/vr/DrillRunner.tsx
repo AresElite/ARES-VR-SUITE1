@@ -11,7 +11,7 @@ import { useAppStore } from "@/app/providers/appStore";
 import { handFromPointerEvent, sliceDirectionFromDelta } from "@/drills/shared/InputMapper";
 import type { PoolSlot } from "@/drills/shared/TargetSpawner";
 import { PERF_MODES } from "@/utils/performance";
-import { makePlateTexture, makeRDSTexture } from "@/utils/platePainter";
+import { makeGratingTexture, makePlateTexture, makeRDSTexture } from "@/utils/platePainter";
 import { sfx } from "@/utils/audio";
 import { FONT_MONO } from "@/utils/fonts";
 
@@ -151,8 +151,8 @@ function StrikeColliders() {
       <mesh ref={orbL} visible={false}>
         <sphereGeometry args={[STRIKE_ORB_RADIUS, 12, 12]} />
         <meshStandardMaterial
-          color={ARES_ACCENTS.purpleGlow}
-          emissive={ARES_ACCENTS.purpleGlow}
+          color={ARES_COLORS.electricTeal}
+          emissive={ARES_COLORS.electricTeal}
           emissiveIntensity={0.9}
           transparent
           opacity={0.85}
@@ -161,8 +161,8 @@ function StrikeColliders() {
       <mesh ref={orbR} visible={false}>
         <sphereGeometry args={[STRIKE_ORB_RADIUS, 12, 12]} />
         <meshStandardMaterial
-          color={ARES_COLORS.warningGold}
-          emissive={ARES_COLORS.warningGold}
+          color={ARES_ACCENTS.purpleGlow}
+          emissive={ARES_ACCENTS.purpleGlow}
           emissiveIntensity={0.9}
           transparent
           opacity={0.85}
@@ -267,6 +267,7 @@ function TargetMesh({
   demCursor?: { seq: number };
 }) {
   const group = useRef<THREE.Group>(null);
+  const demRing = useRef<THREE.Mesh>(null);
   const mat = useRef<THREE.MeshStandardMaterial>(null);
   const engine = useAppStore((s) => s.engine);
   const spec = slot.spec;
@@ -307,11 +308,26 @@ function TargetMesh({
       mat.current.opacity = age >= hideAfter ? 0.0 : 1.0;
       mat.current.transparent = true;
     }
-    // DEM cursor highlight: the CURRENT arrow glows gold and lifts
+    // DEM cursor highlight: the CURRENT arrow blazes gold, pulses, and is
+    // ringed by a spinning halo — the rest of the board dims right down.
     if (demCursor && spec.groupMode === "ordered" && spec.meta?.dem && mat.current && group.current) {
-      const isCurrent = spec.seq === demCursor.seq;
-      mat.current.emissiveIntensity = isCurrent ? 1.2 : 0.25;
-      group.current.scale.setScalar(isCurrent ? 1.35 : 1);
+      const isCurrent = (spec.seq ?? 0) === demCursor.seq;
+      if (isCurrent) {
+        mat.current.emissive.set(ARES_COLORS.warningGold);
+        mat.current.color.set(ARES_COLORS.warningGold);
+        mat.current.emissiveIntensity = 1.6 + Math.sin(age * 0.012) * 0.5;
+        group.current.scale.setScalar(2.1 + Math.sin(age * 0.012) * 0.15);
+      } else {
+        const done = (spec.seq ?? 0) < demCursor.seq;
+        mat.current.emissive.set(done ? "#2C7A4B" : "#38406B");
+        mat.current.color.set(done ? "#2C7A4B" : "#38406B");
+        mat.current.emissiveIntensity = 0.3;
+        group.current.scale.setScalar(1);
+      }
+      if (demRing.current) {
+        demRing.current.visible = isCurrent;
+        if (isCurrent) demRing.current.rotation.z = age * 0.003;
+      }
     }
     // Neural Phase Lock: expanding/contracting pulse
     const pulseMs = spec.meta?.pulsePeriodMs as number | undefined;
@@ -335,6 +351,23 @@ function TargetMesh({
         </mesh>
         <mesh position={[0, 0, -0.005]}>
           <ringGeometry args={[spec.scale, spec.scale * 1.06, 40]} />
+          <meshBasicMaterial color="#2D234F" />
+        </mesh>
+      </group>
+    );
+  }
+
+  // Contrast grating disc (contrast sensitivity assessment)
+  if (spec.shape === "grating" && spec.grating) {
+    const gr = spec.grating;
+    return (
+      <group ref={group} position={spec.position} key={version}>
+        <mesh onClick={onHitProxy(spec, engine, desktopClicks && !isDecor)}>
+          <circleGeometry args={[spec.scale, 36]} />
+          <meshBasicMaterial map={makeGratingTexture(gr.contrastPct, gr.cycles, gr.angleDeg, gr.seed)} />
+        </mesh>
+        <mesh position={[0, 0, -0.004]}>
+          <ringGeometry args={[spec.scale, spec.scale * 1.05, 36]} />
           <meshBasicMaterial color="#2D234F" />
         </mesh>
       </group>
@@ -437,6 +470,12 @@ function TargetMesh({
           opacity={isDecor ? 0.8 : 1}
         />
       </mesh>
+      {spec.meta?.dem !== undefined && (
+        <mesh ref={demRing} visible={false} position={[0, 0, -0.006]}>
+          <ringGeometry args={[spec.scale * 1.7, spec.scale * 2.05, 4]} />
+          <meshBasicMaterial color={ARES_COLORS.warningGold} transparent opacity={0.9} side={THREE.DoubleSide} />
+        </mesh>
+      )}
       {spec.label && (
         <Text
           position={[0, spec.scale + 0.075, 0]}
@@ -524,23 +563,22 @@ function LauncherProp() {
     }
   });
   return (
-    <group position={[0, 1.45, -6]} rotation={[Math.PI / 2, 0, 0]}>
-      {/* housing */}
-      <mesh>
+    <group position={[0, 1.45, -6]}>
+      {/* housing — barrel pointing at the athlete */}
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
         <cylinderGeometry args={[0.3, 0.34, 0.25, 20]} />
         <meshStandardMaterial color="#111428" emissive="#2D234F" emissiveIntensity={0.4} flatShading />
       </mesh>
-      {/* muzzle ring */}
-      <mesh position={[0, 0, 0.14]} rotation={[Math.PI / 2, 0, 0]}>
+      {/* muzzle ring facing the athlete */}
+      <mesh position={[0, 0, 0.14]}>
         <torusGeometry args={[0.17, 0.025, 8, 24]} />
         <meshStandardMaterial color="#2998AA" emissive="#2998AA" emissiveIntensity={0.8} />
       </mesh>
-      {/* dark hole */}
-      <mesh position={[0, 0, 0.13]} rotation={[Math.PI / 2, 0, 0]}>
+      <mesh position={[0, 0, 0.135]}>
         <circleGeometry args={[0.15, 20]} />
         <meshBasicMaterial color="#020308" />
       </mesh>
-      <mesh ref={glow} position={[0, 0, 0.15]} rotation={[Math.PI / 2, 0, 0]}>
+      <mesh ref={glow} position={[0, 0, 0.15]}>
         <ringGeometry args={[0.16, 0.24, 24]} />
         <meshBasicMaterial color="#7FD3DE" transparent opacity={0.35} depthWrite={false} />
       </mesh>
@@ -555,14 +593,15 @@ function HexLauncherWall() {
       {Array.from({ length: 6 }, (_, k) => {
         const a = (k / 6) * Math.PI * 2 + Math.PI / 6;
         return (
-          <group key={k} position={[Math.cos(a) * 0.95, Math.sin(a) * 0.62, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <group key={k} position={[Math.cos(a) * 0.95, Math.sin(a) * 0.62, 0]}>
+            {/* ring faces the athlete — a visible porthole, not an edge */}
             <mesh>
               <torusGeometry args={[0.15, 0.022, 8, 22]} />
-              <meshStandardMaterial color="#2998AA" emissive="#2998AA" emissiveIntensity={0.7} />
+              <meshStandardMaterial color="#2998AA" emissive="#2998AA" emissiveIntensity={0.8} />
             </mesh>
-            <mesh position={[0, -0.005, 0]}>
+            <mesh position={[0, 0, 0.005]}>
               <circleGeometry args={[0.135, 18]} />
-              <meshBasicMaterial color="#020308" side={THREE.DoubleSide} />
+              <meshBasicMaterial color="#020308" />
             </mesh>
           </group>
         );

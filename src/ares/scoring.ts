@@ -81,6 +81,37 @@ export function computeMetrics(events: RawEvent[]): SessionMetrics {
 
   const timingConsistencyMs = stddev(rts) !== undefined ? Math.round(stddev(rts)!) : undefined;
 
+  // Best streak + explicit miss count
+  let bestStreak = 0;
+  {
+    let run = 0;
+    for (const e of [...events].sort((a, b) => a.timestamp - b.timestamp)) {
+      if (e.errorType === "correctRejection") continue;
+      if (e.correct) {
+        run += 1;
+        bestStreak = Math.max(bestStreak, run);
+      } else {
+        run = 0;
+      }
+    }
+  }
+  const misses = events.filter((e) => e.errorType === "miss").length;
+
+  // Per-hand split (choice protocols): required side from expectedAction
+  const sideOf = (e: RawEvent): "left" | "right" | null =>
+    e.expectedAction === "hit:left" ? "left" : e.expectedAction === "hit:right" ? "right" : null;
+  const handStats = (side: "left" | "right") => {
+    const evts = scoreable.filter((e) => sideOf(e) === side);
+    if (evts.length === 0) return { rt: undefined as number | undefined, acc: undefined as number | undefined };
+    const hrts = evts.filter((e) => e.correct && e.reactionMs !== undefined).map((e) => e.reactionMs!);
+    return {
+      rt: hrts.length ? Math.round(mean(hrts)!) : undefined,
+      acc: Math.round((evts.filter((e) => e.correct).length / evts.length) * 1000) / 10,
+    };
+  };
+  const L = handStats("left");
+  const R = handStats("right");
+
   // Eye-hand precision: mean distance from target center at contact (cm)
   const precisions = events.filter((e) => e.precisionM !== undefined).map((e) => e.precisionM! * 100);
   const avgPrecisionCm = precisions.length ? Math.round(mean(precisions)! * 10) / 10 : undefined;
@@ -135,5 +166,11 @@ export function computeMetrics(events: RawEvent[]): SessionMetrics {
     speedAccuracyIndex,
     avgPrecisionCm,
     postErrorSlowingMs,
+    bestStreak: bestStreak || undefined,
+    misses,
+    leftAvgReactionMs: L.rt,
+    rightAvgReactionMs: R.rt,
+    leftAccuracyPct: L.acc,
+    rightAccuracyPct: R.acc,
   };
 }

@@ -15,7 +15,7 @@ export type TargetZone =
 export type TargetKind = "go" | "noGo" | "distractor";
 export type HandRule = "left" | "right" | "either" | "both";
 export type Hand = "left" | "right" | "both" | "unknown";
-export type TargetShape = "sphere" | "box" | "diamond" | "ring" | "cone" | "arc" | "pad" | "plate" | "stereo";
+export type TargetShape = "sphere" | "box" | "diamond" | "ring" | "cone" | "arc" | "pad" | "plate" | "stereo" | "grating";
 
 export type SliceDirection =
   | "up"
@@ -67,6 +67,8 @@ export interface TrialSpec {
   plate?: { digit: number; axis: "control" | "rg" | "by"; seed: number };
   /** dichoptic disparity offset in meters (shape "stereo"; + = crossed) */
   stereoShiftM?: number;
+  /** grating disc spec (shape "grating"): Michelson contrast %, cycles, angle */
+  grating?: { contrastPct: number; cycles: number; angleDeg: number; seed: number };
   /** ms from drill start at which this target's kind flips (late cue change) */
   switchKindAt?: number;
   switchKindTo?: TargetKind;
@@ -129,6 +131,15 @@ export interface DrillDefinition {
   hardStop?: boolean;
   /** clinical assessment: fixed standardized protocol (single level) */
   assessment?: boolean;
+  /** adaptive hook: mutate a trial at the moment it spawns (speed ladders,
+      staircases) using the live snapshot; api.finishEarly() ends the plan */
+  onSpawnAdapt?: (
+    spec: TrialSpec,
+    snapshot: { streak: number; hits: number; errors: number; lastEventCorrect?: boolean },
+    api: { finishEarly(): void },
+  ) => void;
+  /** assessment-specific interpretation appended to result notes */
+  analyze?: (events: RawEvent[]) => string[];
   /** trainer-configurable dropdowns; selections merge into build parameters */
   options?: DrillOptionDef[];
   /** One-line control reminder shown during the countdown */

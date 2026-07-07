@@ -37,6 +37,14 @@ export interface SessionMetrics {
   avgPrecisionCm?: number;
   /** mean slowdown of the response following an error vs overall pace (ms) */
   postErrorSlowingMs?: number;
+  /** longest run of consecutive correct responses */
+  bestStreak?: number;
+  /** go targets that expired unanswered */
+  misses?: number;
+  leftAvgReactionMs?: number;
+  rightAvgReactionMs?: number;
+  leftAccuracyPct?: number;
+  rightAccuracyPct?: number;
 }
 
 export interface AQBlock {

@@ -106,6 +106,49 @@ export function makePlateTexture(digit: number, axis: "control" | "rg" | "by", s
   return tex;
 }
 
+/**
+ * CONTRAST GRATING DISCS: Gabor-style sinusoidal luminance gratings on a
+ * mean-luminance field (CSF testing in the Pelli-Robson / CSV-1000 lineage).
+ * Michelson contrast is exact: L = mean * (1 ± c/100). A contrast of 0
+ * produces a statistically identical uniform disc — the perfect distractor.
+ */
+export function makeGratingTexture(contrastPct: number, cycles: number, angleDeg: number, seed: number): THREE.CanvasTexture {
+  const key = `g-${contrastPct}-${cycles}-${angleDeg}-${seed}`;
+  const hit = cache.get(key);
+  if (hit) return hit;
+  const S = 256;
+  const cv = document.createElement("canvas");
+  cv.width = S;
+  cv.height = S;
+  const g = cv.getContext("2d")!;
+  const img = g.createImageData(S, S);
+  const mean = 128;
+  const amp = (contrastPct / 100) * mean;
+  const th = (angleDeg * Math.PI) / 180;
+  const kx = (Math.cos(th) * cycles * Math.PI * 2) / S;
+  const ky = (Math.sin(th) * cycles * Math.PI * 2) / S;
+  const r = rng(seed);
+  for (let y = 0; y < S; y++) {
+    for (let x = 0; x < S; x++) {
+      const dx = x - S / 2;
+      const dy = y - S / 2;
+      // soft circular window so the disc edge never reveals the grating
+      const w = Math.max(0, 1 - Math.pow(Math.hypot(dx, dy) / (S / 2), 6));
+      const v = mean + amp * w * Math.sin(kx * x + ky * y) + (r() - 0.5) * 1.5;
+      const i = (y * S + x) * 4;
+      img.data[i] = v;
+      img.data[i + 1] = v + 2;
+      img.data[i + 2] = v + 6;
+      img.data[i + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  cache.set(key, tex);
+  return tex;
+}
+
 export function makeRDSTexture(seed: number): THREE.CanvasTexture {
   const key = `rds-${seed}`;
   const hit = cache.get(key);

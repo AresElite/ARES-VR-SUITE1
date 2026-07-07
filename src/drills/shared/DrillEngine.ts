@@ -141,6 +141,13 @@ export class DrillEngine {
     this.setState("running");
   }
 
+  /** Adaptive protocols: drop everything unspawned; completes once the
+      currently-active targets resolve (staircase termination). */
+  finishEarly(): void {
+    this.nextTrialIdx = this.trials.length;
+    this.chains.clear();
+  }
+
   /** Trainer stop — ends immediately and still produces a result. */
   stop(): void {
     if (this.state === "complete" || this.state === "aborted") return;
@@ -168,6 +175,7 @@ export class DrillEngine {
     // Spawn due trials
     while (this.nextTrialIdx < this.trials.length && this.trials[this.nextTrialIdx].spawnAt <= now) {
       const spec = this.trials[this.nextTrialIdx++];
+      this.definition.onSpawnAdapt?.(spec, this.getSnapshot(), { finishEarly: () => this.finishEarly() });
       this.resolveSpawnOverlap(spec);
       const slot = this.pool.acquire(spec, now);
       if (slot) {

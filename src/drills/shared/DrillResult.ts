@@ -47,6 +47,9 @@ export function buildSessionResult(
     notes.push(`${metrics.peripheralMisses} peripheral targets missed — Acquire load exceeded.`);
   }
 
+  // assessment-specific clinical interpretation
+  if (def.analyze) notes.push(...def.analyze(events));
+
   const aq = buildAQBlock(def.phase, metrics, ACTION_LABELS[recommendation.action], notes);
 
   const result: ARESDrillSessionResult = {

@@ -1,11 +1,9 @@
-import type { DrillDefinition, TrialSpec } from "@/ares/drillTypes";
+import type { DrillDefinition, RawEvent, TrialSpec } from "@/ares/drillTypes";
 import { pick } from "@/utils/rng";
 
 /**
- * ASSESS — the clinical baseline suite.
- * Fixed, standardized protocols (single level each) producing EMR-ready
- * measurements: fine/gross motor reaction, color vision screening,
- * dichoptic stereopsis, and oculomotor (DEM) function.
+ * ASSESS — the clinical baseline suite (v2).
+ * Standardized protocols with adaptive ladders and threshold staircases.
  */
 
 const PURPLE = "#8B5CF6";
@@ -19,58 +17,76 @@ const STANDARD = (parameters: Record<string, unknown> = {}) => [
   { level: 1, label: "Standard Protocol", parameters },
 ];
 
+const shuffle = <T,>(arr: T[], rng: () => number): T[] => {
+  for (let k = arr.length - 1; k > 0; k--) {
+    const j = Math.floor(rng() * (k + 1));
+    [arr[k], arr[j]] = [arr[j], arr[k]];
+  }
+  return arr;
+};
+
 // ==================== 1. FINE MOTOR RAW REACTION TIME ====================
+// Dominant hand selected before the protocol; only that trigger counts.
+// Release delays are fully randomized (uniform 500–3500 ms — no rhythm).
 export const FineMotorRawRT: DrillDefinition = {
   id: "assess-fm-raw-rt",
   name: "Fine Motor Raw Reaction Time",
   shortName: "FM Raw RT",
   phase: "Assess",
-  description: "25 trials. A PURPLE sphere fires from the central hole after a random delay — CLICK the trigger (either hand) the instant it launches. Average simple reaction time is recorded.",
-  purpose: "Simple visuomotor reaction time (finger trigger).",
+  description: "25 trials. A PURPLE sphere fires from the central hole after a FULLY RANDOMIZED delay — click the trigger of your DOMINANT hand the instant it launches.",
+  purpose: "Simple visuomotor reaction time (dominant-hand trigger).",
   interaction: "touch",
   responseMode: "trigger",
   launcher: true,
   environment: "arena",
   mvp: true,
   assessment: true,
-  instructions: [
-    "1. Watch the launcher hole dead ahead. Nothing happens for a random delay.",
-    "2. The instant the PURPLE sphere fires, CLICK the top trigger - either hand.",
-    "3. Do NOT anticipate - early clicks count as false starts.",
-    "4. 25 trials. Your overall average reaction time is the score.",
+  options: [
+    { id: "dominantHand", label: "Dominant hand", defaultValue: "right",
+      values: [ { id: "right", label: "Right" }, { id: "left", label: "Left" } ] },
   ],
-  controlsHint: "PURPLE FIRES - CLICK THE TRIGGER INSTANTLY - 25 TRIALS",
-  levels: STANDARD({ trials: 25, speed: 8, minDelay: 800, maxDelay: 2400, size: 0.08 }),
+  instructions: [
+    "1. Select your DOMINANT hand on the setup panel - that trigger is the only one that counts.",
+    "2. Watch the launcher hole. The delay before each launch is completely random - no rhythm to ride.",
+    "3. The instant the PURPLE sphere fires, CLICK your dominant-hand trigger.",
+    "4. Do NOT anticipate. Early clicks and wrong-hand clicks are scored against you. 25 trials.",
+  ],
+  controlsHint: "DOMINANT TRIGGER ONLY - RANDOM DELAYS - 25 TRIALS",
+  levels: STANDARD({ trials: 25, speed: 8, size: 0.08 }),
   buildTrials: (params, rng) => {
-    const p = params as { trials: number; speed: number; minDelay: number; maxDelay: number; size: number };
+    const p = params as { trials: number; speed: number; size: number; dominantHand?: string };
+    const dom = p.dominantHand === "left" ? "left" : "right";
     const travelMs = (Math.abs(LAUNCH_Z) / p.speed) * 1000;
     const trials: TrialSpec[] = [];
     let t = 1500;
     for (let i = 0; i < p.trials; i++) {
-      t += p.minDelay + rng() * (p.maxDelay - p.minDelay);
+      t += 500 + rng() * 3000; // 100% randomized release delay
       trials.push({
         id: `fmr-${i}`, spawnAt: t, duration: travelMs + 250, kind: "go", zone: "center",
         position: [0, 1.45, LAUNCH_Z], velocity: [(rng() - 0.5) * 0.2, (rng() - 0.5) * 0.15, p.speed],
+        requiredHand: dom as "left" | "right",
         color: PURPLE, emissive: PURPLE, shape: "sphere", scale: p.size,
       });
-      t += travelMs + 400;
+      t += travelMs + 300 + rng() * 300;
     }
     return trials;
   },
   durationMs: (params) => {
-    const p = params as { trials: number; speed: number; maxDelay: number };
-    return 1500 + p.trials * (p.maxDelay + (Math.abs(LAUNCH_Z) / p.speed) * 1000 + 650) + 1500;
+    const p = params as { trials: number; speed: number };
+    return 1500 + p.trials * (3500 + (Math.abs(LAUNCH_Z) / p.speed) * 1000 + 600) + 1500;
   },
 };
 
 // ==================== 2. FINE MOTOR CHOICE REACTION TIME ====================
+// Fully randomized delays; results split RIGHT vs LEFT reaction time and
+// accuracy, plus post-error slowing (see the results dashboard).
 export const FineMotorChoiceRT: DrillDefinition = {
   id: "assess-fm-choice-rt",
   name: "Fine Motor Choice Reaction Time",
   shortName: "FM Choice RT",
   phase: "Assess",
-  description: "25 randomized trials. PURPLE ball = RIGHT top trigger. TEAL ball = LEFT top trigger. Choice reaction time and wrong-hand errors are recorded.",
-  purpose: "Two-choice visuomotor reaction time (finger trigger).",
+  description: "25 randomized trials, fully randomized release delays. PURPLE = RIGHT trigger, TEAL = LEFT trigger. Results split right vs left reaction time and accuracy, with post-error slowing.",
+  purpose: "Two-choice reaction time with per-hand analytics.",
   interaction: "touch",
   responseMode: "trigger",
   launcher: true,
@@ -78,27 +94,21 @@ export const FineMotorChoiceRT: DrillDefinition = {
   mvp: true,
   assessment: true,
   instructions: [
-    "1. Balls fire from the central hole after random delays.",
-    "2. PURPLE ball - click the RIGHT top trigger.",
-    "3. TEAL ball - click the LEFT top trigger.",
-    "4. Click the instant it fires. Wrong-hand and early clicks are scored.",
-    "5. 25 trials. Average choice reaction time is the score.",
+    "1. Balls fire from the central hole after COMPLETELY RANDOM delays - some fast, some slow.",
+    "2. PURPLE ball - click the RIGHT top trigger. TEAL ball - click the LEFT top trigger.",
+    "3. Click the instant it fires. Wrong-hand and early clicks are scored.",
+    "4. 25 trials. Your right-hand and left-hand reaction times and accuracy are reported separately.",
   ],
-  controlsHint: "PURPLE = RIGHT TRIGGER - TEAL = LEFT TRIGGER - 25 TRIALS",
-  levels: STANDARD({ trials: 25, speed: 7.5, minDelay: 800, maxDelay: 2400, size: 0.08 }),
+  controlsHint: "PURPLE = RIGHT - TEAL = LEFT - RANDOM DELAYS - 25 TRIALS",
+  levels: STANDARD({ trials: 25, speed: 7.5, size: 0.08 }),
   buildTrials: (params, rng) => {
-    const p = params as { trials: number; speed: number; minDelay: number; maxDelay: number; size: number };
+    const p = params as { trials: number; speed: number; size: number };
     const travelMs = (Math.abs(LAUNCH_Z) / p.speed) * 1000;
-    // balanced deck: exactly half purple / half teal, shuffled
-    const deck = Array.from({ length: p.trials }, (_, k) => k % 2 === 0);
-    for (let k = deck.length - 1; k > 0; k--) {
-      const j = Math.floor(rng() * (k + 1));
-      [deck[k], deck[j]] = [deck[j], deck[k]];
-    }
+    const deck = shuffle(Array.from({ length: p.trials }, (_, k) => k % 2 === 0), rng);
     const trials: TrialSpec[] = [];
     let t = 1500;
     for (let i = 0; i < p.trials; i++) {
-      t += p.minDelay + rng() * (p.maxDelay - p.minDelay);
+      t += 500 + rng() * 3000; // 100% randomized release delay
       const isPurple = deck[i];
       trials.push({
         id: `fmc-${i}`, spawnAt: t, duration: travelMs + 250, kind: "go",
@@ -108,96 +118,107 @@ export const FineMotorChoiceRT: DrillDefinition = {
         color: isPurple ? PURPLE : TEAL, emissive: isPurple ? PURPLE : TEAL,
         shape: "sphere", scale: p.size,
       });
-      t += travelMs + 400;
+      t += travelMs + 300 + rng() * 300;
     }
     return trials;
   },
   durationMs: (params) => {
-    const p = params as { trials: number; speed: number; maxDelay: number };
-    return 1500 + p.trials * (p.maxDelay + (Math.abs(LAUNCH_Z) / p.speed) * 1000 + 650) + 1500;
+    const p = params as { trials: number; speed: number };
+    return 1500 + p.trials * (3500 + (Math.abs(LAUNCH_Z) / p.speed) * 1000 + 600) + 1500;
   },
 };
 
-// ==================== 3/4. GROSS MOTOR (hexagon interception) ====================
-// Six launcher holes in a hexagon; the ball flies past the athlete on a
-// trajectory offset toward its hole's direction — the athlete must MOVE the
-// hand to intercept before it passes. Contact distance from target center is
-// recorded as eye-hand precision.
+// ============ 3/4. GROSS MOTOR (adaptive 120-second hexagon ladder) ============
+// Balls fire faster as the streak grows and ease off after misses — the
+// ladder finds the fastest speed the athlete can still coordinate. 120 s on
+// the clock; each interception spawns the next launch.
 function buildGrossTrials(
-  p: { trials: number; speed: number; minDelay: number; maxDelay: number; size: number; choice: boolean; dominantHand?: string },
+  p: { speed: number; size: number; choice: boolean; dominantHand?: string },
   rng: () => number,
   idp: string,
 ): TrialSpec[] {
   const trials: TrialSpec[] = [];
   const travelDist = Math.abs(LAUNCH_Z) + 0.35;
-  const travelMs = (travelDist / p.speed) * 1000;
   const dom = p.dominantHand === "left" ? "left" : "right";
-  // balanced hole + color decks
-  const holes = Array.from({ length: p.trials }, (_, k) => k % 6);
-  const colors = Array.from({ length: p.trials }, (_, k) => k % 2 === 0);
-  for (const arr of [holes, colors] as const) {
-    for (let k = arr.length - 1; k > 0; k--) {
-      const j = Math.floor(rng() * (k + 1));
-      [(arr as number[] | boolean[])[k], (arr as number[] | boolean[])[j]] = [(arr as number[] | boolean[])[j], (arr as number[] | boolean[])[k]];
-    }
-  }
-  let t = 2000;
-  for (let i = 0; i < p.trials; i++) {
-    t += p.minDelay + rng() * (p.maxDelay - p.minDelay);
-    const a = (holes[i] / 6) * Math.PI * 2 + Math.PI / 6;
+  const members = 110; // ladder never runs dry inside 120s
+  const colors = shuffle(Array.from({ length: members }, (_, k) => k % 2 === 0), rng);
+  for (let i = 0; i < members; i++) {
+    const hole = Math.floor(rng() * 6);
+    const a = (hole / 6) * Math.PI * 2 + Math.PI / 6;
     const hx = Math.cos(a) * 0.95;
     const hy = 1.45 + Math.sin(a) * 0.62;
-    // pass point: same direction as the hole, compressed to the reach shell
     const px = Math.cos(a) * (0.32 + rng() * 0.14);
     const py = 1.45 + Math.sin(a) * (0.24 + rng() * 0.1);
-    const vx = (px - hx) / (travelMs / 1000);
-    const vy = (py - hy) / (travelMs / 1000);
+    const dx = px - hx;
+    const dy = py - hy;
+    const dz = travelDist;
+    const len = Math.hypot(dx, dy, dz);
     const isPurple = p.choice ? (colors[i] as boolean) : true;
+    const travelMs = (travelDist / p.speed) * 1000;
     trials.push({
-      id: `${idp}-${i}`, spawnAt: t, duration: travelMs + 120, kind: "go",
+      id: `${idp}-${i}`,
+      spawnAt: i === 0 ? 1500 : -1,
+      chainId: idp,
+      chainGapMs: 500 + Math.floor(rng() * 900),
+      seq: i,
+      duration: travelMs + 120,
+      kind: "go",
       zone: px < -0.12 ? "left" : px > 0.12 ? "right" : "center",
       position: [hx, hy, LAUNCH_Z],
-      velocity: [vx, vy, p.speed],
+      velocity: [(dx / len) * p.speed * (len / travelDist), (dy / len) * p.speed * (len / travelDist), p.speed],
       requiredHand: p.choice ? (isPurple ? "right" : "left") : (dom as "left" | "right"),
-      color: isPurple ? PURPLE : TEAL, emissive: isPurple ? PURPLE : TEAL,
-      shape: "sphere", scale: p.size,
+      color: isPurple ? PURPLE : TEAL,
+      emissive: isPurple ? PURPLE : TEAL,
+      shape: "sphere",
+      scale: p.size,
+      meta: { baseVx: dx / len, baseVy: dy / len, baseSpeed: p.speed, travelDist, lenRatio: len / travelDist },
     });
-    t += travelMs + 500;
   }
   return trials;
 }
-const grossDuration = (params: Record<string, unknown>) => {
-  const p = params as { trials: number; speed: number; maxDelay: number };
-  return 2000 + p.trials * (p.maxDelay + ((Math.abs(LAUNCH_Z) + 0.35) / p.speed) * 1000 + 620) + 1500;
-};
+
+/** speed ladder: +7% per streak step, capped at 2.4×; misses reset streak. */
+function grossAdapt(spec: TrialSpec, snapshot: { streak: number }): void {
+  const base = spec.meta?.baseSpeed as number;
+  if (!base) return;
+  const factor = Math.min(2.4, 1 + snapshot.streak * 0.07);
+  const speed = base * factor;
+  const ratio = spec.meta?.lenRatio as number;
+  const ux = spec.meta?.baseVx as number;
+  const uy = spec.meta?.baseVy as number;
+  spec.velocity = [ux * speed * ratio, uy * speed * ratio, speed];
+  spec.duration = ((spec.meta?.travelDist as number) / speed) * 1000 + 120;
+}
 
 export const GrossMotorRawRT: DrillDefinition = {
   id: "assess-gm-raw-rt",
   name: "Gross Motor Raw Reaction Time",
   shortName: "GM Raw RT",
   phase: "Assess",
-  description: "25 trials. A PURPLE ball fires from one of six hexagon holes — intercept it with your DOMINANT hand before it flies past. Reaction time, hit accuracy, and eye-hand precision (contact distance from center) are recorded.",
-  purpose: "Whole-arm interception: reaction, accuracy, precision.",
+  description: "120 seconds. PURPLE balls fire from the hexagon — intercept with your DOMINANT hand. Every catch speeds the next launch up (+7% per streak step); misses ease it back. Finds your fastest coordinated interception speed.",
+  purpose: "Adaptive whole-arm interception speed ceiling.",
   interaction: "touch",
   responseMode: "strike",
   hexWall: true,
   environment: "arena",
   mvp: true,
   assessment: true,
+  hardStop: true,
   options: [
     { id: "dominantHand", label: "Dominant hand", defaultValue: "right",
       values: [ { id: "right", label: "Right" }, { id: "left", label: "Left" } ] },
   ],
   instructions: [
-    "1. Six holes form a hexagon ahead of you. A PURPLE ball fires from a random hole.",
-    "2. Move your DOMINANT hand - side to side, up or down - and make contact before it passes you.",
-    "3. The ball travels toward your side of the hexagon; read the hole, move early, intercept cleanly.",
-    "4. 25 trials. Average reaction time, hits vs stimuli, and contact precision are recorded.",
+    "1. 120 seconds. Six visible portholes form a hexagon ahead of you.",
+    "2. A PURPLE ball fires from a random hole - intercept it with your DOMINANT hand before it passes.",
+    "3. Every catch makes the next launch FASTER. A miss slows the ladder back down.",
+    "4. Scored: total hits, best streak, average and fastest reaction, misses, contact precision.",
   ],
-  controlsHint: "DOMINANT HAND ONLY - INTERCEPT BEFORE IT PASSES - 25 TRIALS",
-  levels: STANDARD({ trials: 25, speed: 5.2, minDelay: 900, maxDelay: 2200, size: 0.09, choice: false }),
+  controlsHint: "120s - DOMINANT HAND - EVERY CATCH SPEEDS IT UP",
+  levels: STANDARD({ speed: 4.2, size: 0.09, choice: false }),
   buildTrials: (params, rng) => buildGrossTrials(params as never, rng, "gmr"),
-  durationMs: grossDuration,
+  onSpawnAdapt: (spec, snapshot) => grossAdapt(spec, snapshot),
+  durationMs: () => 122000,
 };
 
 export const GrossMotorChoiceRT: DrillDefinition = {
@@ -205,208 +226,374 @@ export const GrossMotorChoiceRT: DrillDefinition = {
   name: "Gross Motor Choice Reaction Time",
   shortName: "GM Choice RT",
   phase: "Assess",
-  description: "25 trials from the hexagon: PURPLE ball = intercept with the RIGHT hand, TEAL = LEFT hand. Right/left reaction times, hit accuracy, and eye-hand precision are recorded (side split shown as L/R asymmetry).",
-  purpose: "Whole-arm choice interception with hand mapping.",
+  description: "120 seconds from the hexagon: PURPLE = RIGHT hand, TEAL = LEFT hand. The launch speed climbs with your streak and eases after misses. Results split right vs left reaction time and accuracy.",
+  purpose: "Adaptive whole-arm choice interception ceiling.",
   interaction: "touch",
   responseMode: "strike",
   hexWall: true,
   environment: "arena",
   mvp: true,
   assessment: true,
+  hardStop: true,
   instructions: [
-    "1. Balls fire from random hexagon holes.",
-    "2. PURPLE ball - intercept with your RIGHT hand.",
-    "3. TEAL ball - intercept with your LEFT hand.",
-    "4. Move the correct hand into the flight path and make contact before it passes.",
-    "5. 25 trials. Right/left reaction times, accuracy, and contact precision are recorded.",
+    "1. 120 seconds. Balls fire from random hexagon portholes.",
+    "2. PURPLE ball - RIGHT hand. TEAL ball - LEFT hand. Intercept before it passes.",
+    "3. Every catch makes the next launch FASTER; misses ease it back down.",
+    "4. Scored: hits, best streak, right vs left reaction time and accuracy, fastest catch, precision.",
   ],
-  controlsHint: "PURPLE = RIGHT HAND - TEAL = LEFT HAND - 25 TRIALS",
-  levels: STANDARD({ trials: 25, speed: 5.0, minDelay: 900, maxDelay: 2200, size: 0.09, choice: true }),
+  controlsHint: "120s - PURPLE=RIGHT TEAL=LEFT - SPEED CLIMBS WITH YOUR STREAK",
+  levels: STANDARD({ speed: 4.0, size: 0.09, choice: true }),
   buildTrials: (params, rng) => buildGrossTrials(params as never, rng, "gmc"),
-  durationMs: grossDuration,
+  onSpawnAdapt: (spec, snapshot) => grossAdapt(spec, snapshot),
+  durationMs: () => 122000,
 };
 
 // ==================== 5. COLOR VISION (Ishihara Interactive) ====================
-// Pseudo-isochromatic dot plates on drifting discs. 14 plates: 2 luminance
-// control plates (comprehension check), 8 red-green confusion-axis plates
-// (protan/deutan screening), 4 blue-yellow plates (tritan). The athlete
-// answers by striking one of four numbered pads. Screening instrument:
-// display-calibrated inks differ from print — flags candidates for formal
-// plate testing rather than diagnosing type/severity.
+const CV_AXES: ("control" | "rg" | "by")[] = [
+  "control", "rg", "rg", "by", "rg", "rg", "control", "by", "rg", "rg", "by", "rg", "by", "rg",
+];
+
 export const ColorVisionAssessment: DrillDefinition = {
   id: "assess-color-vision",
   name: "Color Vision (Ishihara Interactive)",
   shortName: "Color Vision",
   phase: "Assess",
-  description: "14 pseudo-isochromatic plates drift across your view — read the hidden number and strike the matching answer pad. Control, red-green, and blue-yellow confusion-axis plates. Clinical screening for color-discrimination deficits.",
-  purpose: "Color-discrimination screening on dichromatic confusion axes.",
+  description: "14 pseudo-isochromatic plates fly through your view — left, right, up, down, diagonal, even straight at you. Answer and the plate clears for the next. Axis-specific errors classify the deficit pattern.",
+  purpose: "Color-discrimination screening with axis classification.",
   interaction: "touch",
   responseMode: "strike",
   environment: "arena",
   mvp: true,
   assessment: true,
   instructions: [
-    "1. A dotted plate appears ahead and drifts slowly - somewhere in the dots is a NUMBER.",
-    "2. Read the number, then strike the matching answer pad below.",
-    "3. If you truly cannot see a number, strike the '?' pad - do not guess.",
-    "4. 14 plates. Some are visible to everyone; others test specific color axes.",
+    "1. A dotted plate flies through your view - direction changes every time. Somewhere in the dots is a NUMBER.",
+    "2. Read it and strike the matching answer pad. The plate clears instantly and the next appears.",
+    "3. If you truly cannot see a number, strike the '?' pad - never guess.",
+    "4. 14 plates. Reaction time, accuracy, and the deficit axis pattern are reported.",
   ],
-  controlsHint: "READ THE HIDDEN NUMBER - STRIKE THE MATCHING PAD",
-  levels: STANDARD({ plates: 14, exposureMs: 7000 }),
+  controlsHint: "READ THE FLYING NUMBER - STRIKE THE PAD - NEXT ONE COMES",
+  levels: STANDARD({ plates: 14, exposureMs: 6000 }),
   buildTrials: (params, rng) => {
     const p = params as { plates: number; exposureMs: number };
-    const axes: ("control" | "rg" | "by")[] = [
-      "control", "rg", "rg", "by", "rg", "rg", "control", "by", "rg", "rg", "by", "rg", "by", "rg",
-    ].slice(0, p.plates) as never;
     const trials: TrialSpec[] = [];
     let t = 2000;
     for (let i = 0; i < p.plates; i++) {
       const digit = 1 + Math.floor(rng() * 9);
-      const groupId = `cv-${axes[i]}-${i}`;
-      // the drifting plate (decorative — the ANSWER is the pad strike)
+      const axis = CV_AXES[i % CV_AXES.length];
+      const groupId = `cv-${axis}-${i}`;
+      // flight path variety: L->R, R->L, up, down, diagonals, in/out
+      const paths: { pos: [number, number, number]; vel: [number, number, number] }[] = [
+        { pos: [-0.35, 1.5, -1.1], vel: [0.1, 0, 0] },
+        { pos: [0.35, 1.5, -1.1], vel: [-0.1, 0, 0] },
+        { pos: [0, 1.3, -1.1], vel: [0, 0.07, 0] },
+        { pos: [0, 1.72, -1.1], vel: [0, -0.07, 0] },
+        { pos: [-0.3, 1.32, -1.1], vel: [0.09, 0.055, 0] },
+        { pos: [0.3, 1.68, -1.1], vel: [-0.09, -0.055, 0] },
+        { pos: [0, 1.5, -1.7], vel: [0, 0, 0.13] },
+        { pos: [0, 1.5, -0.95], vel: [0, 0, -0.11] },
+      ];
+      const path = paths[Math.floor(rng() * paths.length)];
       trials.push({
         id: `${groupId}-plate`, spawnAt: t, duration: p.exposureMs, kind: "distractor", decor: true,
-        zone: "center", position: [-0.22, 1.52, -1.1],
-        velocity: [0.06 + rng() * 0.04, (rng() - 0.5) * 0.02, 0],
+        zone: "center", position: path.pos, velocity: path.vel,
         color: WHITE, shape: "plate", scale: 0.24,
-        plate: { digit, axis: axes[i], seed: 1000 + i * 77 + digit },
+        plate: { digit, axis, seed: 1000 + i * 77 + digit },
+        groupId, // clears with the answer
       });
-      // four answer pads: correct digit + 2 confusables + "?" (cannot see)
       const wrong1 = ((digit + 2 + Math.floor(rng() * 5)) % 9) + 1;
       let wrong2 = ((digit + 5 + Math.floor(rng() * 3)) % 9) + 1;
       if (wrong2 === wrong1 || wrong2 === digit) wrong2 = (wrong2 % 9) + 1;
-      const answers = [String(digit), String(wrong1), String(wrong2), "?"];
-      // shuffle pad order
-      for (let k = answers.length - 1; k > 0; k--) {
-        const j = Math.floor(rng() * (k + 1));
-        [answers[k], answers[j]] = [answers[j], answers[k]];
-      }
+      const answers = shuffle([String(digit), String(wrong1), String(wrong2), "?"], rng);
       answers.forEach((label, k) => {
         trials.push({
-          id: `${groupId}-p${k}`, spawnAt: t + 600, duration: p.exposureMs - 600,
+          id: `${groupId}-p${k}`, spawnAt: t + 500, duration: p.exposureMs - 500,
           kind: label === String(digit) ? "go" : "distractor",
-          zone: "center", position: [-0.51 + k * 0.34, 1.05, -0.62],
+          zone: "center", position: [-0.51 + k * 0.34, 1.02, -0.62],
           color: GRAY, emissive: TEAL, shape: "pad", scale: 0.06, label, groupId,
         });
       });
-      t += p.exposureMs + 900;
+      t += p.exposureMs + 800;
     }
     return trials;
   },
+  analyze: (events: RawEvent[]) => {
+    const axisErr = (ax: string) => {
+      const evts = events.filter((e) => e.trialId.startsWith(`cv-${ax}-`) && e.errorType !== "correctRejection");
+      const wrong = evts.filter((e) => !e.correct).length;
+      return { wrong, total: evts.length };
+    };
+    const ctl = axisErr("control");
+    const rg = axisErr("rg");
+    const by = axisErr("by");
+    const notes: string[] = [];
+    if (ctl.wrong > 0) {
+      notes.push(`Control plates missed (${ctl.wrong}/${ctl.total}) - verify comprehension before interpreting axes.`);
+    }
+    if (rg.total && rg.wrong / rg.total >= 0.375) {
+      notes.push(`Red-green axis: ${rg.wrong}/${rg.total} missed - protan/deutan pattern. Refer for formal anomaloscope or printed plate testing.`);
+    } else if (rg.wrong > 0) {
+      notes.push(`Red-green axis: ${rg.wrong}/${rg.total} missed - borderline; consider retest.`);
+    }
+    if (by.total && by.wrong / by.total >= 0.5) {
+      notes.push(`Blue-yellow axis: ${by.wrong}/${by.total} missed - tritan pattern (rare; consider acquired etiology).`);
+    }
+    if (notes.length === 0) notes.push("Color discrimination within normal limits on both confusion axes.");
+    return notes;
+  },
   durationMs: (params) => {
     const p = params as { plates: number; exposureMs: number };
-    return 2000 + p.plates * (p.exposureMs + 900) + 1500;
+    return 2000 + p.plates * (p.exposureMs + 800) + 1500;
   },
 };
 
-// ==================== 6. STEREOPSIS (Dichoptic Randot) ====================
-// Four random-dot discs per trial; one carries true retinal disparity (the
-// left-eye and right-eye renderings are horizontally offset — the VR
-// displays present each eye its own image, replacing Randot polarization
-// with direct dichoptic control). Disparity descends 400" -> 20" arcsec at a
-// 1.0 m test distance. Zero monocular cues: identical dot statistics on all
-// four discs. Score = finest disparity reliably detected.
-const ARCSEC_SERIES = [400, 280, 200, 140, 100, 70, 50, 40, 30, 20];
+// ==================== 6. STEREOPSIS (staircase to threshold) ====================
+// Starts blatantly obvious (800") and steps finer after every correct pick.
+// A wrong pick steps back up; THREE consecutive wrong answers terminate the
+// staircase. The finest disparity answered correctly is the threshold.
+const STEREO_LADDER = [800, 600, 450, 340, 260, 200, 150, 110, 80, 60, 45, 35, 25, 20, 15];
+
+interface StairState { idx: number; wrongRun: number; applied: number; best: number | null; done: boolean }
+const stereoState: StairState = { idx: 0, wrongRun: 0, applied: STEREO_LADDER[0], best: null, done: false };
 
 export const StereopsisAssessment: DrillDefinition = {
   id: "assess-stereopsis",
   name: "Stereopsis (Dichoptic Randot)",
   shortName: "Stereopsis",
   phase: "Assess",
-  description: "Four random-dot discs — one floats in depth via true per-eye retinal disparity (400 down to 20 arcsec at 1 m). Strike the floating disc. Headset presentation replaces polarized Randot glasses with direct dichoptic control.",
-  purpose: "Global stereopsis threshold (arcseconds of disparity).",
+  description: "Adaptive staircase: begins with unmistakable depth (800 arcsec) and steps finer after every correct pick. Three consecutive misses end the test — the finest disparity you resolved is your threshold.",
+  purpose: "Global stereopsis threshold via adaptive staircase.",
   interaction: "touch",
   responseMode: "strike",
   environment: "arena",
   mvp: true,
   assessment: true,
   instructions: [
-    "1. Four dotted discs appear in a row, one meter ahead.",
-    "2. ONE disc floats in depth - it is invisible without two-eyed depth perception.",
-    "3. Strike the floating disc. If none floats, the level may be beyond your threshold - pick your best read.",
-    "4. Depth gets subtler every round: 400 down to 20 arcseconds. 20 rounds.",
-    "5. Requires the headset - the effect cannot appear on a flat screen.",
+    "1. Four dotted discs appear. ONE floats in depth - at first it is obvious.",
+    "2. Strike the floating disc. Every correct pick makes the depth subtler.",
+    "3. A wrong pick steps back to an easier level. Three misses in a row ends the test.",
+    "4. Your threshold - the finest disparity you resolved - is recorded in arcseconds.",
+    "5. Headset required: the depth physically cannot appear on a flat screen.",
   ],
-  controlsHint: "STRIKE THE DISC THAT FLOATS - DEPTH GETS SUBTLER",
-  levels: STANDARD({ perDisparity: 2, exposureMs: 8000 }),
+  controlsHint: "STRIKE THE FLOATING DISC - IT GETS SUBTLER EVERY TIME",
+  levels: STANDARD({ maxTrials: 24, exposureMs: 6500 }),
   buildTrials: (params, rng) => {
-    const p = params as { perDisparity: number; exposureMs: number };
-    const D = 1.0; // meters — viewing distance for arcsec conversion
+    // reset the staircase for this session
+    stereoState.idx = 0;
+    stereoState.wrongRun = 0;
+    stereoState.applied = STEREO_LADDER[0];
+    stereoState.best = null;
+    stereoState.done = false;
+    const p = params as { maxTrials: number; exposureMs: number };
     const trials: TrialSpec[] = [];
     let t = 2000;
-    let n = 0;
-    for (const arcsec of ARCSEC_SERIES) {
-      for (let rep = 0; rep < p.perDisparity; rep++) {
-        const groupId = `st-${arcsec}-${rep}`;
-        const shift = D * arcsec * 4.848e-6; // meters of horizontal offset
-        const targetIdx = Math.floor(rng() * 4);
-        for (let k = 0; k < 4; k++) {
-          trials.push({
-            id: `${groupId}-d${k}`, spawnAt: t, duration: p.exposureMs,
-            kind: k === targetIdx ? "go" : "distractor",
-            zone: "center", position: [-0.45 + k * 0.3, 1.45, -D],
-            color: WHITE, shape: "stereo", scale: 0.105,
-            stereoShiftM: k === targetIdx ? shift : 0,
-            groupId,
-            meta: { rdsSeed: 500 + n * 13 + k },
-          });
-        }
-        t += p.exposureMs + 800;
-        n++;
+    for (let n = 0; n < p.maxTrials; n++) {
+      const groupId = `st-${n}`;
+      const targetIdx = Math.floor(rng() * 4);
+      for (let k = 0; k < 4; k++) {
+        trials.push({
+          id: `${groupId}-d${k}`, spawnAt: t, duration: p.exposureMs,
+          kind: k === targetIdx ? "go" : "distractor",
+          zone: "center", position: [-0.45 + k * 0.3, 1.45, -1.0],
+          color: WHITE, shape: "stereo", scale: 0.105,
+          stereoShiftM: 0, // applied by the staircase at spawn
+          groupId,
+          meta: { rdsSeed: 500 + n * 13 + k, stairFirst: k === 0, isTarget: k === targetIdx },
+        });
       }
+      t += p.exposureMs + 700;
     }
     return trials;
   },
+  onSpawnAdapt: (spec, snapshot, api) => {
+    if (stereoState.done) {
+      api.finishEarly();
+      spec.meta = { ...spec.meta, decor: true };
+      spec.duration = 10;
+      return;
+    }
+    if (spec.meta?.stairFirst) {
+      // fold in the previous trial's outcome
+      if (snapshot.hits + snapshot.errors > 0 && snapshot.lastEventCorrect !== undefined) {
+        if (snapshot.lastEventCorrect) {
+          stereoState.best = stereoState.best === null ? stereoState.applied : Math.min(stereoState.best, stereoState.applied);
+          stereoState.wrongRun = 0;
+          stereoState.idx = Math.min(STEREO_LADDER.length - 1, stereoState.idx + 1);
+        } else {
+          stereoState.wrongRun += 1;
+          stereoState.idx = Math.max(0, stereoState.idx - 1);
+          if (stereoState.wrongRun >= 3) {
+            stereoState.done = true;
+            api.finishEarly();
+            spec.meta = { ...spec.meta, decor: true };
+            spec.duration = 10;
+            return;
+          }
+        }
+      }
+      stereoState.applied = STEREO_LADDER[stereoState.idx];
+    }
+    if (spec.meta?.isTarget) {
+      spec.stereoShiftM = 1.0 * stereoState.applied * 4.848e-6; // 1 m test distance
+    }
+  },
+  analyze: () => {
+    // fold in the final trial's outcome via best already tracked at spawns;
+    // report the finest disparity that was answered correctly
+    if (stereoState.best === null) {
+      return ["No disparity level was reliably resolved - gross stereopsis deficit pattern; refer for full binocular workup."];
+    }
+    return [
+      `Stereoacuity threshold achieved: ${stereoState.best} arcsec (staircase ${stereoState.done ? "terminated on 3 consecutive misses" : "completed"}).`,
+      stereoState.best <= 40
+        ? "Fine global stereopsis - within elite athletic norms."
+        : stereoState.best <= 100
+          ? "Moderate stereoacuity - trainable range."
+          : "Reduced stereoacuity - consider binocular vision evaluation.",
+    ];
+  },
   durationMs: (params) => {
-    const p = params as { perDisparity: number; exposureMs: number };
-    return 2000 + ARCSEC_SERIES.length * p.perDisparity * (p.exposureMs + 800) + 1500;
+    const p = params as { maxTrials: number; exposureMs: number };
+    return 2000 + p.maxTrials * (p.exposureMs + 700) + 1500;
   },
 };
 
-// ==================== 7. DEM (ARROWS) ====================
-// Developmental Eye Movement test, arrow form. Vertical subtests A and B
-// (two columns of 25) isolate visual-verbal automaticity from oculomotor
-// demand; the horizontal subtest imposes DEM-style left-to-right saccadic
-// scanning with irregular spacing; DEM-100 extends to 100 arrows with
-// variable spacing and vertical jitter loading microsaccadic precision.
-// Response: dominant-hand thumbstick flick matching each arrow's direction.
-// Recorded: total time, accuracy, post-error slowing, and (A/B vs C) the
-// vertical/horizontal ratio analog.
+// ==================== 7. CONTRAST SENSITIVITY (staircase) ====================
+// Grating-disc 4-AFC in the Pelli-Robson / CSV-1000 lineage: one disc holds
+// a sinusoidal grating, three are statistically identical uniform discs.
+// Contrast descends on a log ladder after each correct pick; three
+// consecutive misses terminate. Threshold reported as logCS.
+const CS_LADDER = [40, 25, 16, 10, 6.3, 4, 2.5, 1.6, 1.0, 0.63, 0.4];
+const csState: StairState = { idx: 0, wrongRun: 0, applied: CS_LADDER[0], best: null, done: false };
+
+export const ContrastSensitivityAssessment: DrillDefinition = {
+  id: "assess-contrast-sensitivity",
+  name: "Contrast Sensitivity (Grating Staircase)",
+  shortName: "Contrast Sensitivity",
+  phase: "Assess",
+  description: "Four discs — one hides a faint striped grating, three are blank. Strike the striped one (or '?' if you truly cannot see it). Contrast falls on a log ladder until three straight misses. Threshold reported as logCS, the metric elite athletes are benchmarked on.",
+  purpose: "Contrast sensitivity threshold (logCS) via 4-AFC staircase.",
+  interaction: "touch",
+  responseMode: "strike",
+  environment: "arena",
+  mvp: true,
+  assessment: true,
+  instructions: [
+    "1. Four gray discs appear. Exactly ONE contains faint stripes.",
+    "2. Strike the striped disc. Every correct pick makes the stripes fainter.",
+    "3. If you truly cannot see any stripes, strike the '?' pad - never guess.",
+    "4. Three misses in a row ends the test. Your contrast threshold (logCS) is recorded.",
+  ],
+  controlsHint: "FIND THE STRIPED DISC - IT FADES EVERY ROUND",
+  levels: STANDARD({ maxTrials: 22, exposureMs: 6500 }),
+  buildTrials: (params, rng) => {
+    csState.idx = 0;
+    csState.wrongRun = 0;
+    csState.applied = CS_LADDER[0];
+    csState.best = null;
+    csState.done = false;
+    const p = params as { maxTrials: number; exposureMs: number };
+    const trials: TrialSpec[] = [];
+    let t = 2000;
+    for (let n = 0; n < p.maxTrials; n++) {
+      const groupId = `cs-${n}`;
+      const targetIdx = Math.floor(rng() * 4);
+      const angle = pick(rng, [0, 45, 90, 135]);
+      for (let k = 0; k < 4; k++) {
+        trials.push({
+          id: `${groupId}-d${k}`, spawnAt: t, duration: p.exposureMs,
+          kind: k === targetIdx ? "go" : "distractor",
+          zone: "center", position: [-0.45 + k * 0.3, 1.5, -0.95],
+          color: WHITE, shape: "grating", scale: 0.1,
+          grating: { contrastPct: 0, cycles: 7, angleDeg: angle, seed: 40 + n * 7 + k },
+          groupId,
+          meta: { stairFirst: k === 0, isTarget: k === targetIdx },
+        });
+      }
+      // honest escape hatch
+      trials.push({
+        id: `${groupId}-q`, spawnAt: t, duration: p.exposureMs, kind: "distractor",
+        zone: "center", position: [0, 1.12, -0.62],
+        color: GRAY, emissive: GOLD, shape: "pad", scale: 0.055, label: "?", groupId,
+      });
+      t += p.exposureMs + 700;
+    }
+    return trials;
+  },
+  onSpawnAdapt: (spec, snapshot, api) => {
+    if (csState.done) {
+      api.finishEarly();
+      spec.meta = { ...spec.meta, decor: true };
+      spec.duration = 10;
+      return;
+    }
+    if (spec.meta?.stairFirst) {
+      if (snapshot.hits + snapshot.errors > 0 && snapshot.lastEventCorrect !== undefined) {
+        if (snapshot.lastEventCorrect) {
+          csState.best = csState.best === null ? csState.applied : Math.min(csState.best, csState.applied);
+          csState.wrongRun = 0;
+          csState.idx = Math.min(CS_LADDER.length - 1, csState.idx + 1);
+        } else {
+          csState.wrongRun += 1;
+          csState.idx = Math.max(0, csState.idx - 1);
+          if (csState.wrongRun >= 3) {
+            csState.done = true;
+            api.finishEarly();
+            spec.meta = { ...spec.meta, decor: true };
+            spec.duration = 10;
+            return;
+          }
+        }
+      }
+      csState.applied = CS_LADDER[csState.idx];
+    }
+    if (spec.meta?.isTarget && spec.grating) {
+      spec.grating = { ...spec.grating, contrastPct: csState.applied };
+    }
+  },
+  analyze: () => {
+    if (csState.best === null) {
+      return ["Highest-contrast grating not detected - screen for media opacity or refractive blur before interpreting."];
+    }
+    const logCS = Math.round(Math.log10(100 / csState.best) * 100) / 100;
+    return [
+      `Contrast threshold: ${csState.best}% Michelson (logCS ${logCS}).`,
+      logCS >= 1.8
+        ? "Excellent contrast sensitivity - elite athletic range."
+        : logCS >= 1.4
+          ? "Normal contrast sensitivity."
+          : "Reduced contrast sensitivity - consider ocular-health and refractive evaluation.",
+    ];
+  },
+  durationMs: (params) => {
+    const p = params as { maxTrials: number; exposureMs: number };
+    return 2000 + p.maxTrials * (p.exposureMs + 700) + 1500;
+  },
+};
+
+// ==================== 8. DEM (ARROWS) ====================
 const DEM_DIRS = ["up", "down", "left", "right"] as const;
 
-function demArrows(
-  count: number,
-  layout: "vertical" | "horizontal" | "dem100",
-  budgetMs: number,
-  rng: () => number,
-): TrialSpec[] {
+function demArrows(count: number, layout: "vertical" | "horizontal" | "dem100", budgetMs: number, rng: () => number): TrialSpec[] {
   const trials: TrialSpec[] = [];
   const positions: [number, number][] = [];
   if (layout === "vertical") {
-    // two columns, count/2 rows each — read col 1 top->bottom, then col 2
     const rows = count / 2;
-    for (let c = 0; c < 2; c++) {
-      for (let rIdx = 0; rIdx < rows; rIdx++) {
-        positions.push([c === 0 ? -0.3 : 0.3, 1.82 - rIdx * (0.78 / (rows - 1))]);
-      }
-    }
+    for (let c = 0; c < 2; c++) for (let r2 = 0; r2 < rows; r2++) positions.push([c === 0 ? -0.3 : 0.3, 1.82 - r2 * (0.78 / (rows - 1))]);
   } else if (layout === "horizontal") {
-    // 5 rows x (count/5), DEM-C style irregular horizontal spacing
     const cols = count / 5;
-    for (let rIdx = 0; rIdx < 5; rIdx++) {
+    for (let r2 = 0; r2 < 5; r2++) {
       let x = -0.62;
       for (let c = 0; c < cols; c++) {
         x += 0.06 + rng() * 0.09;
-        positions.push([Math.min(0.66, x), 1.74 - rIdx * 0.15]);
+        positions.push([Math.min(0.66, x), 1.74 - r2 * 0.15]);
       }
     }
   } else {
-    // 10 rows x 10, irregular spacing + vertical micro-jitter
-    for (let rIdx = 0; rIdx < 10; rIdx++) {
+    for (let r2 = 0; r2 < 10; r2++) {
       let x = -0.64;
       for (let c = 0; c < 10; c++) {
         x += 0.05 + rng() * 0.085;
-        positions.push([Math.min(0.68, x), 1.86 - rIdx * 0.088 + (rng() - 0.5) * 0.02]);
+        positions.push([Math.min(0.68, x), 1.86 - r2 * 0.088 + (rng() - 0.5) * 0.02]);
       }
     }
   }
@@ -416,7 +603,7 @@ function demArrows(
       id: `dem-${i}`, spawnAt: 1500, duration: budgetMs, kind: "go",
       zone: "center", position: [positions[i][0], positions[i][1], -0.95],
       requiredDirection: dir,
-      color: WHITE, emissive: GOLD, shape: "cone", scale: 0.022,
+      color: WHITE, emissive: GOLD, shape: "cone", scale: 0.028,
       groupId: "dem", groupMode: "ordered", seq: i,
       meta: { pointDir: dir, dem: true },
     });
@@ -429,7 +616,7 @@ export const DEMArrows: DrillDefinition = {
   name: "DEM (Arrows)",
   shortName: "DEM Arrows",
   phase: "Assess",
-  description: "Developmental Eye Movement test, arrow form. Flick the dominant-hand joystick to match each arrow in reading order. Vertical A/B (2×25), horizontal C, and the 100-arrow DEM protocol with irregular spacing. Time, accuracy, and post-error slowing are recorded.",
+  description: "Developmental Eye Movement test, arrow form. Flick the dominant-hand joystick to match each glowing arrow in reading order. Vertical A/B, horizontal C, and the 100-arrow protocol. Time, accuracy, and post-error slowing recorded.",
   purpose: "Oculomotor function: saccadic accuracy, automaticity, V/H ratio.",
   interaction: "touch",
   responseMode: "joystick",
@@ -475,5 +662,6 @@ export const ASSESS_DRILLS = [
   GrossMotorChoiceRT,
   ColorVisionAssessment,
   StereopsisAssessment,
+  ContrastSensitivityAssessment,
   DEMArrows,
 ];

@@ -8,13 +8,14 @@
  * behavior stays consistent across the app.
  */
 import type { XRStoreOptions } from "@react-three/xr";
+import { AresController, AresHand } from "./AresHands";
 
 export function pointerStoreOptions(frameBufferScaling: number, foveation: number): XRStoreOptions {
   return {
     foveation,
     frameBufferScaling,
-    // Defaults: controllers + hands rendered with ray/pinch pointers.
-    hand: { rayPointer: { rayModel: { color: "#7FD3DE", opacity: 0.6 } } },
-    controller: { rayPointer: { rayModel: { color: "#7FD3DE", opacity: 0.7 } } },
+    // Hand identity everywhere: RIGHT = purple, LEFT = teal
+    controller: AresController,
+    hand: AresHand,
   };
 }

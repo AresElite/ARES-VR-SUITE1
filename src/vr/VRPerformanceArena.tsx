@@ -88,12 +88,12 @@ function PhasePortal({ phase }: { phase: ARESPhase }) {
     }
   });
 
-  const dist = 3.4;
+  const dist = 4.3;
   const x = Math.sin(meta.portalAngle) * dist;
   const z = -Math.cos(meta.portalAngle) * dist;
 
   return (
-    <group position={[x, 1.55, z]} rotation={[0, -meta.portalAngle + Math.PI, 0]}>
+    <group position={[x, 1.62, z]} rotation={[0, -meta.portalAngle + Math.PI, 0]} scale={0.74}>
       {/* FULL-CIRCLE hit area — the entire portal face is one button,
           covering the ring, the fill, and the labels above and below */}
       <mesh
@@ -203,7 +203,8 @@ export function VRPerformanceArena() {
 
       {/* welcome / status panel below the loop */}
       <SpatialPanel
-        position={[0, 0.95, -2.0]}
+        position={[0, 0.52, -1.55]}
+        rotation={[-0.38, 0, 0]}
         width={1.35}
         height={0.5}
         title={APP_NAME}

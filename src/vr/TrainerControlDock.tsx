@@ -7,7 +7,7 @@ import { MOCK_ATHLETES } from "@/data/mockAthletes";
 import { PERF_MODES, type PerfModeId } from "@/utils/performance";
 import { SpatialPanel, PanelButton, PanelText } from "./SpatialPanel";
 
-const PAGE_SIZE = 6;
+const PAGE_SIZE = 7;
 
 /**
  * Trainer Control Dock.
@@ -74,9 +74,9 @@ export function TrainerControlDock() {
         {pageDrills.map((d, i) => (
           <PanelButton
             key={d.id}
-            position={[0, 0.52 - i * 0.15, 0]}
+            position={[0, 0.54 - i * 0.135, 0]}
             width={1.14}
-            height={0.125}
+            height={0.115}
             label={d.name}
             color={d.id === drillId ? meta.color : ARES_COLORS.deepPurple}
             textColor={d.id === drillId ? ARES_COLORS.nearBlack : ARES_COLORS.white}
