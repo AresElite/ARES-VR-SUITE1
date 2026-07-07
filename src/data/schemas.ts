@@ -33,6 +33,10 @@ export interface SessionMetrics {
   fatigueDriftPct?: number;
   timingConsistencyMs?: number;
   speedAccuracyIndex?: number;
+  /** mean hand-to-target-center distance at contact (cm) — eye-hand precision */
+  avgPrecisionCm?: number;
+  /** mean slowdown of the response following an error vs overall pace (ms) */
+  postErrorSlowingMs?: number;
 }
 
 export interface AQBlock {
@@ -40,6 +44,7 @@ export interface AQBlock {
   route?: number;
   execute?: number;
   synchronize?: number;
+  assess?: number;
   overall?: number;
   notes?: string[];
   recommendation?: string;

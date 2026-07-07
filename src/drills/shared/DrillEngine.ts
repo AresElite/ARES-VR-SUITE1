@@ -381,7 +381,7 @@ export class DrillEngine {
    * Register a hit on a target (ray trigger, touch, or desktop click).
    * Evaluates go/no-go, hand rules, direction rules, and group resolution.
    */
-  registerHit(targetId: string, hand: Hand, direction?: SliceDirection): void {
+  registerHit(targetId: string, hand: Hand, direction?: SliceDirection, precisionM?: number): void {
     if (this.state !== "running") return;
     const t = this.active.get(targetId);
     if (!t || t.resolved) return;

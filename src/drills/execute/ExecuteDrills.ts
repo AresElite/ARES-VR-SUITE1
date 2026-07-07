@@ -44,17 +44,24 @@ function rgPositions(level: number, zoneMode: string): [number, number, number][
 }
 
 type RGColorMode = "purple-only" | "purple-teal" | "purple-teal-blue";
-function colorFor(mode: string, rng: () => number): { color: string; hand?: "left" | "right" } {
-  if (mode === "purple-teal") {
-    return rng() < 0.5 ? { color: PURPLE, hand: "right" } : { color: TEAL, hand: "left" };
+
+/**
+ * Balanced color deck: exact per-color counts, shuffled. Coin flips can run
+ * streaky inside a 60s window and skew the left/right demand — decks can't.
+ */
+function colorDeck(mode: string, count: number, rng: () => number): { color: string; hand?: "left" | "right" }[] {
+  const variants: { color: string; hand?: "left" | "right" }[] =
+    mode === "purple-teal"
+      ? [ { color: PURPLE, hand: "right" }, { color: TEAL, hand: "left" } ]
+      : mode === "purple-teal-blue"
+        ? [ { color: PURPLE, hand: "right" }, { color: TEAL, hand: "left" }, { color: BLUE } ]
+        : [ { color: PURPLE } ];
+  const deck = Array.from({ length: count }, (_, k) => variants[k % variants.length]);
+  for (let k = deck.length - 1; k > 0; k--) {
+    const j = Math.floor(rng() * (k + 1));
+    [deck[k], deck[j]] = [deck[j], deck[k]];
   }
-  if (mode === "purple-teal-blue") {
-    const r = rng();
-    if (r < 0.34) return { color: PURPLE, hand: "right" };
-    if (r < 0.67) return { color: TEAL, hand: "left" };
-    return { color: BLUE };
-  }
-  return { color: PURPLE }; // purple-only: hand doesn't matter
+  return deck;
 }
 
 export const ReactionGrid: DrillDefinition = {
@@ -109,11 +116,12 @@ export const ReactionGrid: DrillDefinition = {
     const trials: TrialSpec[] = [];
     let last = -1;
     const members = Math.ceil(62000 / Math.max(500, p.timeoutMs * 0.45));
+    const deck = colorDeck(p.colorMode ?? "purple-only", members, rng);
     for (let i = 0; i < members; i++) {
       let idx = Math.floor(rng() * 6);
       if (idx === last) idx = (idx + 1 + Math.floor(rng() * 4)) % 6;
       last = idx;
-      const c = colorFor(p.colorMode ?? "purple-only", rng);
+      const c = deck[i];
       trials.push({
         id: `rg-${i}`,
         spawnAt: i === 0 ? 800 : -1,
@@ -221,11 +229,12 @@ export const EyeHandCoordination: DrillDefinition = {
     const perStream = Math.ceil(62000 / 480); // ~130 members/stream: never drains in 60s
     const trials: TrialSpec[] = [];
     for (let sIdx = 0; sIdx < p.streams; sIdx++) {
+      const deck = colorDeck(p.colorMode ?? "purple-only", perStream, rng);
       for (let i = 0; i < perStream; i++) {
         const central = rng() < centralFrac;
         const zone = central ? "center" : (pick(rng, PERIPHERAL_ZONES) as TargetZone);
         const ecc = central ? 2 + rng() * 9 : 16 + rng() * Math.max(10, p.spreadDeg - 16);
-        const c = colorFor(p.colorMode ?? "purple-only", rng);
+        const c = deck[i];
         trials.push({
           id: `ehc-${sIdx}-${i}`,
           spawnAt: i === 0 ? 1000 + sIdx * 400 : -1,
@@ -351,11 +360,16 @@ export const ChoiceRT: DrillDefinition = {
   buildTrials: (params, rng) => {
     const p = params as { trials: number; speed: number; minDelay: number; maxDelay: number; size: number };
     const travelMs = (Math.abs(LAUNCH_Z) / p.speed) * 1000;
+    const deck = Array.from({ length: p.trials }, (_, k) => k % 2 === 0);
+    for (let k = deck.length - 1; k > 0; k--) {
+      const j = Math.floor(rng() * (k + 1));
+      [deck[k], deck[j]] = [deck[j], deck[k]];
+    }
     const trials: TrialSpec[] = [];
     let t = 1500;
     for (let i = 0; i < p.trials; i++) {
       t += p.minDelay + rng() * (p.maxDelay - p.minDelay);
-      const isPurple = rng() < 0.5;
+      const isPurple = deck[i];
       trials.push({
         id: `crt-${i}`,
         spawnAt: t,

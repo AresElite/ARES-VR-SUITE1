@@ -11,6 +11,7 @@ import { PredictivePathwayVR } from "./route/PredictivePathwayVR";
 import { DepthSliceVR } from "./execute/DepthSliceVR";
 import { ChaosArenaVR } from "./synchronize/ChaosArenaVR";
 import { SportTransferLabVR, sportLabVariant } from "./synchronize/SportTransferLabVR";
+import { ASSESS_DRILLS } from "./assess/AssessDrills";
 
 /**
  * Drill registry — single source of truth.
@@ -18,6 +19,8 @@ import { SportTransferLabVR, sportLabVariant } from "./synchronize/SportTransfer
  * progression structure; VR-native drills extend the system in depth.
  */
 export const ALL_DRILLS: DrillDefinition[] = [
+  // ================= ASSESS (clinical baselines) =================
+  ...ASSESS_DRILLS,
   // ================= ACQUIRE =================
   ReactionGrid, // categorized EXECUTE, ACQUIRE in the suite — listed under Execute below
   SpeedSearch,

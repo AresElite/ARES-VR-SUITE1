@@ -15,7 +15,7 @@ export type TargetZone =
 export type TargetKind = "go" | "noGo" | "distractor";
 export type HandRule = "left" | "right" | "either" | "both";
 export type Hand = "left" | "right" | "both" | "unknown";
-export type TargetShape = "sphere" | "box" | "diamond" | "ring" | "cone" | "arc" | "pad";
+export type TargetShape = "sphere" | "box" | "diamond" | "ring" | "cone" | "arc" | "pad" | "plate" | "stereo";
 
 export type SliceDirection =
   | "up"
@@ -63,6 +63,10 @@ export interface TrialSpec {
   chainGapMs?: number;
   /** ms after spawn at which the target visually switches color (with switchKindAt) */
   switchColor?: string;
+  /** Ishihara-style plate spec (shape "plate") */
+  plate?: { digit: number; axis: "control" | "rg" | "by"; seed: number };
+  /** dichoptic disparity offset in meters (shape "stereo"; + = crossed) */
+  stereoShiftM?: number;
   /** ms from drill start at which this target's kind flips (late cue change) */
   switchKindAt?: number;
   switchKindTo?: TargetKind;
@@ -78,7 +82,7 @@ export interface ProgressionLevel {
 export type InteractionMode = "ray" | "touch";
 
 /** How the athlete responds: physical strike (default) or index-trigger click. */
-export type ResponseMode = "strike" | "trigger";
+export type ResponseMode = "strike" | "trigger" | "joystick";
 
 /** Trainer-configurable drill option (rendered as a dropdown on the dock). */
 export interface DrillOptionDef {
@@ -119,8 +123,12 @@ export interface DrillDefinition {
   responseMode?: ResponseMode;
   /** render the central ball launcher prop during the drill */
   launcher?: boolean;
+  /** render the six-hole hexagon launcher wall (gross-motor assessments) */
+  hexWall?: boolean;
   /** drill ends exactly at durationMs even if trials remain (60s formats) */
   hardStop?: boolean;
+  /** clinical assessment: fixed standardized protocol (single level) */
+  assessment?: boolean;
   /** trainer-configurable dropdowns; selections merge into build parameters */
   options?: DrillOptionDef[];
   /** One-line control reminder shown during the countdown */
@@ -143,4 +151,6 @@ export type RawEvent = {
   hand?: Hand;
   errorType?: string;
   zone?: TargetZone;
+  /** hand-to-target-center distance at contact (meters) */
+  precisionM?: number;
 };

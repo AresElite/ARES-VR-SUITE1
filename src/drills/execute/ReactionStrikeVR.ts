@@ -27,6 +27,7 @@ const STRIKE_ZONES: TargetZone[] = ["center", "left", "right", "up", "down"];
 export function buildReactionTrials(p: Params, rng: () => number, idPrefix = "rs"): TrialSpec[] {
   const trials: TrialSpec[] = [];
   let t = 1200;
+  let handedCount = 0;
   for (let i = 0; i < p.trialCount; i++) {
     const zone = pick(rng, STRIKE_ZONES);
     const isNoGo = rng() < p.noGoRatio;
@@ -37,8 +38,9 @@ export function buildReactionTrials(p: Params, rng: () => number, idPrefix = "rs
       color = ARES_COLORS.errorRed;
       emissive = ARES_COLORS.errorRed;
     } else if (rng() < p.handRuleRatio) {
-      // alternate the deck instead of independent coin flips (L/R balance)
-      if (i % 2 === 0) {
+      // strict alternation over hand-ruled trials only (exact L/R balance)
+      handedCount++;
+      if (handedCount % 2 === 1) {
         requiredHand = "left";
         color = ARES_ACCENTS.purpleGlow;
         emissive = ARES_COLORS.deepPurple;

@@ -81,6 +81,29 @@ export function computeMetrics(events: RawEvent[]): SessionMetrics {
 
   const timingConsistencyMs = stddev(rts) !== undefined ? Math.round(stddev(rts)!) : undefined;
 
+  // Eye-hand precision: mean distance from target center at contact (cm)
+  const precisions = events.filter((e) => e.precisionM !== undefined).map((e) => e.precisionM! * 100);
+  const avgPrecisionCm = precisions.length ? Math.round(mean(precisions)! * 10) / 10 : undefined;
+
+  // Post-error slowing: inter-response interval after an error vs overall
+  let postErrorSlowingMs: number | undefined;
+  {
+    const seq = events
+      .filter((e) => e.errorType !== "correctRejection" && e.actualAction !== "none")
+      .sort((a, b) => a.timestamp - b.timestamp);
+    const intervals: number[] = [];
+    const postErr: number[] = [];
+    for (let i = 1; i < seq.length; i++) {
+      const iv = seq[i].timestamp - seq[i - 1].timestamp;
+      if (iv <= 0 || iv > 8000) continue;
+      intervals.push(iv);
+      if (!seq[i - 1].correct) postErr.push(iv);
+    }
+    if (postErr.length >= 2 && intervals.length >= 6) {
+      postErrorSlowingMs = Math.round(mean(postErr)! - mean(intervals)!);
+    }
+  }
+
   // Speed-accuracy index: accuracy fraction × (600 / avgRT), clamped 0..2.
   // ~1.0 = balanced; >1.2 = fast & clean; <0.8 = slow or sloppy.
   const avg = mean(rts);
@@ -110,5 +133,7 @@ export function computeMetrics(events: RawEvent[]): SessionMetrics {
     fatigueDriftPct,
     timingConsistencyMs,
     speedAccuracyIndex,
+    avgPrecisionCm,
+    postErrorSlowingMs,
   };
 }

@@ -1,4 +1,4 @@
-import { ARES_PHASES, PHASE_META } from "@/ares/phases";
+import { ARES_ALL_PHASES, PHASE_META } from "@/ares/phases";
 import { APP_NAME, APP_VERSION, ORG_NAME } from "@/ares/constants";
 import { useAppStore } from "@/app/providers/appStore";
 import { drillsForPhase, ALL_DRILLS } from "@/drills/registry";
@@ -47,8 +47,8 @@ export function LandingDashboard({ onEnterDesktop }: { onEnterDesktop: () => voi
 
         <div className="stat-strip">
           <div className="stat"><span className="stat-n">{ALL_DRILLS.length}</span><span className="stat-l">Drills</span></div>
-          <div className="stat"><span className="stat-n">{ALL_DRILLS.length * 25}</span><span className="stat-l">Progression levels</span></div>
-          <div className="stat"><span className="stat-n">4</span><span className="stat-l">A.R.E.S. phases</span></div>
+          <div className="stat"><span className="stat-n">{ALL_DRILLS.reduce((a, d) => a + d.levels.length, 0)}</span><span className="stat-l">Progression levels</span></div>
+          <div className="stat"><span className="stat-n">4+1</span><span className="stat-l">Phases + Assess</span></div>
           <div className="stat"><span className="stat-n">547k+</span><span className="stat-l">Simulated QA reps</span></div>
         </div>
 
@@ -102,7 +102,7 @@ export function LandingDashboard({ onEnterDesktop }: { onEnterDesktop: () => voi
 
         <p className="ares-section-title">The A.R.E.S. Performance Loop</p>
         <div className="ares-grid">
-          {ARES_PHASES.map((p) => {
+          {ARES_ALL_PHASES.map((p) => {
             const meta = PHASE_META[p];
             const drills = drillsForPhase(p);
             return (
@@ -122,7 +122,7 @@ export function LandingDashboard({ onEnterDesktop }: { onEnterDesktop: () => voi
 
         <p className="ares-section-title">Drill library</p>
         <div className="ares-grid">
-          {ARES_PHASES.map((p) => {
+          {ARES_ALL_PHASES.map((p) => {
             const meta = PHASE_META[p];
             return (
               <div className="ares-card" key={`lib-${p}`}>
@@ -132,7 +132,7 @@ export function LandingDashboard({ onEnterDesktop }: { onEnterDesktop: () => voi
                     <li key={d.id}>
                       <span className="dot" style={{ background: meta.color }} />
                       {d.name}
-                      <span className="lv">25 LV</span>
+                      <span className="lv">{d.assessment ? "PROTOCOL" : "25 LV"}</span>
                     </li>
                   ))}
                 </ul>

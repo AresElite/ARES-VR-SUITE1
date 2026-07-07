@@ -3,7 +3,7 @@ import { useFrame } from "@react-three/fiber";
 import { Text, useTexture } from "@react-three/drei";
 import * as THREE from "three";
 import { ARES_COLORS } from "@/ares/colors";
-import { ARES_PHASES, PHASE_META, type ARESPhase } from "@/ares/phases";
+import { ARES_PHASES, ARES_ALL_PHASES, PHASE_META, type ARESPhase } from "@/ares/phases";
 import { APP_NAME, APP_VERSION } from "@/ares/constants";
 import { useAppStore } from "@/app/providers/appStore";
 import { SpatialPanel, PanelText } from "./SpatialPanel";
@@ -197,7 +197,7 @@ export function VRPerformanceArena() {
   return (
     <group>
       <FloatingPerformanceLoop />
-      {ARES_PHASES.map((p) => (
+      {ARES_ALL_PHASES.map((p) => (
         <PhasePortal key={p} phase={p} />
       ))}
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import { RoundedBox, Text } from "@react-three/drei";
 import { useXR, useXRInputSourceEvent, useXRInputSourceState } from "@react-three/xr";
 import * as THREE from "three";
@@ -11,6 +11,7 @@ import { useAppStore } from "@/app/providers/appStore";
 import { handFromPointerEvent, sliceDirectionFromDelta } from "@/drills/shared/InputMapper";
 import type { PoolSlot } from "@/drills/shared/TargetSpawner";
 import { PERF_MODES } from "@/utils/performance";
+import { makePlateTexture, makeRDSTexture } from "@/utils/platePainter";
 import { sfx } from "@/utils/audio";
 import { FONT_MONO } from "@/utils/fonts";
 
@@ -135,7 +136,8 @@ function StrikeColliders() {
                   ? sliceDirectionFromDelta(t.vel.x, t.vel.y)
                   : slot.spec.requiredDirection;
             }
-            engine.registerHit(slot.spec.id, t.hand, direction);
+            const contactDist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            engine.registerHit(slot.spec.id, t.hand, direction, contactDist);
             t.pulse?.();
           }
         }
@@ -171,6 +173,19 @@ function StrikeColliders() {
 }
 
 const URGENCY_COLORS = ["#8B5CF6", "#7FD3DE", "#3B82F6", "#F97316", "#EF5A6F"];
+
+function onHitProxy(
+  spec: TrialSpecLike,
+  engine: ReturnType<typeof useAppStore.getState>["engine"],
+  desktopClicks: boolean,
+) {
+  if (!desktopClicks) return undefined;
+  return (e: { stopPropagation(): void }) => {
+    e.stopPropagation();
+    engine?.registerHit(spec.id, "unknown");
+  };
+}
+type TrialSpecLike = { id: string };
 
 /** Pooled hit-spark particles — one draw call, zero allocation per hit. */
 const SPARK_COUNT = 220;
@@ -243,11 +258,13 @@ function TargetMesh({
   segments,
   version,
   desktopClicks,
+  demCursor,
 }: {
   slot: PoolSlot;
   segments: number;
   version: number;
   desktopClicks: boolean;
+  demCursor?: { seq: number };
 }) {
   const group = useRef<THREE.Group>(null);
   const mat = useRef<THREE.MeshStandardMaterial>(null);
@@ -290,6 +307,12 @@ function TargetMesh({
       mat.current.opacity = age >= hideAfter ? 0.0 : 1.0;
       mat.current.transparent = true;
     }
+    // DEM cursor highlight: the CURRENT arrow glows gold and lifts
+    if (demCursor && spec.groupMode === "ordered" && spec.meta?.dem && mat.current && group.current) {
+      const isCurrent = spec.seq === demCursor.seq;
+      mat.current.emissiveIntensity = isCurrent ? 1.2 : 0.25;
+      group.current.scale.setScalar(isCurrent ? 1.35 : 1);
+    }
     // Neural Phase Lock: expanding/contracting pulse
     const pulseMs = spec.meta?.pulsePeriodMs as number | undefined;
     if (pulseMs && group.current) {
@@ -301,6 +324,46 @@ function TargetMesh({
 
   if (!slot.active || !spec) return null;
   const isDecor = Boolean(spec.decor || spec.meta?.decor);
+
+  // Ishihara-style plate: procedural pseudo-isochromatic dot disc
+  if (spec.shape === "plate" && spec.plate) {
+    return (
+      <group ref={group} position={spec.position} key={version}>
+        <mesh rotation={[0, 0, 0]}>
+          <circleGeometry args={[spec.scale, 40]} />
+          <meshBasicMaterial map={makePlateTexture(spec.plate.digit, spec.plate.axis, spec.plate.seed)} />
+        </mesh>
+        <mesh position={[0, 0, -0.005]}>
+          <ringGeometry args={[spec.scale, spec.scale * 1.06, 40]} />
+          <meshBasicMaterial color="#2D234F" />
+        </mesh>
+      </group>
+    );
+  }
+
+  // Dichoptic RDS disc: identical dot fields per eye, horizontally offset —
+  // true retinal disparity (layer 1 = left eye, layer 2 = right eye)
+  if (spec.shape === "stereo") {
+    const shift = (spec.stereoShiftM ?? 0) / 2;
+    const rds = makeRDSTexture((spec.meta?.rdsSeed as number) ?? 7);
+    return (
+      <group ref={group} position={spec.position} key={version}>
+        <mesh position={[shift, 0, 0]} layers-mask={2}>
+          <circleGeometry args={[spec.scale, 32]} />
+          <meshBasicMaterial map={rds} />
+        </mesh>
+        <mesh position={[-shift, 0, 0]} layers-mask={4}>
+          <circleGeometry args={[spec.scale, 32]} />
+          <meshBasicMaterial map={rds} />
+        </mesh>
+        {/* invisible strike/click proxy on the shared layer */}
+        <mesh onClick={onHitProxy(spec, engine, desktopClicks)} visible={true}>
+          <circleGeometry args={[spec.scale, 16]} />
+          <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+        </mesh>
+      </group>
+    );
+  }
 
   const onHit = desktopClicks && !isDecor
     ? (e: { stopPropagation(): void; nativeEvent?: unknown }) => {
@@ -410,6 +473,48 @@ function TriggerListener() {
   return null;
 }
 
+/**
+ * JoystickListener — DEM (Arrows) response mode.
+ * The dominant-hand thumbstick "flicks" up/down/left/right for each arrow
+ * in sequence; a return to neutral is required between responses so held
+ * sticks can never double-fire.
+ */
+function JoystickListener({ cursor }: { cursor: { seq: number } }) {
+  const engine = useAppStore((s) => s.engine);
+  const dominant = (engine?.parameters.dominantHand as string) === "left" ? "left" : "right";
+  const ctl = useXRInputSourceState("controller", dominant as "left" | "right");
+  const armed = useRef(true);
+
+  useFrame(() => {
+    if (!engine || !ctl) return;
+    const gp = ctl.inputSource.gamepad;
+    if (!gp || gp.axes.length < 4) return;
+    // xr-standard mapping: thumbstick on axes[2], axes[3]
+    const x = gp.axes[2] ?? 0;
+    const y = gp.axes[3] ?? 0;
+    const mag = Math.hypot(x, y);
+    if (mag < 0.3) {
+      armed.current = true;
+      return;
+    }
+    if (mag < 0.7 || !armed.current) return;
+    armed.current = false;
+    const dir: SliceDirection =
+      Math.abs(x) > Math.abs(y) ? (x > 0 ? "right" : "left") : y > 0 ? "down" : "up";
+    // resolve the CURRENT arrow in the ordered sequence
+    let target: { id: string } | null = null;
+    for (const slot of engine.pool.slots) {
+      if (!slot.active || !slot.spec || slot.spec.groupMode !== "ordered") continue;
+      if ((slot.spec.seq ?? -1) === cursor.seq) {
+        target = { id: slot.spec.id };
+        break;
+      }
+    }
+    if (target) engine.registerHit(target.id, dominant as Hand, dir);
+  });
+  return null;
+}
+
 /** Central ball launcher — the "hole" stimuli are shot out of. */
 function LauncherProp() {
   const glow = useRef<THREE.Mesh>(null);
@@ -443,6 +548,29 @@ function LauncherProp() {
   );
 }
 
+/** Hexagon launcher wall — six holes for the gross-motor assessments. */
+function HexLauncherWall() {
+  return (
+    <group position={[0, 1.45, -6]}>
+      {Array.from({ length: 6 }, (_, k) => {
+        const a = (k / 6) * Math.PI * 2 + Math.PI / 6;
+        return (
+          <group key={k} position={[Math.cos(a) * 0.95, Math.sin(a) * 0.62, 0]} rotation={[Math.PI / 2, 0, 0]}>
+            <mesh>
+              <torusGeometry args={[0.15, 0.022, 8, 22]} />
+              <meshStandardMaterial color="#2998AA" emissive="#2998AA" emissiveIntensity={0.7} />
+            </mesh>
+            <mesh position={[0, -0.005, 0]}>
+              <circleGeometry args={[0.135, 18]} />
+              <meshBasicMaterial color="#020308" side={THREE.DoubleSide} />
+            </mesh>
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
 /** Central fixation marker for Acquire-phase drills (visual anchor). */
 function FixationMarker() {
   const ref = useRef<THREE.Mesh>(null);
@@ -459,6 +587,12 @@ function FixationMarker() {
 
 export function DrillRunner() {
   const engine = useAppStore((s) => s.engine);
+  const camera = useThree((s) => s.camera);
+  useEffect(() => {
+    // desktop fallback renders the left-eye copy of dichoptic stimuli
+    camera.layers.enable(1);
+  }, [camera]);
+  const demCursor = useMemo(() => ({ seq: 0 }), [engine]);
   const perf = PERF_MODES[useAppStore((s) => s.perfModeId)];
   const inSession = useXR((s) => s.session);
   const [poolVersion, setPoolVersion] = useState(0);
@@ -476,6 +610,7 @@ export function DrillRunner() {
       if (e.type === "spawn" || e.type === "despawn" || e.type === "switched") setPoolVersion((v) => v + 1);
       if (e.type === "spawn") pulseIntensity.current = 1;
       if (e.type === "resolved") {
+        if (engine.definition.responseMode === "joystick") demCursor.seq += 1;
         const ev = e.event;
         const pan = ev.targetPosition ? Math.max(-0.8, Math.min(0.8, ev.targetPosition.x * 1.4)) : 0;
         if (ev.errorType === "correctRejection") {
@@ -554,7 +689,9 @@ export function DrillRunner() {
       {/* strike interaction (VR): hands/controllers hit targets directly */}
       {inSession && engine.definition.responseMode !== "trigger" && <StrikeColliders />}
       {inSession && engine.definition.responseMode === "trigger" && <TriggerListener />}
+      {engine.definition.responseMode === "joystick" && <JoystickListener cursor={demCursor} />}
       {engine.definition.launcher && <LauncherProp />}
+      {engine.definition.hexWall && <HexLauncherWall />}
 
       {/* desktop-only catcher: false starts, or trigger response in trigger mode */}
       {!inSession && (
@@ -579,7 +716,8 @@ export function DrillRunner() {
           slot={slot}
           segments={perf.sphereSegments}
           version={poolVersion}
-          desktopClicks={!inSession}
+          desktopClicks={!inSession && engine.definition.responseMode !== "trigger"}
+          demCursor={engine.definition.responseMode === "joystick" ? demCursor : undefined}
         />
       ))}
 

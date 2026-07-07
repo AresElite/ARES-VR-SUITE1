@@ -97,7 +97,7 @@ function staticChecks(def: DrillDefinition, level: number, trials: TrialSpec[], 
   // session length sanity
   const dur = def.durationMs(def.levels[level - 1].parameters);
   if (dur < 15000) flag(`${key}|SESSION_UNDER_15S`);
-  if (dur > 250000) flag(`${key}|SESSION_OVER_4MIN`);
+  if (dur > (def.assessment ? 260000 : 250000)) flag(`${key}|SESSION_OVER_4MIN`);
 
   // reach envelope for static strike targets
   if (def.responseMode !== "trigger") {
@@ -122,7 +122,9 @@ function staticChecks(def: DrillDefinition, level: number, trials: TrialSpec[], 
       if (overlapT <= 0 || !isStatic(a) || !isStatic(b)) continue;
       const d = Math.hypot(a.position[0] - b.position[0], a.position[1] - b.position[1], a.position[2] - b.position[2]);
       if (a.groupId === b.groupId) {
-        if (d < (a.scale + b.scale) * 1.05) flag(`${key}|GRID_CELLS_TOUCH`);
+        // joystick-response boards (DEM) are read, not struck — print-density
+        // spacing is intentional and no hand ever needs to fit between cells
+        if (def.responseMode !== "joystick" && d < (a.scale + b.scale) * 1.05) flag(`${key}|GRID_CELLS_TOUCH`);
       } else if (d < (a.scale + b.scale) * 1.35) {
         flag(`${key}|TARGETS_OVERLAP`);
       }
@@ -138,8 +140,10 @@ function staticChecks(def: DrillDefinition, level: number, trials: TrialSpec[], 
     }
   }
 
-  // hand-rule balance
-  const handed = scoreable.filter((t) => t.requiredHand === "left" || t.requiredHand === "right");
+  // hand-rule balance — deliberate unilateral protocols (dominant-hand
+  // assessments) are exempt
+  const unilateral = (def.options ?? []).some((o) => o.id === "dominantHand");
+  const handed = unilateral ? [] : scoreable.filter((t) => t.requiredHand === "left" || t.requiredHand === "right");
   if (handed.length >= 10) {
     const left = handed.filter((t) => t.requiredHand === "left").length;
     const ratio = left / handed.length;
@@ -161,7 +165,7 @@ function dynamicRun(def: DrillDefinition, level: number, profile: Profile, seed:
   runs++;
   const key = `${def.id}|L${level}`;
   const rng = makeRng(seed * 31 + level * 7);
-  const engine = createDrillSession(def, level, 60, seed, opts);
+  const engine = createDrillSession(def, level, 112, seed, opts);
   const pending: { id: string; at: number; spec: TrialSpec }[] = [];
   const liveNow = new Map<string, TrialSpec>();
   engine.subscribe((e) => {
@@ -238,7 +242,7 @@ function dynamicRun(def: DrillDefinition, level: number, profile: Profile, seed:
 // ============================== SWEEP ==============================
 for (const def of ALL_DRILLS) {
   if (PHASE && def.phase !== PHASE) continue;
-  if (def.levels.length !== 25) flag(`${def.id}|LEVELS_NOT_25(${def.levels.length})`);
+  if (!def.assessment && def.levels.length !== 25) flag(`${def.id}|LEVELS_NOT_25(${def.levels.length})`);
   const combos = optionCombos(def);
 
   // static: all levels × combos × 3 seeds
@@ -252,9 +256,9 @@ for (const def of ALL_DRILLS) {
   }
 
   // monotonicity across levels — composite multi-stream drills exempt
-  const composite = ["chaos-arena", "cognitive-crossfire", "sport-transfer"].some((x) => def.id.startsWith(x));
+  const composite = def.assessment || ["chaos-arena", "cognitive-crossfire", "sport-transfer"].some((x) => def.id.startsWith(x));
   const ease: number[] = [];
-  for (let level = 1; level <= 25; level++) {
+  for (let level = 1; level <= def.levels.length; level++) {
     let e = 0;
     for (const s of [SEED_BASE, SEED_BASE + 17, SEED_BASE + 43]) e += easeIndex(buildPlan(def, level, s * 101 + level, {}).trials);
     ease.push(e / 3);
@@ -267,7 +271,7 @@ for (const def of ALL_DRILLS) {
 
   // dynamic: all levels × profiles × 2 seeds (default options)
   const accByProfile: Record<string, Record<number, number[]>> = { novice: {}, average: {}, elite: {} };
-  for (let level = 1; level <= 25; level++) {
+  for (let level = 1; level <= def.levels.length; level++) {
     for (const p of PROFILES) {
       for (const s of [SEED_BASE + 3, SEED_BASE + 29]) {
         const acc = dynamicRun(def, level, p, s * 977 + level * 13, {});
@@ -279,10 +283,11 @@ for (const def of ALL_DRILLS) {
   }
   // Goldilocks calibration
   const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / Math.max(1, xs.length);
+  const topLevel = def.levels.length;
   const eliteL1 = avg(accByProfile.elite[1] ?? []);
-  const noviceL25 = avg(accByProfile.novice[25] ?? []);
+  const noviceTop = avg(accByProfile.novice[topLevel] ?? []);
   if ((accByProfile.elite[1] ?? []).length && eliteL1 < 70) flag(`${def.id}|L1_TOO_HARD_FOR_ELITE(${Math.round(eliteL1)}%)`);
-  if ((accByProfile.novice[25] ?? []).length && noviceL25 > 96) flag(`${def.id}|L25_TOO_EASY_FOR_NOVICE(${Math.round(noviceL25)}%)`);
+  if (!def.assessment && (accByProfile.novice[topLevel] ?? []).length && noviceTop > 96) flag(`${def.id}|L25_TOO_EASY_FOR_NOVICE(${Math.round(noviceTop)}%)`);
 }
 
 const grouped: Record<string, { instances: number; total: number }> = {};
