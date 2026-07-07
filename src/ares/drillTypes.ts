@@ -77,6 +77,17 @@ export interface ProgressionLevel {
 
 export type InteractionMode = "ray" | "touch";
 
+/** How the athlete responds: physical strike (default) or index-trigger click. */
+export type ResponseMode = "strike" | "trigger";
+
+/** Trainer-configurable drill option (rendered as a dropdown on the dock). */
+export interface DrillOptionDef {
+  id: string;
+  label: string;
+  values: { id: string; label: string }[];
+  defaultValue: string;
+}
+
 export type SportId =
   | "baseball"
   | "hockey"
@@ -104,6 +115,14 @@ export interface DrillDefinition {
   mvp: boolean;
   /** Clear, numbered athlete-facing directions shown before the drill */
   instructions: string[];
+  /** strike (reach out and hit) or trigger (index-trigger click) */
+  responseMode?: ResponseMode;
+  /** render the central ball launcher prop during the drill */
+  launcher?: boolean;
+  /** drill ends exactly at durationMs even if trials remain (60s formats) */
+  hardStop?: boolean;
+  /** trainer-configurable dropdowns; selections merge into build parameters */
+  options?: DrillOptionDef[];
   /** One-line control reminder shown during the countdown */
   controlsHint: string;
   /** deterministic trial plan for a given level (rng is seeded) */

@@ -23,28 +23,36 @@ const Z = -0.62;
 const px2scale = (px: number) => Math.max(0.035, Math.min(0.13, px * 0.00085));
 
 // ============================== REACTION GRID ==============================
-// 6 fixed locations; the active target lights up; strike -> it instantly
-// moves to another location. Layout spread per level from GET_LAYOUT (dx/dy).
-const RG_LAYOUT: Record<number, { dx: number; dy: number; label: string }> = {
-  1: { dx: 0.08, dy: 0.15, label: "Central Cluster" },
-  2: { dx: 0.15, dy: 0.25, label: "Moderate Spread" },
-  3: { dx: 0.3, dy: 0.25, label: "Wide Horizontal" },
-  4: { dx: 0.35, dy: 0.35, label: "Wide H + V" },
-  5: { dx: 0.42, dy: 0.42, label: "Full Board" },
-};
-
-function rgPositions(level: number): [number, number, number][] {
-  const { dx, dy } = RG_LAYOUT[level] ?? RG_LAYOUT[1];
-  const X = dx * 1.5; // board fraction -> meters at reach
-  const Y = dy * 1.1;
+// 60-second format. 6 locations; the active target lights and moves the
+// instant it is struck. Spacing widens from central cluster to full board
+// as levels rise. Color/hand modes and sphere zones are trainer dropdowns.
+function rgPositions(level: number, zoneMode: string): [number, number, number][] {
+  const f = (level - 1) / 24;
+  const zoneMul = zoneMode === "inner" ? 0.55 : zoneMode === "outer" ? 1.35 : 1.0;
+  const dx = (0.08 + (0.42 - 0.08) * f) * 1.5 * zoneMul;
+  const dy = (0.15 + (0.42 - 0.15) * f) * 1.1 * zoneMul;
   return [
-    [-X, 1.45 + Y, Z],
-    [X, 1.45 + Y, Z],
-    [-X, 1.45, Z],
-    [X, 1.45, Z],
-    [-X, 1.45 - Y, Z],
-    [X, 1.45 - Y, Z],
+    [-dx, 1.45 + dy, Z],
+    [dx, 1.45 + dy, Z],
+    [-dx, 1.45, Z],
+    [dx, 1.45, Z],
+    [-dx, 1.45 - dy, Z],
+    [dx, 1.45 - dy, Z],
   ];
+}
+
+type RGColorMode = "purple-only" | "purple-teal" | "purple-teal-blue";
+function colorFor(mode: string, rng: () => number): { color: string; hand?: "left" | "right" } {
+  if (mode === "purple-teal") {
+    return rng() < 0.5 ? { color: PURPLE, hand: "right" } : { color: TEAL, hand: "left" };
+  }
+  if (mode === "purple-teal-blue") {
+    const r = rng();
+    if (r < 0.34) return { color: PURPLE, hand: "right" };
+    if (r < 0.67) return { color: TEAL, hand: "left" };
+    return { color: BLUE };
+  }
+  return { color: PURPLE }; // purple-only: hand doesn't matter
 }
 
 export const ReactionGrid: DrillDefinition = {
@@ -52,34 +60,61 @@ export const ReactionGrid: DrillDefinition = {
   name: "Reaction Grid",
   shortName: "Reaction Grid",
   phase: "Execute",
-  description: "6 possible target locations. Strike the ACTIVE TARGET as fast as possible — it moves the instant you touch it.",
+  description: "60 seconds. 6 target locations — strike the ACTIVE target; it moves the instant you touch it. Color modes rule which hand strikes: PURPLE = right, TEAL = left, BLUE = either.",
   purpose: "Rapid foveation, peripheral detection, motor output speed.",
   interaction: "touch",
+  responseMode: "strike",
   environment: "arena",
   mvp: true,
-  instructions: [
-    "1. 6 possible target locations on the board in front of you.",
-    "2. STRIKE the ACTIVE (lit) target as fast as possible.",
-    "3. The target moves to a new location the instant you touch it.",
-    "4. Keep both hands ready - use whichever hand is closest.",
+  hardStop: true,
+  options: [
+    {
+      id: "colorMode",
+      label: "Colors",
+      defaultValue: "purple-only",
+      values: [
+        { id: "purple-only", label: "Purple only (any hand)" },
+        { id: "purple-teal", label: "Purple=R / Teal=L" },
+        { id: "purple-teal-blue", label: "Purple=R / Teal=L / Blue=Any" },
+      ],
+    },
+    {
+      id: "zoneMode",
+      label: "Zone",
+      defaultValue: "full",
+      values: [
+        { id: "full", label: "Full Sphere" },
+        { id: "inner", label: "Inner Sphere Only" },
+        { id: "outer", label: "Outer Sphere Only" },
+      ],
+    },
   ],
-  controlsHint: "STRIKE THE LIT TARGET - IT MOVES ON TOUCH",
+  instructions: [
+    "1. 60 seconds on the clock. 6 possible target locations.",
+    "2. STRIKE the lit target - it instantly moves to a new spot.",
+    "3. Color rules: PURPLE = RIGHT hand. TEAL = LEFT hand. BLUE = either hand.",
+    "4. Purple-only mode: any hand, pure speed.",
+    "5. Spacing pushes outward and taller as levels climb - stay centered, let the eyes lead.",
+  ],
+  controlsHint: "60s - STRIKE THE LIT TARGET - PURPLE=R TEAL=L BLUE=ANY",
   levels: levels25((i) => ({
     label: i < 5 ? "Central Cluster" : i < 10 ? "Moderate Spread" : i < 15 ? "Wide Horizontal" : i < 20 ? "Wide H + V" : "Full Board",
-    parameters: { level: i + 1, trials: ilerp25(30, 48, i), timeoutMs: ilerp25(1800, 950, i) },
+    parameters: { level: i + 1, timeoutMs: ilerp25(1700, 900, i), scale: lerp25(0.062, 0.044, i) },
   })),
   buildTrials: (params, rng) => {
-    const p = params as { level: number; trials: number; timeoutMs: number };
-    const spots = rgPositions(p.level);
+    const p = params as { level: number; timeoutMs: number; scale: number; colorMode?: string; zoneMode?: string };
+    const spots = rgPositions(p.level, p.zoneMode ?? "full");
     const trials: TrialSpec[] = [];
     let last = -1;
-    for (let i = 0; i < p.trials; i++) {
+    const members = Math.ceil(62000 / Math.max(500, p.timeoutMs * 0.45));
+    for (let i = 0; i < members; i++) {
       let idx = Math.floor(rng() * 6);
       if (idx === last) idx = (idx + 1 + Math.floor(rng() * 4)) % 6;
       last = idx;
+      const c = colorFor(p.colorMode ?? "purple-only", rng);
       trials.push({
         id: `rg-${i}`,
-        spawnAt: i === 0 ? 1000 : -1,
+        spawnAt: i === 0 ? 800 : -1,
         chainId: "rg",
         chainGapMs: 0,
         seq: i,
@@ -87,54 +122,107 @@ export const ReactionGrid: DrillDefinition = {
         kind: "go",
         zone: idx % 2 === 0 ? "left" : "right",
         position: spots[idx],
-        color: TEAL,
-        emissive: TEAL,
+        requiredHand: c.hand,
+        color: c.color,
+        emissive: c.color,
         shape: "sphere",
-        scale: 0.085,
+        scale: p.scale,
       });
     }
     return trials;
   },
-  durationMs: (params) => {
-    const p = params as { trials: number; timeoutMs: number };
-    return 1000 + p.trials * (p.timeoutMs + 60) + 2000;
-  },
+  durationMs: () => 61500,
 };
 
 // =========================== EYE-HAND COORDINATION ===========================
+// Central/peripheral distribution, stimulus size, and color/hand modes are
+// trainer dropdowns matching the A.R.E.S. Performance Suite formats.
+const EHC_REACH = 0.98; // strike wall sits a full arm's extension out
+const EHC_SIZES: Record<string, number> = { xl: 0.115, l: 0.095, m: 0.078, s: 0.062, xs: 0.05 };
+const EHC_DIST: Record<string, number> = {
+  "60-40": 0.6, "50-50": 0.5, "40-60": 0.4, "30-70": 0.3, "20-80": 0.2, "10-90": 0.1, "0-100": 0,
+};
+
 export const EyeHandCoordination: DrillDefinition = {
   id: "eye-hand-coordination",
   name: "Eye-Hand Coordination",
   shortName: "Eye-Hand Coordination",
   phase: "Execute",
-  description: "Multiple targets live at once across the board. Clear them as fast as they appear — each strike spawns the next.",
+  description: "Multiple targets live at once across the strike wall. Clear them as they appear — each strike spawns the next. Central/peripheral distribution, stimulus size, and color/hand rules are trainer-selectable.",
   purpose: "Continuous eye-hand mapping, bimanual coverage, scan-and-strike speed.",
   interaction: "touch",
+  responseMode: "strike",
   environment: "arena",
   mvp: true,
-  instructions: [
-    "1. Up to three targets are live at the same time across your reach zone.",
-    "2. STRIKE any live target - a new one appears somewhere else the moment you do.",
-    "3. Use BOTH hands. Left hand covers left field, right hand covers right.",
-    "4. Clear as many as you can before the clock runs out.",
+  options: [
+    {
+      id: "colorMode",
+      label: "Colors",
+      defaultValue: "purple-only",
+      values: [
+        { id: "purple-only", label: "Purple only (any hand)" },
+        { id: "purple-teal", label: "Purple=R / Teal=L" },
+        { id: "purple-teal-blue", label: "Purple=R / Teal=L / Blue=Any" },
+      ],
+    },
+    {
+      id: "distribution",
+      label: "Central/Periph",
+      defaultValue: "50-50",
+      values: [
+        { id: "60-40", label: "60/40" },
+        { id: "50-50", label: "50/50" },
+        { id: "40-60", label: "40/60" },
+        { id: "30-70", label: "30/70" },
+        { id: "20-80", label: "20/80" },
+        { id: "10-90", label: "10/90" },
+        { id: "0-100", label: "0/100" },
+      ],
+    },
+    {
+      id: "sizeOpt",
+      label: "Size",
+      defaultValue: "m",
+      values: [
+        { id: "xl", label: "Extra Large" },
+        { id: "l", label: "Large" },
+        { id: "m", label: "Medium" },
+        { id: "s", label: "Small" },
+        { id: "xs", label: "Extra Small" },
+      ],
+    },
   ],
-  controlsHint: "CLEAR TARGETS WITH BOTH HANDS - NEW ONES KEEP COMING",
-levels: levels25((i) => ({
-    label: `${i < 8 ? "Large" : i < 17 ? "Medium" : "Small"} / ${i < 12 ? "Central" : "Wide"} field`,
+  instructions: [
+    "1. Up to three targets are live at once on the strike wall at full arm's reach.",
+    "2. STRIKE any live target - a new one appears elsewhere the moment you do.",
+    "3. Color rules: PURPLE = RIGHT hand. TEAL = LEFT hand. BLUE = either. Purple-only = any hand.",
+    "4. The central/peripheral mix follows the selected distribution.",
+    "5. Use BOTH hands - left covers left field, right covers right.",
+  ],
+  controlsHint: "CLEAR THE WALL - PURPLE=R TEAL=L BLUE=ANY",
+  levels: levels25((i) => ({
+    label: `${i < 8 ? 2 : 3} streams — ${(ilerp25(2500, 1400, i) / 1000).toFixed(1)}s windows`,
     parameters: {
-      scale: lerp25(0.105, 0.05, i),
-      spreadDeg: lerp25(12, 40, i),
+      spreadDeg: lerp25(14, 42, i),
       streams: i < 8 ? 2 : 3,
       perStream: ilerp25(12, 20, i),
       timeoutMs: ilerp25(2500, 1400, i),
     },
   })),
   buildTrials: (params, rng) => {
-    const p = params as { scale: number; spreadDeg: number; streams: number; perStream: number; timeoutMs: number };
+    const p = params as {
+      spreadDeg: number; streams: number; perStream: number; timeoutMs: number;
+      colorMode?: string; distribution?: string; sizeOpt?: string;
+    };
+    const scale = EHC_SIZES[p.sizeOpt ?? "m"] ?? 0.078;
+    const centralFrac = EHC_DIST[p.distribution ?? "50-50"] ?? 0.5;
     const trials: TrialSpec[] = [];
     for (let sIdx = 0; sIdx < p.streams; sIdx++) {
       for (let i = 0; i < p.perStream; i++) {
-        const zone = pick(rng, PERIPHERAL_ZONES.concat(["center"]) as TargetZone[]);
+        const central = rng() < centralFrac;
+        const zone = central ? "center" : (pick(rng, PERIPHERAL_ZONES) as TargetZone);
+        const ecc = central ? 2 + rng() * 9 : 16 + rng() * Math.max(10, p.spreadDeg - 16);
+        const c = colorFor(p.colorMode ?? "purple-only", rng);
         trials.push({
           id: `ehc-${sIdx}-${i}`,
           spawnAt: i === 0 ? 1000 + sIdx * 400 : -1,
@@ -144,11 +232,12 @@ levels: levels25((i) => ({
           duration: p.timeoutMs,
           kind: "go",
           zone,
-          position: strikePosition(zone, rng() * p.spreadDeg, 0.16, rng),
-          color: TEAL,
-          emissive: TEAL,
+          position: strikePosition(zone, ecc, 0.12, rng, EHC_REACH),
+          requiredHand: c.hand,
+          color: c.color,
+          emissive: c.color,
           shape: "sphere",
-          scale: p.scale,
+          scale,
         });
       }
     }
@@ -161,149 +250,134 @@ levels: levels25((i) => ({
 };
 
 // ============================== RAW-REACTION ==============================
-// Exact size ramp from the touchscreen suite; 20 Central + 20 Spatial levels.
-const RAW_SIZES = [120, 116, 112, 107, 103, 99, 95, 91, 87, 82, 78, 74, 70, 66, 62, 57, 53, 49, 45, 41];
+// A ball is SHOT from the central launcher toward the athlete after a random
+// delay. Response = index-trigger CLICK (either hand) the instant it fires.
+// 25 trials at every level; full RT metric set on the results panel.
+const LAUNCH_Z = -6;
 
 export const RawReaction: DrillDefinition = {
   id: "raw-reaction",
   name: "Raw-Reaction",
   shortName: "Raw-Reaction",
   phase: "Execute",
-  description: "Watch intently. Strike the target the instant it appears. Do not anticipate — react only to visual onset.",
+  description: "A ball fires from the central launcher after a random delay. CLICK the trigger — either hand — the instant it launches. 25 trials; do not anticipate.",
   purpose: "Pure simple reaction time to visual onset.",
   interaction: "touch",
+  responseMode: "trigger",
+  launcher: true,
   environment: "arena",
   mvp: true,
   instructions: [
-    "1. Watch the board intently. Nothing happens for a random delay.",
-    "2. The moment the target appears, STRIKE it with either hand.",
-    "3. Do NOT anticipate - striking before onset counts against you.",
-    "4. Central levels: the target is always dead ahead. Spatial levels: it can appear anywhere.",
+    "1. Watch the launcher hole dead ahead. Nothing happens for a random delay.",
+    "2. The instant a ball FIRES out of the hole, CLICK the top trigger - either hand.",
+    "3. Do NOT anticipate. Clicking before a launch counts as a false start.",
+    "4. 25 trials. Your average reaction time and consistency are scored.",
   ],
-  controlsHint: "REACT ONLY TO ONSET - STRIKE INSTANTLY",
+  controlsHint: "CLICK THE TRIGGER THE INSTANT THE BALL FIRES",
   levels: levels25((i) => ({
-    label: `${i < 12 ? "Central (Focus)" : "Spatial (Scan)"} — ${Math.round(lerp25(120, 41, i))}px`,
+    label: `${(lerp25(6, 13, i)).toFixed(1)} m/s launches, delays up to ${(ilerp25(1400, 3200, i) / 1000).toFixed(1)}s`,
     parameters: {
-      spatial: i >= 12, trials: 15,
-      size: px2scale(lerp25(120, 41, i)),
-      minDelay: 500, maxDelay: ilerp25(1000, 3000, i),
-      showMs: ilerp25(1500, 800, i),
+      trials: 25,
+      speed: lerp25(6, 13, i),
+      minDelay: 600,
+      maxDelay: ilerp25(1400, 3200, i),
+      size: lerp25(0.09, 0.055, i),
     },
   })),
   buildTrials: (params, rng) => {
-    const p = params as { spatial: boolean; trials: number; size: number; minDelay: number; maxDelay: number; showMs: number };
+    const p = params as { trials: number; speed: number; minDelay: number; maxDelay: number; size: number };
+    const travelMs = (Math.abs(LAUNCH_Z) / p.speed) * 1000;
     const trials: TrialSpec[] = [];
-    let t = 1200;
+    let t = 1500;
     for (let i = 0; i < p.trials; i++) {
       t += p.minDelay + rng() * (p.maxDelay - p.minDelay);
-      const zone = p.spatial ? (pick(rng, PERIPHERAL_ZONES) as TargetZone) : "center";
       trials.push({
         id: `rr-${i}`,
         spawnAt: t,
-        duration: p.showMs,
+        duration: travelMs + 250,
         kind: "go",
-        zone,
-        position: p.spatial ? strikePosition(zone, 8 + rng() * 24, 0.12, rng) : [0, 1.45, Z],
+        zone: "center",
+        position: [0, 1.45, LAUNCH_Z],
+        velocity: [(rng() - 0.5) * 0.3, (rng() - 0.5) * 0.2, p.speed],
         color: TEAL,
         emissive: TEAL,
         shape: "sphere",
         scale: p.size,
       });
-      t += 350;
+      t += travelMs + 400;
     }
     return trials;
   },
   durationMs: (params) => {
-    const p = params as { trials: number; maxDelay: number; showMs: number };
-    return 1200 + p.trials * (p.maxDelay + p.showMs + 350) + 1500;
+    const p = params as { trials: number; speed: number; maxDelay: number };
+    const travelMs = (Math.abs(LAUNCH_Z) / p.speed) * 1000;
+    return 1500 + p.trials * (p.maxDelay + travelMs + 650) + 1500;
   },
 };
 
 // ================================ CHOICE-RT ================================
-// TEAL -> strike the LEFT pad. PURPLE -> strike the RIGHT pad.
+// PURPLE ball -> RIGHT trigger. TEAL ball -> LEFT trigger. Balls fire from
+// the central launcher; 50 trials at every level.
 export const ChoiceRT: DrillDefinition = {
   id: "choice-rt",
   name: "Choice-RT",
   shortName: "Choice-RT",
   phase: "Execute",
-  description: "A stimulus flashes: TEAL means LEFT pad, PURPLE means RIGHT pad. Focus levels are central; Scan levels are spatial.",
+  description: "Balls fire from the launcher: PURPLE = click the RIGHT trigger, TEAL = click the LEFT trigger. 50 trials of pure choice reaction.",
   purpose: "Choice reaction time — stimulus-response mapping under time pressure.",
   interaction: "touch",
+  responseMode: "trigger",
+  launcher: true,
   environment: "arena",
   mvp: true,
   instructions: [
-    "1. Two answer pads float at your hands: LEFT and RIGHT.",
-    "2. Watch for the stimulus orb.",
-    "3. If it is TEAL - strike the LEFT pad. If PURPLE - strike the RIGHT pad.",
-    "4. Focus levels show it dead ahead; Scan levels can flash it anywhere.",
+    "1. Watch the launcher hole. Balls fire toward you after random delays.",
+    "2. PURPLE ball - click the RIGHT top trigger (right hand).",
+    "3. TEAL ball - click the LEFT top trigger (left hand).",
+    "4. Click the instant the ball fires. Wrong-hand clicks and early clicks are scored against you.",
+    "5. 50 trials. Average choice reaction time plus the full metric set are recorded.",
   ],
-  controlsHint: "TEAL = LEFT PAD - PURPLE = RIGHT PAD",
+  controlsHint: "PURPLE = RIGHT TRIGGER - TEAL = LEFT TRIGGER",
   levels: levels25((i) => ({
-    label: `${i < 12 ? "Central (Focus)" : "Spatial (Scan)"} — ${Math.round(lerp25(150, 45, i))}px`,
+    label: `${(lerp25(5.5, 12, i)).toFixed(1)} m/s launches, delays up to ${(ilerp25(1500, 3200, i) / 1000).toFixed(1)}s`,
     parameters: {
-      central: i < 12, trials: 16,
-      size: px2scale(lerp25(150, 45, i)),
-      minDelay: 500, maxDelay: ilerp25(1000, 2900, i),
+      trials: 50,
+      speed: lerp25(5.5, 12, i),
+      minDelay: 600,
+      maxDelay: ilerp25(1500, 3200, i),
+      size: lerp25(0.09, 0.055, i),
     },
   })),
   buildTrials: (params, rng) => {
-    const p = params as { central: boolean; trials: number; size: number; minDelay: number; maxDelay: number };
+    const p = params as { trials: number; speed: number; minDelay: number; maxDelay: number; size: number };
+    const travelMs = (Math.abs(LAUNCH_Z) / p.speed) * 1000;
     const trials: TrialSpec[] = [];
-    let t = 1200;
-    const windowMs = 1900;
+    let t = 1500;
     for (let i = 0; i < p.trials; i++) {
       t += p.minDelay + rng() * (p.maxDelay - p.minDelay);
-      const isTeal = rng() < 0.5;
-      const zone = p.central ? "center" : (pick(rng, PERIPHERAL_ZONES) as TargetZone);
-      const groupId = `crt-g${i}`;
-      // stimulus (decorative)
+      const isPurple = rng() < 0.5;
       trials.push({
-        id: `${groupId}-stim`,
+        id: `crt-${i}`,
         spawnAt: t,
-        duration: windowMs,
-        kind: "distractor",
-        decor: true,
-        zone,
-        position: p.central ? [0, 1.55, Z - 0.15] : strikePosition(zone, 10 + rng() * 22, 0.1, rng),
-        color: isTeal ? TEAL : PURPLE,
-        emissive: isTeal ? TEAL : PURPLE,
+        duration: travelMs + 250,
+        kind: "go",
+        zone: "center",
+        position: [0, 1.45, LAUNCH_Z],
+        velocity: [(rng() - 0.5) * 0.3, (rng() - 0.5) * 0.2, p.speed],
+        requiredHand: isPurple ? "right" : "left",
+        color: isPurple ? PURPLE : TEAL,
+        emissive: isPurple ? PURPLE : TEAL,
         shape: "sphere",
         scale: p.size,
       });
-      // answer pads
-      trials.push({
-        id: `${groupId}-L`,
-        spawnAt: t,
-        duration: windowMs,
-        kind: isTeal ? "go" : "distractor",
-        zone: "left",
-        position: [-0.42, 1.15, Z],
-        color: WHITE,
-        shape: "pad",
-        scale: 0.075,
-        label: "LEFT",
-        groupId,
-      });
-      trials.push({
-        id: `${groupId}-R`,
-        spawnAt: t,
-        duration: windowMs,
-        kind: isTeal ? "distractor" : "go",
-        zone: "right",
-        position: [0.42, 1.15, Z],
-        color: WHITE,
-        shape: "pad",
-        scale: 0.075,
-        label: "RIGHT",
-        groupId,
-      });
-      t += windowMs + 250;
+      t += travelMs + 400;
     }
     return trials;
   },
   durationMs: (params) => {
-    const p = params as { trials: number; maxDelay: number };
-    return 1200 + p.trials * (p.maxDelay + 2150) + 1500;
+    const p = params as { trials: number; speed: number; maxDelay: number };
+    const travelMs = (Math.abs(LAUNCH_Z) / p.speed) * 1000;
+    return 1500 + p.trials * (p.maxDelay + travelMs + 650) + 1500;
   },
 };
 

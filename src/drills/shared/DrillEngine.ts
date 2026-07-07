@@ -202,6 +202,15 @@ export class DrillEngine {
       if (age >= t.spec.duration) this.expire(id, now);
     }
 
+    // Hard-stop formats (fixed 60s drills) end exactly on the clock.
+    if (this.definition.hardStop && now >= this.totalDurationMs - 1500) {
+      this.chains.clear();
+      this.expireAllActive();
+      this.endedAtISO = new Date().toISOString();
+      this.setState("complete");
+      return;
+    }
+
     // Complete as soon as every trial has spawned and resolved (fast athletes
     // finish early); the duration clock is only the outer bound.
     if (this.active.size === 0 && this.nextTrialIdx >= this.trials.length && [...this.chains.values()].every((c) => c.length === 0)) {
@@ -399,6 +408,22 @@ export class DrillEngine {
         }
       }
     }
+  }
+
+  /**
+   * Trigger response (index trigger click). Routes to the currently live
+   * stimulus — the ball in flight — evaluating hand rules; with no live
+   * stimulus it counts as a false start.
+   */
+  registerTriggerResponse(hand: Hand): void {
+    if (this.state !== "running") return;
+    let earliest: { id: string; spawn: number } | null = null;
+    for (const [id, t] of this.active) {
+      if (t.resolved || t.spec.decor || t.spec.meta?.decor) continue;
+      if (!earliest || t.spawnClock < earliest.spawn) earliest = { id, spawn: t.spawnClock };
+    }
+    if (earliest) this.registerHit(earliest.id, hand);
+    else this.registerBackgroundPress(hand);
   }
 
   /** A press with no live go target = false start. */

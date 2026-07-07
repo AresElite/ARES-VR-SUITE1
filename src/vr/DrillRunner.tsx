@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Text } from "@react-three/drei";
-import { useXR, useXRInputSourceState } from "@react-three/xr";
+import { useXR, useXRInputSourceEvent, useXRInputSourceState } from "@react-three/xr";
 import * as THREE from "three";
 import { ARES_COLORS, ARES_ACCENTS } from "@/ares/colors";
 import { PHASE_META } from "@/ares/phases";
@@ -343,15 +343,69 @@ function TargetMesh({
       </mesh>
       {spec.label && (
         <Text
-          position={[0, spec.scale + 0.07, 0]}
-          fontSize={0.038}
-          color={ARES_COLORS.softGray}
+          position={spec.shape === "pad" ? [0, 0, spec.scale * 0.3 + 0.004] : [0, spec.scale + 0.075, 0]}
+          fontSize={spec.shape === "pad" ? Math.min(0.05, spec.scale * 0.75) : 0.036}
+          color={spec.shape === "pad" ? ARES_COLORS.white : ARES_COLORS.softGray}
           anchorX="center"
+          anchorY="middle"
           font={FONT_MONO}
         >
           {spec.label.toUpperCase()}
         </Text>
       )}
+    </group>
+  );
+}
+
+/**
+ * TriggerListener — index-trigger response mode (Raw-Reaction, Choice-RT).
+ * The athlete clicks the top trigger the instant the ball launches; the
+ * engine routes the press to the live stimulus and applies hand rules
+ * (purple = RIGHT trigger, teal = LEFT trigger).
+ */
+function TriggerListener() {
+  const engine = useAppStore((s) => s.engine);
+  useXRInputSourceEvent(
+    "all",
+    "selectstart",
+    (e) => {
+      const h = e.inputSource.handedness;
+      engine?.registerTriggerResponse(h === "left" || h === "right" ? h : "unknown");
+    },
+    [engine],
+  );
+  return null;
+}
+
+/** Central ball launcher — the "hole" stimuli are shot out of. */
+function LauncherProp() {
+  const glow = useRef<THREE.Mesh>(null);
+  useFrame(({ clock }) => {
+    if (glow.current) {
+      (glow.current.material as THREE.MeshBasicMaterial).opacity = 0.35 + Math.sin(clock.elapsedTime * 2.2) * 0.12;
+    }
+  });
+  return (
+    <group position={[0, 1.45, -6]} rotation={[Math.PI / 2, 0, 0]}>
+      {/* housing */}
+      <mesh>
+        <cylinderGeometry args={[0.3, 0.34, 0.25, 20]} />
+        <meshStandardMaterial color="#111428" emissive="#2D234F" emissiveIntensity={0.4} flatShading />
+      </mesh>
+      {/* muzzle ring */}
+      <mesh position={[0, 0, 0.14]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[0.17, 0.025, 8, 24]} />
+        <meshStandardMaterial color="#2998AA" emissive="#2998AA" emissiveIntensity={0.8} />
+      </mesh>
+      {/* dark hole */}
+      <mesh position={[0, 0, 0.13]} rotation={[Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[0.15, 20]} />
+        <meshBasicMaterial color="#020308" />
+      </mesh>
+      <mesh ref={glow} position={[0, 0, 0.15]} rotation={[Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.16, 0.24, 24]} />
+        <meshBasicMaterial color="#7FD3DE" transparent opacity={0.35} depthWrite={false} />
+      </mesh>
     </group>
   );
 }
@@ -465,13 +519,19 @@ export function DrillRunner() {
       <HitSparks pool={sparks} />
 
       {/* strike interaction (VR): hands/controllers hit targets directly */}
-      {inSession && <StrikeColliders />}
+      {inSession && engine.definition.responseMode !== "trigger" && <StrikeColliders />}
+      {inSession && engine.definition.responseMode === "trigger" && <TriggerListener />}
+      {engine.definition.launcher && <LauncherProp />}
 
-      {/* desktop-only false-start catcher */}
+      {/* desktop-only catcher: false starts, or trigger response in trigger mode */}
       {!inSession && (
         <mesh
           onPointerDown={(e) => {
-            engine.registerBackgroundPress(handFromPointerEvent(e));
+            if (engine.definition.responseMode === "trigger") {
+              engine.registerTriggerResponse(handFromPointerEvent(e));
+            } else {
+              engine.registerBackgroundPress(handFromPointerEvent(e));
+            }
           }}
         >
           <sphereGeometry args={[9, 12, 12]} />

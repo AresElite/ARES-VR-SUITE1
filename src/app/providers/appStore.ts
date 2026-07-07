@@ -25,6 +25,7 @@ interface AppState {
   phase: ARESPhase | null;
   drillId: string | null;
   level: number;
+  drillOptions: Record<string, string>;
   // runtime
   arenaMode: ArenaMode;
   engine: DrillEngine | null;
@@ -40,6 +41,7 @@ interface AppState {
   selectPhase(phase: ARESPhase | null): void;
   selectDrill(drillId: string | null): void;
   setLevel(level: number): void;
+  setDrillOption(id: string, value: string): void;
   goHome(): void;
   proceedToCalibration(): void;
   startDrill(): void;
@@ -71,6 +73,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   phase: null,
   drillId: null,
   level: 1,
+  drillOptions: {},
   arenaMode: "home",
   engine: null,
   snapshot: null,
@@ -86,8 +89,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   selectPhase: (phase) =>
     set({ phase, drillId: null, level: 1, arenaMode: phase ? "setup" : "home" }),
 
-  selectDrill: (drillId) => set({ drillId, level: 1 }),
+  selectDrill: (drillId) => set({ drillId, level: 1, drillOptions: {} }),
   setLevel: (level) => set({ level }),
+  setDrillOption: (id, value) =>
+    set((s) => ({ drillOptions: { ...s.drillOptions, [id]: value } })),
 
   goHome: () => {
     get().engine?.stop();
@@ -102,7 +107,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     const { drillId, level, perfModeId } = get();
     const def = drillId ? drillById(drillId) : undefined;
     if (!def) return;
-    const engine = createDrillSession(def, level, PERF_MODES[perfModeId].maxPooledTargets);
+    const engine = createDrillSession(
+      def,
+      level,
+      PERF_MODES[perfModeId].maxPooledTargets,
+      Date.now() % 2147483647,
+      get().drillOptions,
+    );
     engine.start();
     set({ engine, arenaMode: "drill", snapshot: engine.getSnapshot(), lastFinished: null });
   },

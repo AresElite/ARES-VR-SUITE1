@@ -12,9 +12,14 @@ export function createDrillSession(
   level: number,
   poolSize: number,
   seed = Date.now() % 2147483647,
+  optionSelections?: Record<string, string>,
 ): DrillEngine {
   const lvl = levelFor(def, level);
   const rng = makeRng(seed);
-  const trials = def.buildTrials(lvl.parameters, rng);
-  return new DrillEngine(def, lvl.parameters, trials, poolSize);
+  // trainer dropdown selections (or defaults) merge into the build params
+  const opts: Record<string, string> = {};
+  for (const o of def.options ?? []) opts[o.id] = optionSelections?.[o.id] ?? o.defaultValue;
+  const parameters = { ...lvl.parameters, ...opts };
+  const trials = def.buildTrials(parameters, rng);
+  return new DrillEngine(def, parameters, trials, poolSize);
 }

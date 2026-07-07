@@ -132,10 +132,10 @@ function PhasePortal({ phase }: { phase: ARESPhase }) {
       <Text
         position={[0, -0.86, 0]}
         rotation={[0, Math.PI, 0]}
-        fontSize={0.055}
+        fontSize={0.048}
         color={ARES_COLORS.softGray}
         anchorX="center"
-        maxWidth={1.3}
+        maxWidth={1.0}
         textAlign="center"
       >
         {meta.tagline}

@@ -24,34 +24,34 @@ export function SafetyBoundary() {
       <SpatialPanel
         position={[-0.92, 1.62, -1.85]}
         rotation={[0, 0.26, 0]}
-        width={1.5}
-        height={1.5}
+        width={1.56}
+        height={1.66}
         title={`How to run: ${def.shortName}`}
         accent={ARES_ACCENTS.tealBright}
       >
         <PanelText
-          position={[-0.68, 0.56, 0]}
+          position={[-0.7, 0.66, 0]}
           text={`${def.name} — Level ${level}`}
-          size={0.05}
+          size={0.046}
           color={ARES_COLORS.white}
-          maxWidth={1.38}
+          maxWidth={1.42}
         />
-        {def.instructions.map((line, i) => (
+        {def.instructions.slice(0, 5).map((line, i) => (
           <PanelText
             key={i}
-            position={[-0.68, 0.4 - i * 0.17, 0]}
+            position={[-0.7, 0.5 - i * 0.185, 0]}
             text={line}
-            size={0.04}
+            size={0.034}
             color={ARES_COLORS.softGray}
-            maxWidth={1.38}
+            maxWidth={1.42}
           />
         ))}
         <PanelText
-          position={[-0.68, 0.4 - def.instructions.length * 0.17, 0]}
+          position={[-0.7, 0.5 - Math.min(def.instructions.length, 5) * 0.185 - 0.02, 0]}
           text={def.controlsHint}
-          size={0.038}
+          size={0.032}
           color={ARES_ACCENTS.tealBright}
-          maxWidth={1.38}
+          maxWidth={1.42}
           mono
         />
       </SpatialPanel>
