@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Text } from "@react-three/drei";
+import { RoundedBox, Text } from "@react-three/drei";
 import { useXR, useXRInputSourceEvent, useXRInputSourceState } from "@react-three/xr";
 import * as THREE from "three";
 import { ARES_COLORS, ARES_ACCENTS } from "@/ares/colors";
@@ -321,6 +321,40 @@ function TargetMesh({
   const pointDir = (spec.meta?.pointDir as SliceDirection | undefined) ?? spec.requiredDirection;
   const rotZ = pointDir ? DIR_ANGLE[pointDir] - Math.PI / 2 : 0;
 
+  if (spec.shape === "pad") {
+    // Suite card language: pads are rounded (rounded-xl) tiles
+    return (
+      <group ref={group} position={spec.position} key={version}>
+        <RoundedBox
+          args={[spec.scale * 2.4, spec.scale * 1.6, spec.scale * 0.4]}
+          radius={spec.scale * 0.35}
+          smoothness={2}
+          onClick={onHit}
+        >
+          <meshStandardMaterial
+            ref={mat}
+            color={spec.color}
+            emissive={spec.emissive ?? spec.color}
+            emissiveIntensity={spec.emissive ? 0.65 : 0.2}
+            flatShading
+          />
+        </RoundedBox>
+        {spec.label && (
+          <Text
+            position={[0, 0, spec.scale * 0.3 + 0.004]}
+            fontSize={Math.min(0.05, spec.scale * 0.75)}
+            color={ARES_COLORS.white}
+            anchorX="center"
+            anchorY="middle"
+            font={FONT_MONO}
+          >
+            {spec.label.toUpperCase()}
+          </Text>
+        )}
+      </group>
+    );
+  }
+
   return (
     <group ref={group} position={spec.position} key={version}>
       <mesh onClick={onHit} rotation={[0, 0, rotZ]}>
@@ -330,7 +364,6 @@ function TargetMesh({
         {spec.shape === "ring" && <torusGeometry args={[spec.scale, spec.scale * 0.32, 6, 20]} />}
         {spec.shape === "cone" && <coneGeometry args={[spec.scale * 0.8, spec.scale * 2.2, 8]} />}
         {spec.shape === "arc" && <torusGeometry args={[spec.scale, spec.scale * 0.28, 6, 24, Math.PI * 1.7]} />}
-        {spec.shape === "pad" && <boxGeometry args={[spec.scale * 2.4, spec.scale * 1.6, spec.scale * 0.4]} />}
         <meshStandardMaterial
           ref={mat}
           color={spec.color}
@@ -343,9 +376,9 @@ function TargetMesh({
       </mesh>
       {spec.label && (
         <Text
-          position={spec.shape === "pad" ? [0, 0, spec.scale * 0.3 + 0.004] : [0, spec.scale + 0.075, 0]}
-          fontSize={spec.shape === "pad" ? Math.min(0.05, spec.scale * 0.75) : 0.036}
-          color={spec.shape === "pad" ? ARES_COLORS.white : ARES_COLORS.softGray}
+          position={[0, spec.scale + 0.075, 0]}
+          fontSize={0.036}
+          color={ARES_COLORS.softGray}
           anchorX="center"
           anchorY="middle"
           font={FONT_MONO}

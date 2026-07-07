@@ -148,7 +148,7 @@ body,
   border: 1px solid var(--ares-indigo);
   background: var(--ares-panel);
   color: var(--ares-white);
-  border-radius: 12px;
+  border-radius: 9999px; /* suite buttons are pills (rounded-full) */
   padding: 12px 22px;
   font-size: 15px;
   font-weight: 600;
@@ -159,6 +159,10 @@ body,
     transform 0.12s ease,
     background 0.12s ease,
     box-shadow 0.12s ease;
+}
+
+.ares-btn:active {
+  transform: scale(0.95); /* suite: active:scale-95 */
 }
 
 .ares-btn:hover {
@@ -200,7 +204,7 @@ body,
 .ares-card {
   background: var(--ares-charcoal);
   border: 1px solid var(--ares-border);
-  border-radius: 16px;
+  border-radius: 22px; /* brand token --r-2xl */
   padding: 18px 20px;
 }
 
@@ -304,7 +308,7 @@ select {
   background: var(--ares-charcoal);
   color: var(--ares-white);
   border: 1px solid var(--ares-indigo);
-  border-radius: 10px;
+  border-radius: 14px;
   padding: 10px 12px;
   font-size: 14px;
   font-family: "Poppins", sans-serif;
@@ -331,7 +335,7 @@ label.ares-label {
   flex: 1 1 150px;
   background: linear-gradient(160deg, rgba(139, 92, 246, 0.1), rgba(41, 152, 170, 0.08)), var(--ares-charcoal);
   border: 1px solid var(--ares-border);
-  border-radius: 14px;
+  border-radius: 22px;
   padding: 14px 18px;
   display: flex;
   flex-direction: column;

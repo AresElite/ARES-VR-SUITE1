@@ -1,7 +1,32 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { Text } from "@react-three/drei";
+
+/**
+ * Rounded-rectangle geometry — the A.R.E.S. Performance Suite card language
+ * (rounded-xl cards, rounded-full pill buttons) carried into 3D.
+ */
+function roundedRectShape(w: number, h: number, r: number): THREE.ShapeGeometry {
+  const radius = Math.min(r, w / 2, h / 2);
+  const x = -w / 2;
+  const y = -h / 2;
+  const shape = new THREE.Shape();
+  shape.moveTo(x + radius, y);
+  shape.lineTo(x + w - radius, y);
+  shape.absarc(x + w - radius, y + radius, radius, -Math.PI / 2, 0, false);
+  shape.lineTo(x + w, y + h - radius);
+  shape.absarc(x + w - radius, y + h - radius, radius, 0, Math.PI / 2, false);
+  shape.lineTo(x + radius, y + h);
+  shape.absarc(x + radius, y + h - radius, radius, Math.PI / 2, Math.PI, false);
+  shape.lineTo(x, y + radius);
+  shape.absarc(x + radius, y + radius, radius, Math.PI, Math.PI * 1.5, false);
+  return new THREE.ShapeGeometry(shape, 6);
+}
+
+export function useRoundedRect(w: number, h: number, r: number): THREE.ShapeGeometry {
+  return useMemo(() => roundedRectShape(w, h, r), [w, h, r]);
+}
 import { ARES_COLORS, ARES_ACCENTS } from "@/ares/colors";
 import { FONT_MONO, FONT_POPPINS_SEMIBOLD } from "@/utils/fonts";
 import { sfx } from "@/utils/audio";
@@ -44,7 +69,7 @@ export function SpatialPanel({
           [-1, 1], [1, 1], [-1, -1], [1, -1],
         ] as const
       ).map(([sx, sy], k) => (
-        <group key={k} position={[(sx * width) / 2, (sy * height) / 2, 0.002]}>
+        <group key={k} position={[(sx * (width - 0.05)) / 2, (sy * (height - 0.05)) / 2, 0.002]}>
           <mesh position={[(-sx * bracket) / 2, 0, 0]}>
             <planeGeometry args={[bracket, 0.008]} />
             <meshBasicMaterial color={accent} transparent opacity={0.8} />
@@ -55,14 +80,13 @@ export function SpatialPanel({
           </mesh>
         </group>
       ))}
-      {/* backdrop */}
-      <mesh position={[0, 0, -0.01]}>
-        <planeGeometry args={[width, height]} />
+      {/* backdrop — rounded card (suite: rounded-xl/2xl) */}
+      <mesh position={[0, 0, -0.01]} geometry={useRoundedRect(width, height, 0.075)}>
         <meshBasicMaterial color={ARES_COLORS.panel} transparent opacity={0.94} />
       </mesh>
       {/* accent frame line */}
-      <mesh position={[0, height / 2 - 0.012, 0]}>
-        <planeGeometry args={[width, 0.012]} />
+      <mesh position={[0, height / 2 - 0.016, 0]}>
+        <planeGeometry args={[width - 0.16, 0.012]} />
         <meshBasicMaterial color={accent} />
       </mesh>
       {title && (
@@ -143,9 +167,11 @@ export function PanelButton({
   fontSize?: number;
 }) {
   const [hover, setHover] = useState(false);
+  const pill = useRoundedRect(width, height, height / 2);
   return (
     <group position={position}>
       <mesh
+        geometry={pill}
         onClick={(e) => {
           e.stopPropagation();
           if (!disabled) {
@@ -160,7 +186,6 @@ export function PanelButton({
         onPointerOut={() => setHover(false)}
         scale={hover ? 1.04 : 1}
       >
-        <planeGeometry args={[width, height]} />
         <meshBasicMaterial
           color={disabled ? ARES_COLORS.graphite : hover ? accent : color}
           transparent
