@@ -47,6 +47,24 @@ export function buildSessionResult(
     notes.push(`${metrics.peripheralMisses} peripheral targets missed — Acquire load exceeded.`);
   }
 
+  // rhythm tracks: score timing offset against the beat (arrival moment)
+  if (def.rhythm) {
+    const offsets = events
+      .filter((e) => e.correct && e.reactionMs !== undefined)
+      .map((e) => e.reactionMs! - def.rhythm!.approachMs);
+    if (offsets.length) {
+      const abs = offsets.map(Math.abs);
+      metrics.timingPerfect = abs.filter((o) => o <= 60).length;
+      metrics.timingGood = abs.filter((o) => o > 60 && o <= 140).length;
+      metrics.avgAbsTimingMs = Math.round(abs.reduce((a, b) => a + b, 0) / abs.length);
+      const early = offsets.filter((o) => o < -60).length;
+      const late = offsets.filter((o) => o > 60).length;
+      notes.push(
+        `Beat timing: ${metrics.timingPerfect} PERFECT / ${metrics.timingGood} GOOD — avg ${metrics.avgAbsTimingMs}ms off the beat${early > late * 1.5 ? " (tends EARLY — rushing the beat)" : late > early * 1.5 ? " (tends LATE — chasing the beat)" : ""}.`,
+      );
+    }
+  }
+
   // assessment-specific clinical interpretation
   if (def.analyze) notes.push(...def.analyze(events));
 

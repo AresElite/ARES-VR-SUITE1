@@ -140,6 +140,8 @@ export interface DrillDefinition {
   ) => void;
   /** assessment-specific interpretation appended to result notes */
   analyze?: (events: RawEvent[]) => string[];
+  /** beat-locked track (Perform): timing windows scored against arrival */
+  rhythm?: { approachMs: number; bpm: number; style: "pulse" | "drive" | "wave" | "storm"; lengthBeats: number; countInBeats: number };
   /** trainer-configurable dropdowns; selections merge into build parameters */
   options?: DrillOptionDef[];
   /** One-line control reminder shown during the countdown */

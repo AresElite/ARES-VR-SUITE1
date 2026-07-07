@@ -45,6 +45,10 @@ export interface SessionMetrics {
   rightAvgReactionMs?: number;
   leftAccuracyPct?: number;
   rightAccuracyPct?: number;
+  /** rhythm tracks: strikes within the 60ms / 140ms windows of the beat */
+  timingPerfect?: number;
+  timingGood?: number;
+  avgAbsTimingMs?: number;
 }
 
 export interface AQBlock {
@@ -53,6 +57,7 @@ export interface AQBlock {
   execute?: number;
   synchronize?: number;
   assess?: number;
+  perform?: number;
   overall?: number;
   notes?: string[];
   recommendation?: string;

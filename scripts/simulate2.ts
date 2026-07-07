@@ -242,7 +242,7 @@ function dynamicRun(def: DrillDefinition, level: number, profile: Profile, seed:
 // ============================== SWEEP ==============================
 for (const def of ALL_DRILLS) {
   if (PHASE && def.phase !== PHASE) continue;
-  if (!def.assessment && def.levels.length !== 25) flag(`${def.id}|LEVELS_NOT_25(${def.levels.length})`);
+  if (!def.assessment && !def.rhythm && def.levels.length !== 25) flag(`${def.id}|LEVELS_NOT_25(${def.levels.length})`);
   const combos = optionCombos(def);
 
   // static: all levels × combos × 3 seeds

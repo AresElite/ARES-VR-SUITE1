@@ -48,7 +48,7 @@ export function LandingDashboard({ onEnterDesktop }: { onEnterDesktop: () => voi
         <div className="stat-strip">
           <div className="stat"><span className="stat-n">{ALL_DRILLS.length}</span><span className="stat-l">Drills</span></div>
           <div className="stat"><span className="stat-n">{ALL_DRILLS.reduce((a, d) => a + d.levels.length, 0)}</span><span className="stat-l">Progression levels</span></div>
-          <div className="stat"><span className="stat-n">4+1</span><span className="stat-l">Phases + Assess</span></div>
+          <div className="stat"><span className="stat-n">6</span><span className="stat-l">Suites (Loop + Assess + Perform)</span></div>
           <div className="stat"><span className="stat-n">547k+</span><span className="stat-l">Simulated QA reps</span></div>
         </div>
 
@@ -132,7 +132,7 @@ export function LandingDashboard({ onEnterDesktop }: { onEnterDesktop: () => voi
                     <li key={d.id}>
                       <span className="dot" style={{ background: meta.color }} />
                       {d.name}
-                      <span className="lv">{d.assessment ? "PROTOCOL" : "25 LV"}</span>
+                      <span className="lv">{d.assessment ? "PROTOCOL" : d.phase === "Perform" ? `D${d.levels[0].label.split("D")[1] ?? ""}` : "25 LV"}</span>
                     </li>
                   ))}
                 </ul>

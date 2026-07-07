@@ -13,6 +13,7 @@ import type { PoolSlot } from "@/drills/shared/TargetSpawner";
 import { PERF_MODES } from "@/utils/performance";
 import { makeGratingTexture, makePlateTexture, makeRDSTexture } from "@/utils/platePainter";
 import { sfx } from "@/utils/audio";
+import { rhythmMusic } from "@/perform/rhythmMusic";
 import { FONT_MONO } from "@/utils/fonts";
 
 /**
@@ -632,12 +633,14 @@ export function DrillRunner() {
     camera.layers.enable(1);
   }, [camera]);
   const demCursor = useMemo(() => ({ seq: 0 }), [engine]);
+  useEffect(() => () => rhythmMusic.stop(), [engine]);
   const perf = PERF_MODES[useAppStore((s) => s.perfModeId)];
   const inSession = useXR((s) => s.session);
   const [poolVersion, setPoolVersion] = useState(0);
   const [countdown, setCountdown] = useState<number | null>(null);
   const sparks = useMemo(() => new SparkPool(), []);
   const lastStreakMilestone = useRef(0);
+  const musicOn = useRef(false);
   const hudAccum = useRef(0);
   const phaseColor = engine ? PHASE_META[engine.definition.phase].color : ARES_COLORS.electricTeal;
   const pulseRef = useRef<THREE.MeshBasicMaterial>(null);
@@ -668,9 +671,23 @@ export function DrillRunner() {
         }
       }
       if (e.type === "stateChange") {
-        if (e.state === "running") sfx.go();
+        if (e.state === "running") {
+          sfx.go();
+          const r = engine.definition.rhythm;
+          if (r && !musicOn.current) {
+            rhythmMusic.start(r.bpm, r.style, r.lengthBeats, r.countInBeats);
+            musicOn.current = true;
+          } else if (r && musicOn.current) {
+            rhythmMusic.resume();
+          }
+        }
+        if (e.state === "paused" && engine.definition.rhythm) rhythmMusic.pause();
         if (e.state === "complete") sfx.complete();
         if (e.state === "complete" || e.state === "aborted") {
+          if (engine.definition.rhythm) {
+            rhythmMusic.stop();
+            musicOn.current = false;
+          }
           setTimeout(() => useAppStore.getState().finishDrill(), 350);
         }
       }

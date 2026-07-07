@@ -12,6 +12,7 @@ import { DepthSliceVR } from "./execute/DepthSliceVR";
 import { ChaosArenaVR } from "./synchronize/ChaosArenaVR";
 import { SportTransferLabVR, sportLabVariant } from "./synchronize/SportTransferLabVR";
 import { ASSESS_DRILLS } from "./assess/AssessDrills";
+import { PERFORM_DRILLS } from "@/perform/performDrills";
 
 /**
  * Drill registry — single source of truth.
@@ -21,6 +22,7 @@ import { ASSESS_DRILLS } from "./assess/AssessDrills";
 export const ALL_DRILLS: DrillDefinition[] = [
   // ================= ASSESS (clinical baselines) =================
   ...ASSESS_DRILLS,
+  ...PERFORM_DRILLS,
   // ================= ACQUIRE =================
   ReactionGrid, // categorized EXECUTE, ACQUIRE in the suite — listed under Execute below
   SpeedSearch,
