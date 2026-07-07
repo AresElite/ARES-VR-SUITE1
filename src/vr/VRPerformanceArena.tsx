@@ -92,9 +92,11 @@ function PhasePortal({ phase }: { phase: ARESPhase }) {
 
   return (
     <group position={[x, 1.55, z]} rotation={[0, -meta.portalAngle + Math.PI, 0]}>
-      {/* portal ring */}
+      {/* FULL-CIRCLE hit area — the entire portal face is one button,
+          covering the ring, the fill, and the labels above and below */}
       <mesh
-        ref={ring}
+        rotation={[0, Math.PI, 0]}
+        position={[0, 0, 0.02]}
         onClick={(e) => {
           e.stopPropagation();
           sfx.portal();
@@ -105,8 +107,12 @@ function PhasePortal({ phase }: { phase: ARESPhase }) {
           setHover(true);
         }}
         onPointerOut={() => setHover(false)}
-        rotation={[0, Math.PI, 0]}
       >
+        <circleGeometry args={[0.78, 32]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} side={THREE.DoubleSide} />
+      </mesh>
+      {/* portal ring (decorative) */}
+      <mesh ref={ring} rotation={[0, Math.PI, 0]}>
         <torusGeometry args={[0.62, 0.045, 8, 36]} />
         <meshStandardMaterial
           color={meta.color}
@@ -114,20 +120,33 @@ function PhasePortal({ phase }: { phase: ARESPhase }) {
           emissiveIntensity={hover ? 1.1 : 0.5}
         />
       </mesh>
-      {/* portal fill */}
+      {/* portal fill (decorative) */}
       <mesh position={[0, 0, -0.01]} rotation={[0, Math.PI, 0]}>
         <circleGeometry args={[0.6, 28]} />
-        <meshBasicMaterial color={ARES_COLORS.deepPurple} transparent opacity={hover ? 0.55 : 0.3} />
+        <meshBasicMaterial color={ARES_COLORS.deepPurple} transparent opacity={hover ? 0.6 : 0.35} />
       </mesh>
+      {/* phase name INSIDE the portal — the whole disc reads as the button */}
       <Text
-        position={[0, 0.92, 0]}
+        position={[0, 0.1, 0.01]}
         rotation={[0, Math.PI, 0]}
-        fontSize={0.14}
-        color={meta.color}
+        fontSize={0.13}
+        color={hover ? ARES_COLORS.white : meta.color}
         anchorX="center"
-        letterSpacing={0.14}
+        anchorY="middle"
+        letterSpacing={0.12}
       >
         {phase.toUpperCase()}
+      </Text>
+      <Text
+        position={[0, -0.14, 0.01]}
+        rotation={[0, Math.PI, 0]}
+        fontSize={0.055}
+        color={hover ? meta.color : ARES_COLORS.softGray}
+        anchorX="center"
+        anchorY="middle"
+        letterSpacing={0.3}
+      >
+        {hover ? ">> ENTER <<" : "ENTER"}
       </Text>
       <Text
         position={[0, -0.86, 0]}
