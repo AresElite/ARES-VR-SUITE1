@@ -23,72 +23,13 @@ export function LandingDashboard({ onEnterDesktop }: { onEnterDesktop: () => voi
   const sessions = useAppStore((s) => s.sessions);
   const { setAthlete, setPerfMode } = useAppStore.getState();
 
-  const NAV = [
-    { id: "launch", label: "Launch" },
-    { id: "plan", label: "Today's Plan" },
-    { id: "config", label: "Session Config" },
-    { id: "loop", label: "Performance Loop" },
-    { id: "library", label: "Drill Library" },
-    { id: "history", label: "Session History" },
-  ];
-  const jump = (id: string) =>
-    document.getElementById(`sec-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
-
   return (
-    <div className="portal-shell">
-      {/* sidebar — portal language: glass rail, brand block, mono labels */}
-      <aside className="portal-aside">
-        <div className="portal-brand">
-          <img src="/brand/aesv-logo.png" alt="AESV" />
-          <div>
-            <div className="brand-top">ARES ELITE</div>
-            <div className="brand-sub">Sports Vision · VR Suite</div>
-          </div>
-        </div>
-        <div className="portal-nav">
-          <div className="portal-nav-label">Suite</div>
-          {NAV.map((n) => (
-            <div key={n.id} className="portal-nav-item" onClick={() => jump(n.id)}>
-              <span className="dot" style={{ background: "var(--ares-teal)" }} />
-              {n.label}
-            </div>
-          ))}
-          <div className="portal-nav-label">Phases</div>
-          {ARES_ALL_PHASES.map((p) => (
-            <div key={p} className="portal-nav-item" onClick={() => jump("library")}>
-              <span className="dot" style={{ background: PHASE_META[p].color }} />
-              {p}
-            </div>
-          ))}
-        </div>
-        <div className="portal-aside-foot">{APP_VERSION.toUpperCase()}</div>
-      </aside>
-
-      <main className="portal-main">
-        {/* sticky topbar with mono breadcrumb */}
-        <div className="portal-topbar">
-          <div className="portal-crumb">
-            <span className="tag">A.R.E.S.</span>
-            <span className="sep">/</span>
-            <span className="page">VR Performance Suite</span>
-          </div>
-          <span
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: 10,
-              letterSpacing: "0.18em",
-              color: "var(--ares-dim)",
-            }}
-          >
-            {ORG_NAME.toUpperCase()}
-          </span>
-        </div>
-
-        <div className="portal-content">
-        <section id="sec-launch">
+    <div className="ares-overlay">
+      <div className="ares-shell">
+        <img className="ares-logo" src="/brand/aesv-logo.png" alt="Ares Elite Sports Vision" />
         <p className="ares-kicker">{ORG_NAME}</p>
-        <h1 className="portal-hero-h1">
-          A.R.E.S. <span style={{ background: "var(--grad-brand-3)", WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}>VR</span> Performance Suite
+        <h1 className="ares-title">
+          A.R.E.S. <span className="accent">VR</span> Performance Suite
         </h1>
         <p className="ares-loopline">
           <b>Acquire</b> · <b>Route</b> · <b>Execute</b> · <b>Synchronize</b>
@@ -106,19 +47,18 @@ export function LandingDashboard({ onEnterDesktop }: { onEnterDesktop: () => voi
           </button>
         </div>
 
-        <div className="num-tile-row">
-          <div className="num-tile"><div className="n">{ALL_DRILLS.length}</div><div className="l">Drills</div></div>
-          <div className="num-tile"><div className="n">{ALL_DRILLS.reduce((a, d) => a + d.levels.length, 0)}</div><div className="l">Progression levels</div></div>
-          <div className="num-tile"><div className="n">6</div><div className="l">Suites — Loop + Assess + Perform</div></div>
-          <div className="num-tile"><div className="n">1M+</div><div className="l">Simulated QA reps</div></div>
+        <div className="stat-strip">
+          <div className="stat"><span className="stat-n">{ALL_DRILLS.length}</span><span className="stat-l">Drills</span></div>
+          <div className="stat"><span className="stat-n">{ALL_DRILLS.reduce((a, d) => a + d.levels.length, 0)}</span><span className="stat-l">Progression levels</span></div>
+          <div className="stat"><span className="stat-n">6</span><span className="stat-l">Suites (Loop + Assess + Perform)</span></div>
+          <div className="stat"><span className="stat-n">547k+</span><span className="stat-l">Simulated QA reps</span></div>
         </div>
 
         <div style={{ marginTop: 20 }}>
           <SupportBadges />
         </div>
-        </section>
 
-        <h2 className="portal-h2" id="sec-config">Session configuration</h2>
+        <p className="ares-section-title">Session configuration</p>
         <div className="ares-grid">
           <div className="ares-card">
             <h3 style={{ color: "var(--ares-teal-bright)" }}>Athlete</h3>
@@ -162,7 +102,7 @@ export function LandingDashboard({ onEnterDesktop }: { onEnterDesktop: () => voi
           </div>
         </div>
 
-        <h2 className="portal-h2" id="sec-plan">Today's prescribed session</h2>
+        <p className="ares-section-title">Today's prescribed session</p>
         <div className="ares-card">
           <h3 style={{ color: "var(--ares-purple-glow, #8B5CF6)" }}>
             The closed loop — assessment drives training
@@ -183,7 +123,7 @@ export function LandingDashboard({ onEnterDesktop }: { onEnterDesktop: () => voi
           </p>
         </div>
 
-        <h2 className="portal-h2" id="sec-loop">The A.R.E.S. Performance Loop</h2>
+        <p className="ares-section-title">The A.R.E.S. Performance Loop</p>
         <div className="ares-grid">
           {ARES_ALL_PHASES.map((p) => {
             const meta = PHASE_META[p];
@@ -203,7 +143,7 @@ export function LandingDashboard({ onEnterDesktop }: { onEnterDesktop: () => voi
           })}
         </div>
 
-        <h2 className="portal-h2" id="sec-library">Drill library</h2>
+        <p className="ares-section-title">Drill library</p>
         <div className="ares-grid">
           {ARES_ALL_PHASES.map((p) => {
             const meta = PHASE_META[p];
@@ -226,7 +166,7 @@ export function LandingDashboard({ onEnterDesktop }: { onEnterDesktop: () => voi
 
         {lastFinished && (
           <>
-            <h2 className="portal-h2">Last session</h2>
+            <p className="ares-section-title">Last session</p>
             <div className="ares-card">
               <h3 style={{ color: PHASE_META[lastFinished.result.phase].color }}>
                 {lastFinished.result.drillName} — AQ {lastFinished.result.aq.overall ?? "—"} (
@@ -242,7 +182,7 @@ export function LandingDashboard({ onEnterDesktop }: { onEnterDesktop: () => voi
           </>
         )}
 
-        <h2 className="portal-h2" id="sec-history">Local session history</h2>
+        <p className="ares-section-title">Local session history</p>
         <HistoryTable />
 
         <p className="footer-note">
@@ -250,8 +190,7 @@ export function LandingDashboard({ onEnterDesktop }: { onEnterDesktop: () => voi
           A.R.E.S. Immersive Performance Engine · WebXR requires HTTPS — use the Netlify deploy URL
           in the Meta Quest Browser. Results stored locally, EMR-sync ready.
         </p>
-        </div>
-      </main>
+      </div>
     </div>
   );
 }
