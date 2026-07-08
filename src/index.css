@@ -43,10 +43,26 @@
   --warning: #f5b648;
   --danger: #ef5a6f;
   /* Gradients & glows */
+  --info: #2998aa;
+
   --grad-brand: linear-gradient(90deg, #8b5cf6, #2998aa);
-  --glow-purple: 0 0 24px rgba(139, 92, 246, 0.6);
+  --grad-brand-3: linear-gradient(90deg, #8b5cf6, #2d234f, #2998aa);
+  --glow-purple: 0 0 15px rgba(139, 92, 246, 0.3);
+  --glow-purple-strong: 0 0 25px rgba(139, 92, 246, 0.6);
   --glow-teal: 0 0 18px rgba(41, 152, 170, 0.35);
-  --mono: "JetBrains Mono", monospace;
+
+  /* radius scale — straight from the brand guide */
+  --r-sm: 8px;
+  --r-md: 11px;
+  --r-lg: 14px;
+  --r-xl: 18px;
+  --r-2xl: 22px;
+  --r-full: 9999px;
+
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --font-display: "Poppins", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+  --mono: var(--font-mono);
 }
 
 * {
@@ -87,7 +103,7 @@ body,
   height: 84px;
   display: block;
   margin-bottom: 18px;
-  filter: drop-shadow(var(--glow-purple));
+  filter: drop-shadow(var(--glow-purple-strong));
 }
 
 .ares-kicker {
@@ -109,7 +125,7 @@ body,
 }
 
 .ares-title .accent {
-  background: var(--grad-brand);
+  background: var(--grad-brand-3);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -148,7 +164,7 @@ body,
   border: 1px solid var(--ares-indigo);
   background: var(--ares-panel);
   color: var(--ares-white);
-  border-radius: 9999px; /* suite buttons are pills (rounded-full) */
+  border-radius: var(--r-full); /* suite buttons are pills */
   padding: 12px 22px;
   font-size: 15px;
   font-weight: 600;
@@ -156,9 +172,9 @@ body,
   letter-spacing: 0.04em;
   cursor: pointer;
   transition:
-    transform 0.12s ease,
-    background 0.12s ease,
-    box-shadow 0.12s ease;
+    transform 0.35s var(--ease),
+    background 0.35s var(--ease),
+    box-shadow 0.35s var(--ease);
 }
 
 .ares-btn:active {
@@ -204,7 +220,7 @@ body,
 .ares-card {
   background: var(--ares-charcoal);
   border: 1px solid var(--ares-border);
-  border-radius: 22px; /* brand token --r-2xl */
+  border-radius: var(--r-2xl);
   padding: 18px 20px;
 }
 
@@ -235,7 +251,7 @@ body,
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  border-radius: 9999px;
+  border-radius: var(--r-full);
   padding: 6px 14px;
   font-size: 11.5px;
   font-family: var(--mono);
@@ -308,7 +324,7 @@ select {
   background: var(--ares-charcoal);
   color: var(--ares-white);
   border: 1px solid var(--ares-indigo);
-  border-radius: 14px;
+  border-radius: var(--r-lg);
   padding: 10px 12px;
   font-size: 14px;
   font-family: "Poppins", sans-serif;
@@ -335,7 +351,7 @@ label.ares-label {
   flex: 1 1 150px;
   background: linear-gradient(160deg, rgba(139, 92, 246, 0.1), rgba(41, 152, 170, 0.08)), var(--ares-charcoal);
   border: 1px solid var(--ares-border);
-  border-radius: 22px;
+  border-radius: var(--r-2xl);
   padding: 14px 18px;
   display: flex;
   flex-direction: column;
@@ -375,7 +391,7 @@ label.ares-label {
 .drill-list .dot {
   width: 6px;
   height: 6px;
-  border-radius: 999px;
+  border-radius: var(--r-full);
   flex: none;
 }
 
