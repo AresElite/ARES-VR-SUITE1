@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { ARES_COLORS, ARES_ACCENTS } from "@/ares/colors";
 import { PHASE_META } from "@/ares/phases";
 import { useAppStore } from "@/app/providers/appStore";
@@ -19,14 +19,50 @@ export function TodaysPlanPanel() {
   const launchPrescribed = useAppStore((s) => s.launchPrescribed);
 
   const plan = useMemo(() => buildPrescription(sessions, athlete.id), [sessions, athlete.id]);
+  const [open, setOpen] = useState(false);
   if (plan.length === 0) return null;
+
+  // Collapsed by default: a single pill, tucked left of the welcome console,
+  // never blocking the Assess/Acquire portals. Opens on demand, closes on X.
+  if (!open) {
+    return (
+      <group position={[-1.15, 0.62, -1.45]} rotation={[0, 0.5, 0]}>
+        <PanelButton
+          position={[0, 0, 0]}
+          width={0.62}
+          height={0.11}
+          fontSize={0.036}
+          label={`TODAY'S PLAN (${plan.length})`}
+          color={ARES_COLORS.deepPurple}
+          textColor={ARES_ACCENTS.purpleGlow}
+          onClick={() => {
+            sfx.uiClick();
+            setOpen(true);
+          }}
+        />
+      </group>
+    );
+  }
 
   const rowH = 0.155;
   const height = 0.34 + plan.length * rowH;
 
   return (
-    <group position={[-1.62, 1.42, -1.62]} rotation={[0, 0.62, 0]}>
+    <group position={[-1.35, 1.18, -1.5]} rotation={[0, 0.55, 0]}>
       <SpatialPanel position={[0, 0, 0]} width={1.16} height={height} title="TODAY'S PLAN" accent={ARES_ACCENTS.purpleGlow}>
+        {/* close */}
+        <PanelButton
+          position={[0.51, height / 2 - 0.075, 0.001]}
+          width={0.085}
+          height={0.085}
+          fontSize={0.04}
+          label="X"
+          color={ARES_COLORS.errorRed}
+          onClick={() => {
+            sfx.uiClick();
+            setOpen(false);
+          }}
+        />
         <PanelText
           position={[-0.52, height / 2 - 0.155, 0]}
           text={`Prescribed for ${athlete.name} — weakest systems first`}
