@@ -129,7 +129,7 @@ export function buildPrescription(sessions: ARESDrillSessionResult[], athleteId?
     items.push({
       drillId,
       drillName: def.shortName,
-      level: level ?? (def.assessment || def.rhythm ? 1 : levelFor(drillId, sessions)),
+      level: level ?? (def.assessment ? 1 : levelFor(drillId, sessions)),
       reason,
       priority,
     });

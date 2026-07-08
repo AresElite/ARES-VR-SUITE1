@@ -49,9 +49,11 @@ export function buildSessionResult(
 
   // rhythm tracks: score timing offset against the beat (arrival moment)
   if (def.rhythm) {
+    const lvParams = def.levels[opts.level - 1]?.parameters as { approachSec?: number } | undefined;
+    const approachMs = lvParams?.approachSec ? lvParams.approachSec * 1000 : def.rhythm.approachMs;
     const offsets = events
       .filter((e) => e.correct && e.reactionMs !== undefined)
-      .map((e) => e.reactionMs! - def.rhythm!.approachMs);
+      .map((e) => e.reactionMs! - approachMs);
     if (offsets.length) {
       const abs = offsets.map(Math.abs);
       metrics.timingPerfect = abs.filter((o) => o <= 60).length;

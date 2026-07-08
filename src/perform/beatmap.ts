@@ -149,7 +149,7 @@ export function computeDifficulty(map: BeatMap): number {
  * exactly like a difficulty-ordered song list. IDs are stable; difficulty
  * is computed from the chart, and the library ships sorted by it.
  */
-const RECIPES: TrackRecipe[] = [
+export const BASE_RECIPES: TrackRecipe[] = [
   { id: "warmup-90",    title: "Warm-Up Circuit",  bpm: 90,  bars: 24, approachSec: 1.5,  style: "pulse", fill: 0.55, offbeat: 0.0,  doubles: 0.0,  crossover: 0.0,  spread: 0.25, seed: 101 },
   { id: "pulse-100",    title: "Pulse",            bpm: 100, bars: 26, approachSec: 1.4,  style: "pulse", fill: 0.68, offbeat: 0.04, doubles: 0.02, crossover: 0.0,  spread: 0.35, seed: 102 },
   { id: "flow-110",     title: "Flow State",       bpm: 110, bars: 28, approachSec: 1.3,  style: "wave",  fill: 0.74, offbeat: 0.08, doubles: 0.04, crossover: 0.04, spread: 0.45, seed: 103 },
@@ -162,12 +162,35 @@ const RECIPES: TrackRecipe[] = [
   { id: "ascension-160",title: "Ascension",        bpm: 160, bars: 34, approachSec: 0.95, style: "storm", fill: 0.9,  offbeat: 0.35, doubles: 0.18, crossover: 0.34, spread: 0.95, seed: 110 },
 ];
 
+/**
+ * LEVEL SCALING — every track becomes a 12-rung ladder. Low levels are
+ * slower, sparser, and CENTRAL (targets hug the midline); high levels are
+ * denser, faster, syncopated, and PERIPHERAL (full-width field, crossovers,
+ * doubles). The Goldilocks Zone lives somewhere on this ladder for every
+ * athlete — the prescription engine finds it and holds them there.
+ */
+export function levelRecipe(base: TrackRecipe, level: number): TrackRecipe {
+  const L = Math.max(1, Math.min(12, level));
+  const t = (L - 1) / 11; // 0..1 across the ladder
+  return {
+    ...base,
+    id: `${base.id}-l${L}`,
+    fill: Math.min(0.95, base.fill * (0.72 + t * 0.42)),
+    offbeat: Math.min(0.5, base.offbeat * 0.4 + t * (base.offbeat + 0.08)),
+    doubles: Math.min(0.3, base.doubles * 0.3 + t * (base.doubles + 0.05)),
+    crossover: Math.min(0.45, base.crossover * 0.3 + t * (base.crossover + 0.06)),
+    spread: Math.min(1, 0.15 + t * (0.35 + base.spread)), // central -> peripheral
+    approachSec: base.approachSec * (1.18 - t * 0.3), // slower read -> faster read
+    seed: base.seed * 1000 + L,
+  };
+}
+
 export interface Track {
   map: BeatMap;
   difficulty: number;
 }
 
-export const TRACK_LIBRARY: Track[] = RECIPES
+export const TRACK_LIBRARY: Track[] = BASE_RECIPES
   .map((r) => {
     const map = generateMap(r);
     return { map, difficulty: computeDifficulty(map) };
