@@ -571,42 +571,38 @@ export const ContrastSensitivityAssessment: DrillDefinition = {
 };
 
 // ==================== 8. DEM (ARROWS) ====================
+// Timed reading-pattern protocol: after the 3-2-1-GO countdown the stopwatch
+// starts. The athlete zigzags the grid in reading order — left to right,
+// row by row — flicking the joystick to match each glowing arrow. The clock
+// stops THE INSTANT the bottom-right arrow is answered. Total time, errors,
+// and accuracy are the score. DEM III is the same protocol with more arrows.
 const DEM_DIRS = ["up", "down", "left", "right"] as const;
+const DEM_FIRST_SPAWN = 600;
 
-function demArrows(count: number, layout: "vertical" | "horizontal" | "dem100", budgetMs: number, rng: () => number): TrialSpec[] {
+function demArrows(rows: number, cols: number, scale: number, seedBase: number, rng: () => number): TrialSpec[] {
   const trials: TrialSpec[] = [];
-  const positions: [number, number][] = [];
-  if (layout === "vertical") {
-    const rows = count / 2;
-    for (let c = 0; c < 2; c++) for (let r2 = 0; r2 < rows; r2++) positions.push([c === 0 ? -0.3 : 0.3, 1.82 - r2 * (0.78 / (rows - 1))]);
-  } else if (layout === "horizontal") {
-    const cols = count / 5;
-    for (let r2 = 0; r2 < 5; r2++) {
-      let x = -0.62;
-      for (let c = 0; c < cols; c++) {
-        x += 0.06 + rng() * 0.09;
-        positions.push([Math.min(0.66, x), 1.74 - r2 * 0.15]);
-      }
+  const top = 2.08;
+  const rowGap = rows > 8 ? 0.088 : 0.108;
+  const width = 1.7;
+  let i = 0;
+  for (let r = 0; r < rows; r++) {
+    // irregular horizontal spacing — the oculomotor stressor of the real DEM
+    const gaps = Array.from({ length: cols }, () => 0.55 + rng());
+    const gsum = gaps.reduce((a, b) => a + b, 0);
+    let x = -width / 2;
+    for (let c = 0; c < cols; c++) {
+      x += (gaps[c] / gsum) * width;
+      const dir = pick(rng, DEM_DIRS);
+      trials.push({
+        id: `dem-${seedBase}-${i}`, spawnAt: DEM_FIRST_SPAWN, duration: 300000, kind: "go",
+        zone: "center", position: [x - width / (cols * 2), top - r * rowGap, -1.6],
+        requiredDirection: dir,
+        color: "#9FA8D6", emissive: "#9FA8D6", shape: "arrow", scale,
+        groupId: "dem", groupMode: "ordered", seq: i,
+        meta: { pointDir: dir, dem: true },
+      });
+      i++;
     }
-  } else {
-    for (let r2 = 0; r2 < 10; r2++) {
-      let x = -0.64;
-      for (let c = 0; c < 10; c++) {
-        x += 0.05 + rng() * 0.085;
-        positions.push([Math.min(0.68, x), 1.86 - r2 * 0.088 + (rng() - 0.5) * 0.02]);
-      }
-    }
-  }
-  for (let i = 0; i < count; i++) {
-    const dir = pick(rng, DEM_DIRS);
-    trials.push({
-      id: `dem-${i}`, spawnAt: 1500, duration: budgetMs, kind: "go",
-      zone: "center", position: [positions[i][0], positions[i][1], -0.95],
-      requiredDirection: dir,
-      color: WHITE, emissive: GOLD, shape: "cone", scale: 0.028,
-      groupId: "dem", groupMode: "ordered", seq: i,
-      meta: { pointDir: dir, dem: true },
-    });
   }
   return trials;
 }
@@ -616,42 +612,53 @@ export const DEMArrows: DrillDefinition = {
   name: "DEM (Arrows)",
   shortName: "DEM Arrows",
   phase: "Assess",
-  description: "Developmental Eye Movement test, arrow form. Flick the dominant-hand joystick to match each glowing arrow in reading order. Vertical A/B, horizontal C, and the 100-arrow protocol. Time, accuracy, and post-error slowing recorded.",
-  purpose: "Oculomotor function: saccadic accuracy, automaticity, V/H ratio.",
+  description: "Timed oculomotor protocol. After 3-2-1-GO the stopwatch starts: zigzag the arrow grid in reading order — left to right, row by row — flicking the joystick to match each glowing arrow. The clock stops the instant the final arrow is answered. DEM I & II: 40 arrows. DEM III: 80.",
+  purpose: "Oculomotor function: saccadic accuracy, automaticity, completion speed.",
   interaction: "touch",
   responseMode: "joystick",
   environment: "arena",
   mvp: true,
   assessment: true,
+  stopwatch: true,
   options: [
-    { id: "subtest", label: "Subtest", defaultValue: "vertical-a",
+    { id: "subtest", label: "Subtest", defaultValue: "dem-1",
       values: [
-        { id: "vertical-a", label: "Vertical A (2×25)" },
-        { id: "vertical-b", label: "Vertical B (2×25)" },
-        { id: "horizontal-c", label: "Horizontal C (50)" },
-        { id: "dem-100", label: "DEM 100 (10×10)" },
+        { id: "dem-1", label: "DEM I (40 arrows)" },
+        { id: "dem-2", label: "DEM II (40 arrows)" },
+        { id: "dem-3", label: "DEM III (80 arrows)" },
       ] },
     { id: "dominantHand", label: "Joystick hand", defaultValue: "right",
       values: [ { id: "right", label: "Right" }, { id: "left", label: "Left" } ] },
   ],
   instructions: [
-    "1. A board of small arrows appears. The GLOWING arrow is your current target.",
-    "2. Flick your dominant-hand JOYSTICK in the direction that arrow points.",
-    "3. The highlight advances arrow by arrow in reading order - keep a steady rhythm.",
-    "4. Let the stick return to center between flicks. Wrong flicks are scored and the test continues.",
-    "5. Completion time, accuracy, and post-error slowing are recorded.",
+    "1. A grid of arrows appears at distance. The GLOWING GOLD arrow is your current target.",
+    "2. On GO the stopwatch starts. Flick your joystick in the direction the gold arrow points.",
+    "3. Work LEFT to RIGHT, row by row — a zigzag reading pattern down to the bottom-right arrow.",
+    "4. The clock stops the instant the last arrow is answered. Errors advance the test but count against you.",
+    "5. Scored: TOTAL TIME, errors, and accuracy. Let the stick return to center between flicks.",
   ],
-  controlsHint: "FLICK THE JOYSTICK TO MATCH EACH GLOWING ARROW",
+  controlsHint: "GO = CLOCK STARTS - READ LEFT TO RIGHT - FINISH FAST",
   levels: STANDARD({}),
   buildTrials: (params, rng) => {
-    const sub = (params as { subtest?: string }).subtest ?? "vertical-a";
-    if (sub === "vertical-a" || sub === "vertical-b") return demArrows(50, "vertical", 90000, rng);
-    if (sub === "horizontal-c") return demArrows(50, "horizontal", 100000, rng);
-    return demArrows(100, "dem100", 200000, rng);
+    const sub = (params as { subtest?: string }).subtest ?? "dem-1";
+    if (sub === "dem-3") return demArrows(10, 8, 0.042, 3, rng);
+    return demArrows(8, 5, 0.055, sub === "dem-2" ? 2 : 1, rng);
+  },
+  analyze: (events: RawEvent[]) => {
+    const scored = events.filter((e) => e.errorType !== "correctRejection");
+    if (scored.length === 0) return [];
+    const last = Math.max(...scored.map((e) => e.timestamp));
+    const totalS = Math.round((last - DEM_FIRST_SPAWN) / 100) / 10;
+    const errors = scored.filter((e) => !e.correct).length;
+    const acc = Math.round((scored.filter((e) => e.correct).length / scored.length) * 1000) / 10;
+    return [
+      `DEM total time: ${totalS}s — ${errors} error(s), ${acc}% accuracy over ${scored.length} arrows.`,
+      `Adjusted per-arrow pace: ${Math.round((totalS / scored.length) * 100) / 100}s.`,
+    ];
   },
   durationMs: (params) => {
-    const sub = (params as { subtest?: string }).subtest ?? "vertical-a";
-    return sub === "dem-100" ? 203000 : sub === "horizontal-c" ? 103000 : 93000;
+    const sub = (params as { subtest?: string }).subtest ?? "dem-1";
+    return sub === "dem-3" ? 302000 : 301000;
   },
 };
 

@@ -15,7 +15,7 @@ export type TargetZone =
 export type TargetKind = "go" | "noGo" | "distractor";
 export type HandRule = "left" | "right" | "either" | "both";
 export type Hand = "left" | "right" | "both" | "unknown";
-export type TargetShape = "sphere" | "box" | "diamond" | "ring" | "cone" | "arc" | "pad" | "plate" | "stereo" | "grating";
+export type TargetShape = "sphere" | "box" | "diamond" | "ring" | "cone" | "arc" | "pad" | "plate" | "stereo" | "grating" | "arrow";
 
 export type SliceDirection =
   | "up"
@@ -140,6 +140,9 @@ export interface DrillDefinition {
   ) => void;
   /** assessment-specific interpretation appended to result notes */
   analyze?: (events: RawEvent[]) => string[];
+  /** timed completion protocol (DEM): HUD shows a stopwatch counting UP,
+      and the clock stops the instant the final target is resolved */
+  stopwatch?: boolean;
   /** beat-locked track (Perform): timing windows scored against arrival */
   rhythm?: { approachMs: number; bpm: number; style: "pulse" | "drive" | "wave" | "storm"; lengthBeats: number; countInBeats: number };
   /** trainer-configurable dropdowns; selections merge into build parameters */

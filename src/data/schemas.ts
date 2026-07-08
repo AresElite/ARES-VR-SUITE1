@@ -49,6 +49,8 @@ export interface SessionMetrics {
   timingPerfect?: number;
   timingGood?: number;
   avgAbsTimingMs?: number;
+  /** stopwatch protocols (DEM): GO-to-final-answer completion time */
+  completionTimeMs?: number;
 }
 
 export interface AQBlock {

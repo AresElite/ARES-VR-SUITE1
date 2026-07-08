@@ -32,6 +32,20 @@ import { FONT_MONO } from "@/utils/fonts";
  *  - Collision checks are plain distance math on pooled slots — no physics.
  */
 
+/** clean flat DEM arrow: shaft + head, unit-sized, faces the athlete */
+const ARROW_SHAPE = (() => {
+  const sh = new THREE.Shape();
+  sh.moveTo(-0.55, -0.16);
+  sh.lineTo(0.05, -0.16);
+  sh.lineTo(0.05, -0.38);
+  sh.lineTo(0.62, 0);
+  sh.lineTo(0.05, 0.38);
+  sh.lineTo(0.05, 0.16);
+  sh.lineTo(-0.55, 0.16);
+  sh.closePath();
+  return sh;
+})();
+
 const DIR_ANGLE: Record<SliceDirection, number> = {
   right: 0,
   upRight: Math.PI / 4,
@@ -317,12 +331,12 @@ function TargetMesh({
         mat.current.emissive.set(ARES_COLORS.warningGold);
         mat.current.color.set(ARES_COLORS.warningGold);
         mat.current.emissiveIntensity = 1.6 + Math.sin(age * 0.012) * 0.5;
-        group.current.scale.setScalar(2.1 + Math.sin(age * 0.012) * 0.15);
+        group.current.scale.setScalar(1.55 + Math.sin(age * 0.012) * 0.1);
       } else {
         const done = (spec.seq ?? 0) < demCursor.seq;
-        mat.current.emissive.set(done ? "#2C7A4B" : "#38406B");
-        mat.current.color.set(done ? "#2C7A4B" : "#38406B");
-        mat.current.emissiveIntensity = 0.3;
+        mat.current.emissive.set(done ? "#3FA96B" : "#9FA8D6");
+        mat.current.color.set(done ? "#3FA96B" : "#9FA8D6");
+        mat.current.emissiveIntensity = done ? 0.55 : 0.4;
         group.current.scale.setScalar(1);
       }
       if (demRing.current) {
@@ -454,7 +468,8 @@ function TargetMesh({
 
   return (
     <group ref={group} position={spec.position} key={version}>
-      <mesh onClick={onHit} rotation={[0, 0, rotZ]}>
+      <mesh onClick={onHit} rotation={[0, 0, rotZ]} scale={spec.shape === "arrow" ? spec.scale : 1}>
+        {spec.shape === "arrow" && <shapeGeometry args={[ARROW_SHAPE]} />}
         {spec.shape === "sphere" && <sphereGeometry args={[spec.scale, segments, segments]} />}
         {spec.shape === "box" && <boxGeometry args={[spec.scale * 1.6, spec.scale * 1.6, spec.scale * 1.6]} />}
         {spec.shape === "diamond" && <octahedronGeometry args={[spec.scale, 0]} />}

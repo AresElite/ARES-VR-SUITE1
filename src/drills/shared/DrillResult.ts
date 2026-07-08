@@ -65,6 +65,12 @@ export function buildSessionResult(
     }
   }
 
+  // stopwatch protocols: completion time = GO to the final resolved target
+  if (def.stopwatch) {
+    const scored = events.filter((e) => e.errorType !== "correctRejection");
+    if (scored.length) metrics.completionTimeMs = Math.max(0, Math.round(Math.max(...scored.map((e) => e.timestamp)) - 600));
+  }
+
   // assessment-specific clinical interpretation
   if (def.analyze) notes.push(...def.analyze(events));
 

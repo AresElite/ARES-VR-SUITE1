@@ -17,6 +17,9 @@ export function AthleteHUD() {
   if (!engine || !snapshot) return null;
   const meta = PHASE_META[engine.definition.phase];
   const secondsLeft = Math.max(0, Math.ceil(snapshot.remainingMs / 1000));
+  const stopwatch = engine.definition.stopwatch
+    ? `${(Math.max(0, snapshot.elapsedMs - 600) / 1000).toFixed(1)}s`
+    : null;
   const paused = snapshot.state === "paused";
 
   return (
@@ -34,7 +37,7 @@ export function AthleteHUD() {
         />
         <PanelText
           position={[-0.68, -0.06, 0]}
-          text={`${secondsLeft}s | HIT ${snapshot.hits} | ERR ${snapshot.errors} | ${snapshot.accuracyPct}% | STK ${snapshot.streak}${
+          text={`${stopwatch ?? `${secondsLeft}s`} | HIT ${snapshot.hits} | ERR ${snapshot.errors} | ${snapshot.accuracyPct}% | STK ${snapshot.streak}${
             snapshot.lastReactionMs ? ` | ${Math.round(snapshot.lastReactionMs)}ms` : ""
           }`}
           size={0.048}
