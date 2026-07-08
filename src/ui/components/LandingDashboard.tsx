@@ -155,7 +155,7 @@ export function LandingDashboard({ onEnterDesktop }: { onEnterDesktop: () => voi
                     <li key={d.id}>
                       <span className="dot" style={{ background: meta.color }} />
                       {d.name}
-                      <span className="lv">{d.assessment ? "PROTOCOL" : d.phase === "Perform" ? "12 LV" : "25 LV"}</span>
+                      <span className="lv">{d.assessment ? "PROTOCOL" : d.phase === "Perform" ? "12 LV" : `${d.levels.length} LV`}</span>
                     </li>
                   ))}
                 </ul>

@@ -396,63 +396,135 @@ export const ChoiceRT: DrillDefinition = {
 };
 
 // ================================ GO/NO GO ================================
-// GO: Teal / Blue / Orange. NO-GO: Purple. Elite band: White becomes NO-GO.
+// 50-LEVEL PROGRESSION across six bands, engaging every difficulty axis the
+// engine offers. `k` = level-1 (0..49); band-local ramps use gngT(k).
+//   L1-10   CENTRAL       learn the rule; big, slow, central, 25% no-go
+//   L11-20  SPATIAL       periphery opens to 30 deg; smaller, faster
+//   L21-30  TEMPO         relentless pace; no-go turns RARE (more surprising)
+//   L31-38  ELITE FLIP    WHITE becomes no-go; 4 go-colors; 38 deg field
+//   L39-44  STOP-SIGNAL   targets can flip to no-go MID-FLIGHT (red flash)
+//   L45-50  APEX          45 deg field, drifting targets, burst pacing
+const GNG_LEVELS = 50;
+const gngT = (k: number, a: number, b: number) => (k - a) / (b - a);
+const gLerp = (from: number, to: number, t: number) => from + (to - from) * Math.max(0, Math.min(1, t));
+
+interface GngParams {
+  trials: number; showMs: number; isiMin: number; isiMax: number; size: number;
+  noGoProb: number; stopProb: number; eccMax: number; spatial: boolean;
+  elite: boolean; fourGo: boolean; drift: number;
+}
+
+function gngParams(k: number): GngParams {
+  let p: GngParams = {
+    trials: 24, showMs: 1500, isiMin: 450, isiMax: 1300, size: 90,
+    noGoProb: 0.25, stopProb: 0, eccMax: 0, spatial: false,
+    elite: false, fourGo: false, drift: 0,
+  };
+  if (k <= 9) {            // CENTRAL
+    const t = gngT(k, 0, 9);
+    p = { ...p, showMs: gLerp(1500, 1150, t), isiMax: gLerp(1300, 1050, t), size: gLerp(90, 64, t) };
+  } else if (k <= 19) {    // SPATIAL
+    const t = gngT(k, 10, 19);
+    p = { ...p, spatial: true, eccMax: gLerp(14, 30, t), showMs: gLerp(1150, 950, t),
+      isiMax: gLerp(1050, 900, t), size: gLerp(64, 48, t), noGoProb: gLerp(0.27, 0.3, t) };
+  } else if (k <= 29) {    // TEMPO — rare no-go is the trap
+    const t = gngT(k, 20, 29);
+    p = { ...p, spatial: true, eccMax: 30, showMs: gLerp(950, 850, t),
+      isiMin: gLerp(450, 350, t), isiMax: gLerp(900, 750, t), size: gLerp(48, 40, t),
+      noGoProb: gLerp(0.3, 0.2, t), trials: 26 };
+  } else if (k <= 37) {    // ELITE FLIP
+    const t = gngT(k, 30, 37);
+    p = { ...p, spatial: true, elite: true, fourGo: true, eccMax: gLerp(30, 38, t),
+      showMs: gLerp(850, 800, t), isiMin: 350, isiMax: gLerp(750, 700, t),
+      size: gLerp(40, 37, t), noGoProb: 0.28, trials: 26 };
+  } else if (k <= 43) {    // STOP-SIGNAL HYBRID
+    const t = gngT(k, 38, 43);
+    p = { ...p, spatial: true, elite: true, fourGo: true, eccMax: 38,
+      showMs: gLerp(800, 780, t), isiMin: 330, isiMax: 680, size: gLerp(37, 35, t),
+      noGoProb: 0.22, stopProb: gLerp(0.12, 0.18, t), trials: 28 };
+  } else {                 // APEX
+    const t = gngT(k, 44, 49);
+    p = { ...p, spatial: true, elite: true, fourGo: true, eccMax: gLerp(38, 45, t),
+      showMs: gLerp(780, 720, t), isiMin: gLerp(330, 300, t), isiMax: gLerp(680, 620, t),
+      size: gLerp(35, 30, t), noGoProb: 0.28, stopProb: 0.2, drift: gLerp(0.05, 0.11, t), trials: 28 };
+  }
+  return { ...p, showMs: Math.round(p.showMs), isiMin: Math.round(p.isiMin),
+    isiMax: Math.round(p.isiMax), size: px2scale(p.size),
+    noGoProb: Math.round(p.noGoProb * 100) / 100, stopProb: Math.round(p.stopProb * 100) / 100,
+    eccMax: Math.round(p.eccMax), drift: Math.round(p.drift * 1000) / 1000 };
+}
+
+const GNG_BAND = (k: number) =>
+  k <= 9 ? "Central" : k <= 19 ? "Spatial" : k <= 29 ? "Tempo" :
+  k <= 37 ? "Elite (white no-go)" : k <= 43 ? "Stop-Signal" : "Apex";
+
 export const GoNoGo: DrillDefinition = {
   id: "go-no-go",
   name: "Go/No Go",
   shortName: "Go/No Go",
   phase: "Execute",
-  description: "GO COLORS (teal, blue, orange): strike fast. NO-GO (purple): do not strike. Central fixation or spatial scan by level.",
-  purpose: "Selective response inhibition and processing speed.",
+  description:
+    "Response inhibition across 50 levels and six bands: central foundation, peripheral field to 45 degrees, relentless tempo with RARE no-gos, the elite white-flip, mid-flight stop-signals, and a drifting-target apex. Strike GO colors; never strike the forbidden one.",
+  purpose: "Response inhibition, impulse control, discipline under speed.",
   interaction: "touch",
+  responseMode: "strike",
   environment: "arena",
   mvp: true,
   instructions: [
-    "1. GO COLORS: strike TEAL, BLUE, and ORANGE targets immediately.",
+    "1. GO COLORS: strike TEAL, BLUE, and ORANGE targets immediately (a 4th GO color joins at Elite).",
     "2. NO-GO: DO NOT strike PURPLE targets. Freeze the hand.",
-    "3. Elite levels flip the trap: WHITE becomes the no-go color.",
-    "4. Maintain central fixation on Focus levels; scan the field on Spatial levels.",
+    "3. Level 31+: the trap flips - WHITE becomes the no-go color.",
+    "4. Level 39+: some targets FLASH RED mid-flight - abort the strike you already started.",
+    "5. Apex levels drift. Rare no-gos are the most dangerous - stay disciplined.",
   ],
-  controlsHint: "STRIKE TEAL/BLUE/ORANGE - NEVER PURPLE",
-  levels: levels25((i) => ({
-    label: i < 8 ? "Central" : i < 17 ? "Spatial" : "Elite (white no-go)",
-    parameters: {
-      trials: 24, elite: i >= 17, spatial: i >= 8,
-      size: px2scale(lerp25(80, 30, i)),
-      showMs: ilerp25(1400, 750, i),
-      isiMin: 450, isiMax: ilerp25(1200, 800, i),
-    },
+  controlsHint: "STRIKE GO COLORS - NEVER THE FORBIDDEN ONE",
+  levels: Array.from({ length: GNG_LEVELS }, (_, k) => ({
+    level: k + 1,
+    label: GNG_BAND(k),
+    parameters: gngParams(k) as unknown as Record<string, unknown>,
   })),
   buildTrials: (params, rng) => {
-    const p = params as { trials: number; elite: boolean; spatial: boolean; size: number; showMs: number; isiMin: number; isiMax: number };
-    const goColors = p.elite ? [CYAN, BLUE, ORANGE] : [TEAL, BLUE, ORANGE];
+    const p = params as unknown as GngParams;
+    const goColors = p.elite
+      ? (p.fourGo ? [CYAN, BLUE, ORANGE, TEAL] : [CYAN, BLUE, ORANGE])
+      : [TEAL, BLUE, ORANGE];
     const noGoColor = p.elite ? WHITE : PURPLE;
     const trials: TrialSpec[] = [];
     let t = 1200;
     for (let i = 0; i < p.trials; i++) {
-      const isNoGo = rng() < 0.3;
+      const r = rng();
+      const isNoGo = r < p.noGoProb;
+      const isStop = !isNoGo && p.stopProb > 0 && r < p.noGoProb + p.stopProb;
       const zone = p.spatial ? (pick(rng, PERIPHERAL_ZONES) as TargetZone) : "center";
+      const drift: [number, number, number] | undefined = p.drift
+        ? [(rng() - 0.5) * 2 * p.drift, (rng() - 0.5) * p.drift, 0]
+        : undefined;
       trials.push({
         id: `gng-${i}`,
         spawnAt: t,
         duration: p.showMs,
         kind: isNoGo ? "noGo" : "go",
+        ...(isStop
+          ? { switchKindAt: t + 250 + rng() * 200, switchKindTo: "noGo" as const, switchColor: RED }
+          : {}),
         zone,
         // full strike distance — targets sit at arm's length, never in the face
-        position: p.spatial ? strikePosition(zone, 8 + rng() * 26, 0.12, rng, 0.92) : [(rng() - 0.5) * 0.55, 1.34 + (rng() - 0.5) * 0.34, -0.88],
+        position: p.spatial
+          ? strikePosition(zone, 8 + rng() * Math.max(1, p.eccMax - 8), 0.12, rng, 0.92)
+          : [(rng() - 0.5) * 0.55, 1.34 + (rng() - 0.5) * 0.34, -0.88],
+        ...(drift ? { velocity: drift } : {}),
         color: isNoGo ? noGoColor : pick(rng, goColors),
         emissive: isNoGo ? noGoColor : undefined,
         shape: "sphere",
         scale: p.size,
       });
-      trials[trials.length - 1].emissive = trials[trials.length - 1].color;
       t += p.showMs + p.isiMin + rng() * (p.isiMax - p.isiMin);
     }
     return trials;
   },
   durationMs: (params) => {
-    const p = params as { trials: number; showMs: number; isiMin: number; isiMax: number };
-    return 1200 + p.trials * (p.showMs + (p.isiMin + p.isiMax) / 2) + 1500;
+    const p = params as unknown as GngParams;
+    return 1200 + p.trials * (p.showMs + p.isiMax) + 1500;
   },
 };
 

@@ -114,8 +114,9 @@ export function buildProfile(sessions: ARESDrillSessionResult[], athleteId?: str
 function levelFor(drillId: string, sessions: ARESDrillSessionResult[]): number {
   const last = [...sessions].reverse().find((s) => s.drillId === drillId);
   if (!last) return 1;
+  const cap = drillById(drillId)?.levels.length ?? 25;
   const lv = last.progression.level;
-  if (last.metrics.accuracyPct >= 85) return Math.min(25, lv + 1);
+  if (last.metrics.accuracyPct >= 85) return Math.min(cap, lv + 1);
   if (last.metrics.accuracyPct < 60) return Math.max(1, lv - 1);
   return lv;
 }
