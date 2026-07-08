@@ -438,7 +438,8 @@ export const GoNoGo: DrillDefinition = {
         duration: p.showMs,
         kind: isNoGo ? "noGo" : "go",
         zone,
-        position: p.spatial ? strikePosition(zone, 8 + rng() * 26, 0.12, rng) : [(rng() - 0.5) * 0.2, 1.45 + (rng() - 0.5) * 0.16, Z],
+        // full strike distance — targets sit at arm's length, never in the face
+        position: p.spatial ? strikePosition(zone, 8 + rng() * 26, 0.12, rng, 0.92) : [(rng() - 0.5) * 0.55, 1.34 + (rng() - 0.5) * 0.34, -0.88],
         color: isNoGo ? noGoColor : pick(rng, goColors),
         emissive: isNoGo ? noGoColor : undefined,
         shape: "sphere",
