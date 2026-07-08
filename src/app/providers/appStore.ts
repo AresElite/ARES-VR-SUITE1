@@ -39,6 +39,7 @@ interface AppState {
   setSeated(seated: boolean): void;
   setAthlete(a: Athlete): void;
   selectPhase(phase: ARESPhase | null): void;
+  launchPrescribed(drillId: string, level: number): void;
   selectDrill(drillId: string | null): void;
   setLevel(level: number): void;
   setDrillOption(id: string, value: string): void;
@@ -90,6 +91,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ phase, drillId: null, level: 1, arenaMode: phase ? "setup" : "home" }),
 
   selectDrill: (drillId) => set({ drillId, level: 1, drillOptions: {} }),
+
+  launchPrescribed: (drillId, level) => {
+    const def = drillById(drillId);
+    if (!def) return;
+    set({ phase: def.phase, drillId, level, drillOptions: {}, arenaMode: "calibration" });
+  },
   setLevel: (level) => set({ level }),
   setDrillOption: (id, value) =>
     set((s) => ({ drillOptions: { ...s.drillOptions, [id]: value } })),

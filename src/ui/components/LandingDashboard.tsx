@@ -5,6 +5,7 @@ import { drillsForPhase, ALL_DRILLS } from "@/drills/registry";
 import { MOCK_ATHLETES } from "@/data/mockAthletes";
 import { PERF_MODES, type PerfModeId } from "@/utils/performance";
 import { aqBand } from "@/ares/aq";
+import { buildPrescription } from "@/prescribe/prescription";
 import { XREntryButton } from "@/vr/XREntryButton";
 import { SupportBadges } from "./SupportBadges";
 import { HistoryTable } from "./HistoryTable";
@@ -19,6 +20,7 @@ export function LandingDashboard({ onEnterDesktop }: { onEnterDesktop: () => voi
   const perfModeId = useAppStore((s) => s.perfModeId);
   const lastFinished = useAppStore((s) => s.lastFinished);
   const lastSyncMessage = useAppStore((s) => s.lastSyncMessage);
+  const sessions = useAppStore((s) => s.sessions);
   const { setAthlete, setPerfMode } = useAppStore.getState();
 
   return (
@@ -98,6 +100,27 @@ export function LandingDashboard({ onEnterDesktop }: { onEnterDesktop: () => voi
               accuracy.
             </p>
           </div>
+        </div>
+
+        <p className="ares-section-title">Today's prescribed session</p>
+        <div className="ares-card">
+          <h3 style={{ color: "var(--ares-purple-glow, #8B5CF6)" }}>
+            The closed loop — assessment drives training
+          </h3>
+          <ul className="drill-list">
+            {buildPrescription(sessions, athlete.id).map((item, i) => (
+              <li key={item.drillId}>
+                <span className="dot" style={{ background: "#8B5CF6" }} />
+                <b>{i + 1}. {item.drillName}</b>
+                {` — ${item.reason}`}
+                <span className="lv">LV {item.level}</span>
+              </li>
+            ))}
+          </ul>
+          <p style={{ marginTop: 10 }}>
+            Recomputed after every session. Weakest visual-cognitive systems first, each at the
+            level targeting ~80% success — the optimal challenge point.
+          </p>
         </div>
 
         <p className="ares-section-title">The A.R.E.S. Performance Loop</p>

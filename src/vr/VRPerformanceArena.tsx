@@ -7,6 +7,7 @@ import { ARES_PHASES, ARES_ALL_PHASES, PHASE_META, type ARESPhase } from "@/ares
 import { APP_NAME, APP_VERSION } from "@/ares/constants";
 import { useAppStore } from "@/app/providers/appStore";
 import { SpatialPanel, PanelText } from "./SpatialPanel";
+import { TodaysPlanPanel } from "./TodaysPlanPanel";
 import { sfx } from "@/utils/audio";
 
 /**
@@ -197,6 +198,7 @@ export function VRPerformanceArena() {
   return (
     <group>
       <FloatingPerformanceLoop />
+      <TodaysPlanPanel />
       {ARES_ALL_PHASES.map((p) => (
         <PhasePortal key={p} phase={p} />
       ))}
