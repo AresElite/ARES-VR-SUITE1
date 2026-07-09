@@ -15,7 +15,7 @@ export type TargetZone =
 export type TargetKind = "go" | "noGo" | "distractor";
 export type HandRule = "left" | "right" | "either" | "both";
 export type Hand = "left" | "right" | "both" | "unknown";
-export type TargetShape = "sphere" | "box" | "diamond" | "ring" | "cone" | "arc" | "pad" | "plate" | "stereo" | "grating" | "arrow";
+export type TargetShape = "sphere" | "box" | "diamond" | "ring" | "cone" | "pyramid" | "arc" | "pad" | "plate" | "stereo" | "grating" | "arrow";
 
 export type SliceDirection =
   | "up"

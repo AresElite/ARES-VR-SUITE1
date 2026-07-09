@@ -16,37 +16,39 @@ const WHITE = "#EAF0FF";
 const Z = -0.62;
 
 // ============================== SPEED-SEARCH ==============================
-// Find the single TRIANGLE among circle/square/diamond decoys.
+// Find the single PYRAMID among sphere/cube decoys. All shapes share one
+// color — the target is found by 3D FORM alone, never by a highlight.
 // Phase 1 (Shapes): size ramps 60->20px, central fraction 0.8->0.2 (L1-30).
 export const SpeedSearch: DrillDefinition = {
   id: "speed-search",
   name: "Speed-Search",
   shortName: "Speed-Search",
   phase: "Acquire",
-  description: "A field of decoy shapes floods the board. Find the single TRIANGLE and strike it before the field collapses.",
+  description: "A field of 3D shapes floods the board — spheres and cubes. Find the single PYRAMID (all the same color, no highlight) and strike it before the field collapses.",
   purpose: "Fast saccades, crowd discrimination, target selection.",
   interaction: "touch",
   environment: "arena",
   mvp: true,
   instructions: [
-    "1. A field of shapes appears across your reach zone - circles, boxes, diamonds.",
-    "2. Exactly ONE triangle (cone) hides among them.",
-    "3. Find it with your eyes and STRIKE it before the field disappears.",
+    "1. A field of 3D shapes appears at distance - SPHERES and CUBES, all one color.",
+    "2. Exactly ONE PYRAMID hides among them. There is NO color highlight - find it by shape.",
+    "3. Scan with your eyes and STRIKE the pyramid before the field disappears.",
     "4. Striking any decoy counts against you. Higher levels: smaller shapes, wider field.",
   ],
-  controlsHint: "FIND THE TRIANGLE - STRIKE IT FAST",
+  controlsHint: "FIND THE PYRAMID BY ITS SHAPE - STRIKE IT FAST",
   levels: levels50((i) => ({
-    label: `field of ${6 + Math.floor(i / 6)} — ${Math.round(lerp50(60, 18, i))}px`,
+    label: `field of ${6 + Math.floor(i / 6)} — ${Math.round(lerp50(48, 15, i))}px`,
     parameters: {
       searches: 10, fieldSize: 6 + Math.floor(i / 6),
       exposureMs: ilerp50(3000, 1250, i), gapMs: 1000,
-      scale: Math.max(0.042, lerp50(60, 18, i) * 0.0011),
+      scale: Math.max(0.02, lerp50(48, 15, i) * 0.0011),
       spreadDeg: lerp50(12, 40, i),
     },
   })),
   buildTrials: (params, rng) => {
     const p = params as { searches: number; fieldSize: number; exposureMs: number; gapMs: number; scale: number; spreadDeg: number };
-    const decoyShapes = ["sphere", "box", "diamond"] as const;
+    const decoyShapes = ["sphere", "box"] as const;
+    const SHAPE_COLOR = "#9FA8D6"; // one color for every shape — no highlight
     const trials: TrialSpec[] = [];
     let t = 1200;
     for (let s = 0; s < p.searches; s++) {
@@ -78,7 +80,7 @@ export const SpeedSearch: DrillDefinition = {
       for (let i = 0; i < p.fieldSize; i++) {
         const zone = pick(rng, PERIPHERAL_ZONES.concat(["center"]) as TargetZone[]);
         const isTarget = i === targetIdx;
-        const pos: [number, number, number] = [lattice[i][0], lattice[i][1], -0.68];
+        const pos: [number, number, number] = [lattice[i][0], lattice[i][1], -0.92];
         trials.push({
           id: `${groupId}-${i}`,
           spawnAt: t,
@@ -86,9 +88,9 @@ export const SpeedSearch: DrillDefinition = {
           kind: isTarget ? "go" : "distractor",
           zone,
           position: pos,
-          color: isTarget ? TEAL_L : "#38406B",
-          emissive: undefined, // target must NOT light up — find the shape, not the glow
-          shape: isTarget ? "cone" : pick(rng, decoyShapes),
+          color: SHAPE_COLOR,
+          emissive: SHAPE_COLOR, // identical fill for every shape — no target highlight
+          shape: isTarget ? "pyramid" : pick(rng, decoyShapes),
           scale: p.scale,
           groupId,
         });

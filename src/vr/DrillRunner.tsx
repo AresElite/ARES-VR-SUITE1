@@ -496,6 +496,7 @@ function TargetMesh({
         {spec.shape === "diamond" && <octahedronGeometry args={[spec.scale, 0]} />}
         {spec.shape === "ring" && <torusGeometry args={[spec.scale, spec.scale * 0.32, 6, 20]} />}
         {spec.shape === "cone" && <coneGeometry args={[spec.scale * 0.8, spec.scale * 2.2, 8]} />}
+        {spec.shape === "pyramid" && <coneGeometry args={[spec.scale * 1.15, spec.scale * 1.9, 4]} />}
         {spec.shape === "arc" && <torusGeometry args={[spec.scale, spec.scale * 0.28, 6, 24, Math.PI * 1.7]} />}
         <meshStandardMaterial
           ref={mat}
