@@ -20,3 +20,15 @@ export function levels25(
     parameters: make(i).parameters,
   }));
 }
+
+/** 50-level variants — extended banded progressions (Execute suite). */
+export const lerp50 = (from: number, to: number, i: number) => from + ((to - from) * i) / 49;
+export const ilerp50 = (from: number, to: number, i: number) => Math.round(lerp50(from, to, i));
+export function levels50(
+  make: (i: number) => { label: string; parameters: Record<string, unknown> },
+): ProgressionLevel[] {
+  return Array.from({ length: 50 }, (_, i) => ({
+    level: i + 1,
+    ...make(i),
+  }));
+}

@@ -2,7 +2,7 @@ import type { DrillDefinition, TrialSpec, SliceDirection, TargetZone } from "@/a
 import { ARES_COLORS } from "@/ares/colors";
 import { pick } from "@/utils/rng";
 import { strikePosition, PERIPHERAL_ZONES } from "../shared/zones";
-import { levels25, lerp25, ilerp25 } from "../shared/levels";
+import { levels25, lerp25, ilerp25, levels50, lerp50, ilerp50 } from "../shared/levels";
 
 /**
  * EXECUTE — direct ports of the A.R.E.S. Performance Suite drills.
@@ -106,9 +106,9 @@ export const ReactionGrid: DrillDefinition = {
     "5. Spacing pushes outward and taller as levels climb - stay centered, let the eyes lead.",
   ],
   controlsHint: "60s - STRIKE THE LIT TARGET - PURPLE=R TEAL=L BLUE=ANY",
-  levels: levels25((i) => ({
-    label: i < 5 ? "Central Cluster" : i < 10 ? "Moderate Spread" : i < 15 ? "Wide Horizontal" : i < 20 ? "Wide H + V" : "Full Board",
-    parameters: { level: i + 1, timeoutMs: ilerp25(1700, 900, i), scale: lerp25(0.062, 0.044, i) },
+  levels: levels50((i) => ({
+    label: i < 10 ? "Central Cluster" : i < 20 ? "Moderate Spread" : i < 30 ? "Wide Horizontal" : i < 40 ? "Wide H + V" : "Full Board",
+    parameters: { level: Math.min(25, Math.ceil((i + 1) / 2)), timeoutMs: ilerp50(1700, 850, i), scale: lerp50(0.062, 0.042, i) },
   })),
   buildTrials: (params, rng) => {
     const p = params as { level: number; timeoutMs: number; scale: number; colorMode?: string; zoneMode?: string };
@@ -211,12 +211,12 @@ export const EyeHandCoordination: DrillDefinition = {
     "5. Use BOTH hands - left covers left field, right covers right. Clear as many as you can before time expires.",
   ],
   controlsHint: "60s - CLEAR THE WALL - PURPLE=R TEAL=L BLUE=ANY",
-  levels: levels25((i) => ({
-    label: `${i < 8 ? 2 : 3} live targets — ${(ilerp25(2500, 1400, i) / 1000).toFixed(1)}s windows`,
+  levels: levels50((i) => ({
+    label: `${i < 16 ? 2 : 3} live targets — ${(ilerp50(2500, 1150, i) / 1000).toFixed(1)}s windows`,
     parameters: {
-      spreadDeg: lerp25(14, 42, i),
-      streams: i < 8 ? 2 : 3,
-      timeoutMs: ilerp25(2500, 1400, i),
+      spreadDeg: lerp50(14, 46, i),
+      streams: i < 16 ? 2 : 3,
+      timeoutMs: ilerp50(2500, 1150, i),
     },
   })),
   buildTrials: (params, rng) => {
@@ -283,14 +283,14 @@ export const RawReaction: DrillDefinition = {
     "4. 25 trials. Your average reaction time and consistency are scored.",
   ],
   controlsHint: "CLICK THE TRIGGER THE INSTANT THE BALL FIRES",
-  levels: levels25((i) => ({
-    label: `${(lerp25(6, 13, i)).toFixed(1)} m/s launches, delays up to ${(ilerp25(1400, 3200, i) / 1000).toFixed(1)}s`,
+  levels: levels50((i) => ({
+    label: `${(lerp50(6, 14, i)).toFixed(1)} m/s launches, delays up to ${(ilerp50(1400, 3400, i) / 1000).toFixed(1)}s`,
     parameters: {
       trials: 25,
-      speed: lerp25(6, 13, i),
+      speed: lerp50(6, 14, i),
       minDelay: 600,
-      maxDelay: ilerp25(1400, 3200, i),
-      size: lerp25(0.09, 0.055, i),
+      maxDelay: ilerp50(1400, 3400, i),
+      size: lerp50(0.09, 0.05, i),
     },
   })),
   buildTrials: (params, rng) => {
@@ -347,14 +347,14 @@ export const ChoiceRT: DrillDefinition = {
     "5. 50 trials. Average choice reaction time plus the full metric set are recorded.",
   ],
   controlsHint: "PURPLE = RIGHT TRIGGER - TEAL = LEFT TRIGGER",
-  levels: levels25((i) => ({
-    label: `${(lerp25(5.5, 12, i)).toFixed(1)} m/s launches, delays up to ${(ilerp25(1500, 3200, i) / 1000).toFixed(1)}s`,
+  levels: levels50((i) => ({
+    label: `${(lerp50(5.5, 13, i)).toFixed(1)} m/s launches, delays up to ${(ilerp50(1500, 3400, i) / 1000).toFixed(1)}s`,
     parameters: {
       trials: 50,
-      speed: lerp25(5.5, 12, i),
+      speed: lerp50(5.5, 13, i),
       minDelay: 600,
-      maxDelay: ilerp25(1500, 3200, i),
-      size: lerp25(0.09, 0.055, i),
+      maxDelay: ilerp50(1500, 3400, i),
+      size: lerp50(0.09, 0.05, i),
     },
   })),
   buildTrials: (params, rng) => {
@@ -548,13 +548,15 @@ export const StopSignal: DrillDefinition = {
     "4. The stop signal comes later and later as you level up - commitment gets harder to cancel.",
   ],
   controlsHint: "STRIKE TEAL FAST - CANCEL IF IT TURNS RED",
-  levels: levels25((i) => ({
-    label: `SSD ~${ilerp25(200, 560, i)}ms`,
+  levels: levels50((i) => ({
+    label: `${i < 30 ? "Standard" : "High-pressure"} — SSD ~${ilerp50(200, 600, i)}ms`,
     parameters: {
-      trials: 24, ssd: ilerp25(200, 560, i),
-      deadline: ilerp25(2000, 1400, i),
-      stopProb: 0.25, noGoProb: 0.15,
-      size: px2scale(lerp25(64, 34, i)),
+      trials: i < 30 ? 24 : 28,
+      ssd: ilerp50(200, 600, i),
+      deadline: ilerp50(2000, 1300, i),
+      stopProb: i < 30 ? 0.25 : 0.3,
+      noGoProb: 0.15,
+      size: px2scale(lerp50(64, 30, i)),
     },
   })),
   buildTrials: (params, rng) => {
@@ -620,14 +622,14 @@ export const FocusFrenzy: DrillDefinition = {
     "4. Triage: always clear the most urgent colors first.",
   ],
   controlsHint: "CLEAR TARGETS BEFORE THEY TURN RED",
-levels: levels25((i) => ({
-    label: `${i < 8 ? 2 : i < 17 ? 3 : 4} live — ${(lerp25(4.4, 2.2, i)).toFixed(1)}s decay`,
+levels: levels50((i) => ({
+    label: `${i < 16 ? 2 : i < 34 ? 3 : 4} live — ${(lerp50(4.4, 2.0, i)).toFixed(1)}s decay`,
     parameters: {
-      streams: i < 8 ? 2 : i < 17 ? 3 : 4,
-      perStream: ilerp25(12, 16, i),
-      lifeMs: ilerp25(4400, 2200, i),
-      drift: lerp25(0.08, 0.3, i),
-      scale: lerp25(0.09, 0.055, i),
+      streams: i < 16 ? 2 : i < 34 ? 3 : 4,
+      perStream: ilerp50(12, 18, i),
+      lifeMs: ilerp50(4400, 2000, i),
+      drift: lerp50(0.08, 0.34, i),
+      scale: lerp50(0.09, 0.05, i),
     },
   })),
   buildTrials: (params, rng) => {
@@ -686,9 +688,9 @@ export const SaccadeSwipe: DrillDefinition = {
     "4. Anti-saccade density rises with level.",
   ],
   controlsHint: "CYAN = WITH THE ARROW - RED = AGAINST IT",
-  levels: levels25((i) => ({
-    label: `${ilerp25(15, 85, i)}% anti-saccade`,
-    parameters: { trials: 20, antiRatio: lerp25(0.15, 0.85, i), showMs: ilerp25(1900, 900, i), fixationLoad: true },
+  levels: levels50((i) => ({
+    label: `${ilerp50(15, 90, i)}% anti-saccade`,
+    parameters: { trials: i < 30 ? 20 : 24, antiRatio: lerp50(0.15, 0.9, i), showMs: ilerp50(1900, 850, i), fixationLoad: true },
   })),
   buildTrials: (params, rng) => {
     const p = params as { trials: number; antiRatio: number; showMs: number };

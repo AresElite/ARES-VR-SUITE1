@@ -2,7 +2,7 @@ import type { DrillDefinition, HandRule, SliceDirection, TrialSpec } from "@/are
 import { ARES_COLORS, ARES_ACCENTS } from "@/ares/colors";
 import { pick } from "@/utils/rng";
 import { EYE_Y } from "../shared/zones";
-import { levels25, lerp25, ilerp25 } from "../shared/levels";
+import { levels50, lerp50, ilerp50 } from "../shared/levels";
 
 /**
  * EXECUTE — Depth Slice VR
@@ -89,17 +89,17 @@ export function buildDepthSliceTrials(p: Params, rng: () => number, idPrefix = "
   return trials;
 }
 
-const levels = levels25((i) => ({
-  label: `${lerp25(2.2, 4.0, i).toFixed(1)} m/s${i >= 13 ? `, ${ilerp25(90, 125, i)} BPM` : ""}`,
+const levels = levels50((i) => ({
+  label: `${lerp50(2.2, 4.4, i).toFixed(1)} m/s${i >= 26 ? `, ${ilerp50(90, 132, i)} BPM` : ""}`,
   parameters: {
-    trialCount: ilerp25(20, 32, i),
-    approachSpeed: lerp25(2.2, 4.0, i),
-    spawnDepth: lerp25(7, 9, i),
-    handRules: i < 5 ? ["either"] : i < 13 ? ["left", "right", "either"] : ["left", "right", "either", "both"],
-    directionRatio: lerp25(0, 0.8, i),
-    crossMidlineRatio: lerp25(0, 0.55, i),
-    ...(i >= 13 ? { bpm: ilerp25(90, 125, i) } : {}),
-    isiMs: ilerp25(1400, 900, i),
+    trialCount: ilerp50(20, 34, i),
+    approachSpeed: lerp50(2.2, 4.4, i),
+    spawnDepth: lerp50(7, 9, i),
+    handRules: i < 10 ? ["either"] : i < 26 ? ["left", "right", "either"] : ["left", "right", "either", "both"],
+    directionRatio: lerp50(0, 0.85, i),
+    crossMidlineRatio: lerp50(0, 0.6, i),
+    ...(i >= 26 ? { bpm: ilerp50(90, 132, i) } : {}),
+    isiMs: ilerp50(1400, 850, i),
   },
 }));
 
