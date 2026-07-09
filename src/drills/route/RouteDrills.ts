@@ -32,12 +32,17 @@ function buildSternberg(
 ): TrialSpec[] {
   const trials: TrialSpec[] = [];
   let t = 1500;
-  const palette = [TEAL, PURPLE, GOLD, GREEN, RED, WHITE];
+  // balanced YES/NO deck so left/right trigger loads stay even
+  const deck = Array.from({ length: p.trials }, (_, k) => k % 2 === 0);
+  for (let k = deck.length - 1; k > 0; k--) {
+    const j = Math.floor(rng() * (k + 1));
+    [deck[k], deck[j]] = [deck[j], deck[k]];
+  }
   for (let i = 0; i < p.trials; i++) {
     const groupId = `${idp}-g${i}`;
     const shuffled = [...items].sort(() => rng() - 0.5);
     const set = shuffled.slice(0, p.setSize);
-    const inSet = rng() < 0.5;
+    const inSet = deck[i];
     const probe = inSet ? pick(rng, set) : shuffled[p.setSize];
     // memorize display (row of items)
     set.forEach((item, k) => {
@@ -49,33 +54,32 @@ function buildSternberg(
         label: colorItems ? undefined : item,
       });
     });
-    // probe + pads after retention
+    // probe IS the response target — RIGHT trigger = YES (in set), LEFT = NO
     const probeAt = t + p.memorizeMs + p.retentionMs;
     trials.push({
-      id: `${groupId}-probe`, spawnAt: probeAt, duration: p.probeMs, kind: "distractor", decor: true,
+      id: `${groupId}-probe`, spawnAt: probeAt, duration: p.probeMs, kind: "go",
+      requiredHand: inSet ? "right" : "left",
       zone: "center", position: [0, 1.55, Z - 0.08],
       color: colorItems ? probe : WHITE, emissive: colorItems ? probe : undefined,
       shape: colorItems ? "sphere" : "diamond", scale: colorItems ? 0.065 : 0.04,
       label: colorItems ? undefined : probe,
-    });
-    trials.push({
-      id: `${groupId}-yes`, spawnAt: probeAt, duration: p.probeMs, kind: inSet ? "go" : "distractor",
-      zone: "right", position: YES_POS, color: GREEN, shape: "pad", scale: 0.07, label: "YES", groupId,
-    });
-    trials.push({
-      id: `${groupId}-no`, spawnAt: probeAt, duration: p.probeMs, kind: inSet ? "distractor" : "go",
-      zone: "left", position: NO_POS, color: RED, shape: "pad", scale: 0.07, label: "NO", groupId,
     });
     t = probeAt + p.probeMs + 800;
   }
   return trials;
 }
 
+const STERNBERG_SPECTRUM = [
+  "#EF4444", "#F97316", "#F5B648", "#22C55E", "#14B8A6", "#2998AA",
+  "#3B82F6", "#6366F1", "#8B5CF6", "#D946EF", "#EC4899", "#EAF0FF",
+  "#7FD3DE", "#C4B5FD",
+];
+
 function sternbergLevels() {
   return levels50((i) => ({
     label: `set of ${2 + Math.floor(i / 6)}, ${ilerp50(2800, 1050, i)}ms study`,
     parameters: {
-      trials: 14, setSize: 2 + Math.floor(i / 6),
+      trials: 14, setSize: Math.min(7, 2 + Math.floor(i / 6)), // max 7 balls on screen
       memorizeMs: ilerp50(2800, 1050, i),
       retentionMs: ilerp50(800, 3200, i),
       probeMs: ilerp50(2600, 1350, i),
@@ -90,8 +94,8 @@ const STERNBERG_INSTRUCTIONS = (what: string) => [
   `1. Memorize the set of ${what} shown ahead.`,
   "2. Wait through the blank retention interval - hold the set in mind.",
   `3. A single probe ${what.replace(/s$/, "")} appears.`,
-  "4. Strike the RIGHT pad (YES) if it WAS in the set.",
-  "5. Strike the LEFT pad (NO) if it was NOT.",
+  "4. RIGHT-hand TRIGGER = YES (it WAS in the set).",
+  "5. LEFT-hand TRIGGER = NO (it was NOT in the set).",
 ];
 
 export const Sternberg: DrillDefinition = {
@@ -101,12 +105,14 @@ export const Sternberg: DrillDefinition = {
   phase: "Route",
   description: "Memorize a set of colors. After the retention interval a probe color appears: RIGHT pad = YES it was in the set, LEFT pad = NO.",
   purpose: "Working-memory scanning (colors).",
-  interaction: "touch", environment: "arena", mvp: true,
+  interaction: "touch", responseMode: "trigger", environment: "arena", mvp: true,
   instructions: STERNBERG_INSTRUCTIONS("colors"),
-  controlsHint: "RIGHT PAD = YES IN SET - LEFT PAD = NO",
+  controlsHint: "RIGHT TRIGGER = YES IN SET - LEFT TRIGGER = NO",
   levels: sternbergLevels(),
+  // full spectrum here (the purple/teal UI restriction is for menus, not this
+  // memory drill) — a rich, distinct color set so recall is genuinely tested
   buildTrials: (params, rng) =>
-    buildSternberg([TEAL, PURPLE, GOLD, GREEN, RED, WHITE, "#7FD3DE", "#007A8A"], true, params as never, rng, "stc"),
+    buildSternberg(STERNBERG_SPECTRUM, true, params as never, rng, "stc"),
   durationMs: sternbergDuration,
 };
 
@@ -115,7 +121,7 @@ export const SternbergDigits: DrillDefinition = {
   id: "sternberg-digits",
   name: "Sternberg-Digits",
   shortName: "Sternberg-Digits",
-  description: "Memorize a set of digits. After retention, a probe digit appears: RIGHT pad = YES in set, LEFT pad = NO.",
+  description: "Memorize a set of digits. After retention, a probe digit appears: RIGHT trigger = YES in set, LEFT trigger = NO.",
   purpose: "Working-memory scanning (digits).",
   instructions: STERNBERG_INSTRUCTIONS("digits"),
   buildTrials: (params, rng) => buildSternberg("0123456789".split(""), false, params as never, rng, "std"),
@@ -126,7 +132,7 @@ export const SternbergLetters: DrillDefinition = {
   id: "sternberg-letters",
   name: "Sternberg-Letters",
   shortName: "Sternberg-Letters",
-  description: "Memorize a set of letters. After retention, a probe letter appears: RIGHT pad = YES in set, LEFT pad = NO.",
+  description: "Memorize a set of letters. After retention, a probe letter appears: RIGHT trigger = YES in set, LEFT trigger = NO.",
   purpose: "Working-memory scanning (letters).",
   instructions: STERNBERG_INSTRUCTIONS("letters"),
   buildTrials: (params, rng) => buildSternberg("BCDFGHJKLMNPQRSTVXZ".split(""), false, params as never, rng, "stl"),
@@ -140,16 +146,17 @@ export const FlankerCompatibility: DrillDefinition = {
   name: "Flanker Compatibility",
   shortName: "Flanker",
   phase: "Route",
+  responseMode: "trigger",
   description: "A row of five arrows appears. Respond ONLY to the CENTER arrow — strike the pad on the side it points to. Flankers lie.",
   purpose: "Selective attention and conflict resolution.",
   interaction: "touch", environment: "arena", mvp: true,
   instructions: [
     "1. A row of five arrows appears (for example  < < > < < ).",
     "2. Only the CENTER arrow matters. Ignore the flankers.",
-    "3. Center points RIGHT - strike the RIGHT pad. LEFT - strike the LEFT pad.",
+    "3. Center points RIGHT - pull the RIGHT-hand TRIGGER. Points LEFT - LEFT-hand TRIGGER.",
     "4. Incompatible rows (flankers pointing the other way) are the test. Stay on the center.",
   ],
-  controlsHint: "ANSWER THE CENTER ARROW ONLY",
+  controlsHint: "CENTER ARROW: RIGHT TRIGGER = >  /  LEFT TRIGGER = <",
   levels: levels50((i) => ({
     label: `${ilerp50(50, 95, i)}% incompatible, ${ilerp50(2200, 950, i)}ms`,
     parameters: { trials: i < 30 ? 16 : 20, incompatibleRatio: lerp50(0.5, 0.95, i), windowMs: ilerp50(2200, 950, i) },
@@ -158,24 +165,23 @@ export const FlankerCompatibility: DrillDefinition = {
     const p = params as { trials: number; incompatibleRatio: number; windowMs: number };
     const trials: TrialSpec[] = [];
     let t = 1500;
+    const rdeck = Array.from({ length: p.trials }, (_, k) => k % 2 === 0);
+    for (let k = rdeck.length - 1; k > 0; k--) {
+      const j = Math.floor(rng() * (k + 1));
+      [rdeck[k], rdeck[j]] = [rdeck[j], rdeck[k]];
+    }
     for (let i = 0; i < p.trials; i++) {
       const groupId = `flk-g${i}`;
-      const centerRight = rng() < 0.5;
+      const centerRight = rdeck[i];
       const incompatible = rng() < p.incompatibleRatio;
       const c = centerRight ? ">" : "<";
       const f = incompatible ? (centerRight ? "<" : ">") : c;
+      // the arrow row IS the response target — RIGHT trigger = >, LEFT = <
       trials.push({
-        id: `${groupId}-row`, spawnAt: t, duration: p.windowMs, kind: "distractor", decor: true,
+        id: `${groupId}-row`, spawnAt: t, duration: p.windowMs, kind: "go",
+        requiredHand: centerRight ? "right" : "left",
         zone: "center", position: [0, 1.55, Z - 0.08], color: WHITE, shape: "diamond", scale: 0.001,
         label: `${f} ${f} ${c} ${f} ${f}`,
-      });
-      trials.push({
-        id: `${groupId}-L`, spawnAt: t, duration: p.windowMs, kind: centerRight ? "distractor" : "go",
-        zone: "left", position: NO_POS, color: WHITE, shape: "pad", scale: 0.07, label: "LEFT", groupId,
-      });
-      trials.push({
-        id: `${groupId}-R`, spawnAt: t, duration: p.windowMs, kind: centerRight ? "go" : "distractor",
-        zone: "right", position: YES_POS, color: WHITE, shape: "pad", scale: 0.07, label: "RIGHT", groupId,
       });
       t += p.windowMs + 700;
     }
@@ -188,7 +194,7 @@ export const FlankerCompatibility: DrillDefinition = {
 };
 
 // ================================== STROOP ==================================
-// A color word is shown in a mismatching ink. Strike the pad matching the
+// A color word is shown in colored ink. RIGHT trigger = word meaning matches
 // INK color (the physical property), not the word.
 const STROOP_COLORS: { name: string; hex: string }[] = [
   { name: "RED", hex: RED },
@@ -199,44 +205,46 @@ const STROOP_COLORS: { name: string; hex: string }[] = [
 
 export const Stroop: DrillDefinition = {
   id: "stroop",
+  responseMode: "trigger",
   name: "Stroop",
   shortName: "Stroop",
   phase: "Route",
-  description: "A color word appears in mismatched ink. Answer the INK — the physical property — never the word. Strike the matching color pad.",
+  description: "A color word appears in colored ink. Judge whether the word MEANING matches the INK color: RIGHT trigger = YES (they match), LEFT trigger = NO (mismatch).",
   purpose: "Interference control — physical property over semantic meaning.",
   interaction: "touch", environment: "arena", mvp: true,
   instructions: [
-    "1. A word appears ahead - for example the word GREEN written in RED ink.",
-    "2. Identify the INK COLOR. IGNORE what the word says.",
-    "3. Strike the color pad that matches the INK.",
-    "4. Respond as fast as possible without sacrificing accuracy.",
+    "1. A color word appears in colored ink - e.g. the word GREEN written in TEAL ink.",
+    "2. Does the WORD'S MEANING match its INK color?",
+    "3. MATCH (e.g. GREEN in green ink) - pull the RIGHT-hand TRIGGER (YES).",
+    "4. MISMATCH (e.g. GREEN in teal ink) - pull the LEFT-hand TRIGGER (NO).",
+    "5. Respond fast - resist reading the word instead of judging the ink.",
   ],
-  controlsHint: "ANSWER THE INK COLOR - IGNORE THE WORD",
+  controlsHint: "MATCH? RIGHT TRIGGER = YES  /  LEFT TRIGGER = NO",
   levels: levels50((i) => ({
     label: `${ilerp50(2300, 1000, i)}ms window`,
-    parameters: { trials: i < 30 ? 16 : 20, windowMs: ilerp50(2300, 1000, i), congruentRatio: lerp50(0.45, 0.05, i) },
+    parameters: { trials: i < 30 ? 16 : 20, windowMs: ilerp50(2300, 1000, i), congruentRatio: 0.5 },
   })),
   buildTrials: (params, rng) => {
     const p = params as { trials: number; windowMs: number; congruentRatio: number };
     const trials: TrialSpec[] = [];
     let t = 1500;
+    const cdeck = Array.from({ length: p.trials }, (_, k) => k % 2 === 0);
+    for (let k = cdeck.length - 1; k > 0; k--) {
+      const j = Math.floor(rng() * (k + 1));
+      [cdeck[k], cdeck[j]] = [cdeck[j], cdeck[k]];
+    }
     for (let i = 0; i < p.trials; i++) {
       const groupId = `str-g${i}`;
       const ink = STROOP_COLORS[Math.floor(rng() * STROOP_COLORS.length)];
-      const congruent = rng() < p.congruentRatio;
+      const congruent = cdeck[i];
       const word = congruent ? ink : STROOP_COLORS[(STROOP_COLORS.indexOf(ink) + 1 + Math.floor(rng() * 2)) % STROOP_COLORS.length];
+      // the WORD (in its ink color) IS the response target: does the word's
+      // meaning MATCH its ink? RIGHT trigger = YES (congruent), LEFT = NO
       trials.push({
-        id: `${groupId}-w`, spawnAt: t, duration: p.windowMs, kind: "distractor", decor: true,
+        id: `${groupId}-w`, spawnAt: t, duration: p.windowMs, kind: "go",
+        requiredHand: congruent ? "right" : "left",
         zone: "center", position: [0, 1.58, Z - 0.08], color: ink.hex, shape: "diamond", scale: 0.001, label: word.name,
-        meta: { labelColor: ink.hex, labelSize: 0.075 }, // the WORD wears the ink color
-      });
-      STROOP_COLORS.forEach((c, k) => {
-        trials.push({
-          id: `${groupId}-p${k}`, spawnAt: t, duration: p.windowMs,
-          kind: c.name === ink.name ? "go" : "distractor",
-          zone: k < 2 ? "left" : "right",
-          position: [-0.51 + k * 0.34, 1.12, Z], color: c.hex, emissive: c.hex, shape: "pad", scale: 0.06, groupId,
-        });
+        meta: { labelColor: ink.hex, labelSize: 0.075 },
       });
       t += p.windowMs + 700;
     }
