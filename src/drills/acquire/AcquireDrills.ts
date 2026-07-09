@@ -26,22 +26,23 @@ export const SpeedSearch: DrillDefinition = {
   phase: "Acquire",
   description: "A field of 3D shapes floods the board — spheres and cubes. Find the single PYRAMID (all the same color, no highlight) and strike it before the field collapses.",
   purpose: "Fast saccades, crowd discrimination, target selection.",
-  interaction: "touch",
+  interaction: "ray",
+  responseMode: "pointer",
   environment: "arena",
   mvp: true,
   instructions: [
-    "1. A field of 3D shapes appears at distance - SPHERES and CUBES, all one color.",
+    "1. A field of 3D shapes appears ahead - SPHERES and CUBES, all one color.",
     "2. Exactly ONE PYRAMID hides among them. There is NO color highlight - find it by shape.",
-    "3. Scan with your eyes and STRIKE the pyramid before the field disappears.",
-    "4. Striking any decoy counts against you. Higher levels: smaller shapes, wider field.",
+    "3. POINT your controller at the pyramid and pull the TRIGGER.",
+    "4. Clicking any decoy counts against you. Higher levels: smaller shapes, wider field.",
   ],
-  controlsHint: "FIND THE PYRAMID BY ITS SHAPE - STRIKE IT FAST",
+  controlsHint: "POINT AT THE PYRAMID - PULL THE TRIGGER",
   levels: levels50((i) => ({
-    label: `field of ${6 + Math.floor(i / 6)} — ${Math.round(lerp50(48, 15, i))}px`,
+    label: `field of ${6 + Math.floor(i / 6)} — ${Math.round(lerp50(56, 20, i))}px`,
     parameters: {
       searches: 10, fieldSize: 6 + Math.floor(i / 6),
       exposureMs: ilerp50(3000, 1250, i), gapMs: 1000,
-      scale: Math.max(0.02, lerp50(48, 15, i) * 0.0011),
+      scale: Math.max(0.024, lerp50(56, 20, i) * 0.0011),
       spreadDeg: lerp50(12, 40, i),
     },
   })),
@@ -80,7 +81,7 @@ export const SpeedSearch: DrillDefinition = {
       for (let i = 0; i < p.fieldSize; i++) {
         const zone = pick(rng, PERIPHERAL_ZONES.concat(["center"]) as TargetZone[]);
         const isTarget = i === targetIdx;
-        const pos: [number, number, number] = [lattice[i][0], lattice[i][1], -0.92];
+        const pos: [number, number, number] = [lattice[i][0] * 1.35, lattice[i][1], -1.25];
         trials.push({
           id: `${groupId}-${i}`,
           spawnAt: t,
@@ -125,12 +126,13 @@ export const SchulteTable: DrillDefinition = {
   environment: "arena",
   mvp: true,
   trialPaced: true,
+  interTrialCountdown: true,
   instructions: [
     "1. Fixate your gaze on the CENTER of the grid.",
     "2. Use PERIPHERAL vision to locate the numbers - do not scan with your head.",
     "3. POINT your controller at each number and pull the TRIGGER, in ascending order (1, 2, 3...).",
     "4. A wrong-order click counts against you, but the grid keeps going.",
-    "5. Finish a grid and the next one appears - 5 grids per level.",
+    "5. Finish a grid, take the 3-2-1-GO to recenter, and the next grid appears - 5 grids per level.",
   ],
   controlsHint: "EYES CENTER - POINT + TRIGGER 1..N IN ORDER",
   levels: levels50((i) => {
@@ -253,71 +255,147 @@ export const ContrastAssessment: DrillDefinition = {
 };
 
 // ============================ RAPID RECOGNITION ============================
-// Central cue stays visible; peripheral rings flash confusable characters
-// briefly, then blank. Strike the ring that held the MATCHING character.
+// Match-to-sample under pressure. A central CUE shows the target; options
+// fan out around it — POINT and click the one that matches. Lives-based:
+// you get 3 hearts, lose one on a miss, and win one back every 3 in a row.
+// The run ends when your hearts hit zero. It ramps continuously — more
+// options, smaller, faster — and the CONTENT hardens by level: colors ->
+// shapes -> harder shapes -> letters -> letters+numbers.
 const CONFUSABLES: Record<string, string> = { "0": "O", O: "0", "1": "I", I: "1", "2": "Z", Z: "2", "3": "E", E: "3", "5": "S", S: "5", "6": "G", G: "6", "7": "T", T: "7", "8": "B", B: "8" };
+const RR_Z = -1.1; // pointer distance
+const RR_COLORS = ["#EF4444", "#F97316", "#F5B648", "#22C55E", "#2998AA", "#3B82F6", "#8B5CF6", "#EC4899", "#7FD3DE", "#C4B5FD"];
+const RR_SHAPES = ["sphere", "box", "pyramid"] as const;
+const RR_HARD_SHAPES = ["box", "pyramid", "diamond", "cone", "ring"] as const;
+const RR_LETTERS = "BCDEGIOSTZ".split("");
+const RR_ALNUM = Object.keys(CONFUSABLES);
+
+type RRBand = "colors" | "shapes" | "hardshapes" | "letters" | "alnum";
+const rrBand = (i: number): RRBand =>
+  i < 10 ? "colors" : i < 20 ? "shapes" : i < 30 ? "hardshapes" : i < 40 ? "letters" : "alnum";
+
+interface RRState { lives: number; done: boolean; lastMilestone: number }
+const rrState: RRState = { lives: 3, done: false, lastMilestone: 0 };
+const RR_MAX_LIVES = 5;
+
+// build one option's visual for a given band; `variant` picks distinct content
+function rrOption(band: RRBand, variant: string, scale: number, pos: [number, number, number], id: string, groupId: string, spawnAt: number, duration: number, kind: "go" | "distractor"): TrialSpec {
+  if (band === "colors") {
+    return { id, spawnAt, duration, kind, groupId, zone: "center", position: pos, color: variant, emissive: variant, shape: "sphere", scale };
+  }
+  if (band === "shapes" || band === "hardshapes") {
+    return { id, spawnAt, duration, kind, groupId, zone: "center", position: pos, color: "#9FA8D6", emissive: "#9FA8D6", shape: variant as never, scale };
+  }
+  // letters / alnum: a rounded pad with the character
+  return { id, spawnAt, duration, kind, groupId, zone: "center", position: pos, color: GRAY, emissive: TEAL, shape: "pad", scale, label: variant };
+}
 
 export const RapidRecognition: DrillDefinition = {
   id: "rapid-recognition",
   name: "Rapid Recognition",
   shortName: "Rapid Recognition",
   phase: "Acquire",
-  description: "The central cue stays visible. Peripheral rings flash characters briefly, then blank. Strike the ring that held the MATCH — confusables everywhere.",
-  purpose: "Peripheral character recognition under brief exposure.",
-  interaction: "touch",
+  description: "Match-to-sample under pressure. A central cue shows the target - POINT and click the matching option around it. 3 hearts: lose one on a miss, earn one back every 3 correct in a row; the run ends at zero hearts. Ramps continuously and the content hardens by level: colors -> shapes -> harder shapes -> letters -> letters+numbers.",
+  purpose: "Rapid recognition and match-to-sample under load (lives-based endurance).",
+  interaction: "ray",
+  responseMode: "pointer",
   environment: "arena",
   mvp: true,
+  trialPaced: true,
   instructions: [
-    "1. A cue character stays visible at center (for example 'B').",
-    "2. Rings around it flash characters BRIEFLY, then go blank.",
-    "3. One ring held the exact match - the others held confusables (8 vs B, 0 vs O, 5 vs S...).",
-    "4. Strike the ring that held the MATCH after the characters vanish.",
+    "1. A CUE appears at center - a color, shape, or character to find.",
+    "2. Options fan out around it. POINT your controller at the MATCH and pull the TRIGGER.",
+    "3. You have 3 HEARTS. A wrong pick or a miss costs a heart.",
+    "4. Get 3 correct IN A ROW to win a heart back (up to 5).",
+    "5. It speeds up and adds options as you go. The run ends when your hearts hit zero.",
   ],
-  controlsHint: "READ FAST - STRIKE THE RING THAT HELD THE MATCH",
-  levels: levels50((i) => ({
-    label: `${Math.min(6, 3 + Math.floor(i / 12))} rings — ${ilerp50(750, 220, i)}ms flash`,
-    parameters: { trials: 12, rings: Math.min(6, 3 + Math.floor(i / 12)), flashMs: ilerp50(750, 220, i), answerMs: ilerp50(2400, 1400, i) },
-  })),
+  controlsHint: "POINT + TRIGGER THE MATCH - DON'T LOSE ALL 3 HEARTS",
+  levels: levels50((i) => {
+    const band = rrBand(i);
+    const within = i % 10; // position inside the band (0..9)
+    return {
+      label: `${band === "alnum" ? "letters+numbers" : band} — starts ${3 + Math.floor(within / 3)} options`,
+      parameters: { band, baseOptions: 3 + Math.floor(within / 3), startSpeed: within },
+    };
+  }),
   buildTrials: (params, rng) => {
-    const p = params as { trials: number; rings: number; flashMs: number; answerMs: number };
-    const chars = Object.keys(CONFUSABLES);
+    const p = params as { band: RRBand; baseOptions: number; startSpeed: number };
+    rrState.lives = 3;
+    rrState.done = false;
+    rrState.lastMilestone = 0;
+    const pool: string[] =
+      p.band === "colors" ? RR_COLORS
+      : p.band === "shapes" ? [...RR_SHAPES]
+      : p.band === "hardshapes" ? [...RR_HARD_SHAPES]
+      : p.band === "letters" ? RR_LETTERS
+      : RR_ALNUM;
     const trials: TrialSpec[] = [];
     let t = 1500;
-    for (let i = 0; i < p.trials; i++) {
-      const groupId = `rrec-g${i}`;
-      const cue = pick(rng, chars);
-      const matchIdx = Math.floor(rng() * p.rings);
-      // persistent central cue
-      // cue sits DEAD CENTER at eye height, slightly behind the ring circle
+    const ROUNDS = 60;
+    for (let r = 0; r < ROUNDS; r++) {
+      const groupId = `rr-g${r}`;
+      // continuous ramp: more options, smaller, faster
+      const count = Math.min(7, p.baseOptions + Math.floor((p.startSpeed + r) / 5));
+      const scale = Math.max(0.026, 0.05 - r * 0.0009);
+      const cueDelay = Math.max(300, 850 - (p.startSpeed * 15 + r * 22));
+      const answerMs = Math.max(1100, 2200 - (p.startSpeed * 20 + r * 28));
+      // choose the match + distinct distractors
+      const shuffled = [...pool].sort(() => rng() - 0.5);
+      const match = shuffled[0];
+      const distractors = shuffled.slice(1, count);
+      // for alnum, prefer confusable distractors so it's genuinely hard
+      const optionVals = [match, ...distractors];
+      for (let k = optionVals.length - 1; k > 0; k--) { const j = Math.floor(rng() * (k + 1)); [optionVals[k], optionVals[j]] = [optionVals[j], optionVals[k]]; }
+      // lives/hearts marker (drives the lives logic + shows hearts)
       trials.push({
-        id: `${groupId}-cue`, spawnAt: t, duration: p.flashMs + p.answerMs, kind: "distractor", decor: true,
-        zone: "center", position: [0, 1.45, -1.05], color: WHITE, shape: "diamond", scale: 0.004,
-        label: cue, meta: { labelInside: true, labelColor: WHITE, labelSize: 0.07 },
+        id: `${groupId}-lives`, spawnAt: t, duration: cueDelay + answerMs, kind: "distractor",
+        zone: "center", position: [0, 1.92, RR_Z], color: TEAL, emissive: TEAL, shape: "diamond", scale: 0.001,
+        label: "HEARTS 3", meta: { decor: true, rrLivesFirst: true, labelInside: true, labelSize: 0.05, labelColor: "#EC4899" },
       });
-      for (let rIdx = 0; rIdx < p.rings; rIdx++) {
-        const ang = (rIdx / p.rings) * Math.PI * 2 + rng() * 0.5;
-        const pos: [number, number, number] = [Math.cos(ang) * 0.44, 1.45 + Math.sin(ang) * 0.32, -0.85];
-        // character flashes INSIDE its ring
-        trials.push({
-          id: `${groupId}-f${rIdx}`, spawnAt: t, duration: p.flashMs, kind: "distractor", decor: true,
-          zone: "center", position: [pos[0], pos[1], pos[2] + 0.015], color: GOLD, shape: "diamond", scale: 0.003,
-          label: rIdx === matchIdx ? cue : CONFUSABLES[cue],
-          meta: { labelInside: true, labelColor: GOLD, labelSize: 0.05 },
-        });
-        // strikeable ring (answer window opens after the flash)
-        trials.push({
-          id: `${groupId}-r${rIdx}`, spawnAt: t, duration: p.flashMs + p.answerMs,
-          kind: rIdx === matchIdx ? "go" : "distractor",
-          zone: "center", position: pos, color: TEAL, emissive: TEAL, shape: "ring", scale: 0.06, groupId,
-          meta: { hitBoost: 0.02 },
-        });
+      // central cue
+      const cueScale = p.band === "colors" ? 0.05 : 0.045;
+      trials.push(
+        p.band === "colors"
+          ? { id: `${groupId}-cue`, spawnAt: t, duration: cueDelay + answerMs, kind: "distractor", decor: true, zone: "center", position: [0, 1.5, RR_Z], color: match, emissive: match, shape: "sphere", scale: cueScale }
+          : p.band === "shapes" || p.band === "hardshapes"
+            ? { id: `${groupId}-cue`, spawnAt: t, duration: cueDelay + answerMs, kind: "distractor", decor: true, zone: "center", position: [0, 1.5, RR_Z], color: "#EAF0FF", emissive: "#EAF0FF", shape: match as never, scale: cueScale }
+            : { id: `${groupId}-cue`, spawnAt: t, duration: cueDelay + answerMs, kind: "distractor", decor: true, zone: "center", position: [0, 1.5, RR_Z], color: GRAY, emissive: WHITE, shape: "pad", scale: 0.05, label: match },
+      );
+      // options fan out on a ring, appearing after the cue delay
+      const radius = 0.34 + count * 0.02;
+      for (let o = 0; o < optionVals.length; o++) {
+        const ang = (o / optionVals.length) * Math.PI * 2 + Math.PI / 2 + rng() * 0.2;
+        const pos: [number, number, number] = [Math.cos(ang) * radius * 1.25, 1.42 + Math.sin(ang) * radius, RR_Z];
+        const val = optionVals[o];
+        const isMatch = val === match;
+        trials.push({ ...rrOption(p.band, val, scale, pos, `${groupId}-o${o}`, groupId, t + cueDelay, answerMs, isMatch ? "go" : "distractor") });
       }
-      t += p.flashMs + p.answerMs + 700;
+      t += cueDelay + answerMs + 500;
     }
     return trials;
   },
-  durationMs: (params) => {
-    const p = params as { trials: number; flashMs: number; answerMs: number };
-    return 1500 + p.trials * (p.flashMs + p.answerMs + 700) + 1500;
+  onSpawnAdapt: (spec, snapshot, api) => {
+    if (!spec.meta?.rrLivesFirst) return;
+    if (rrState.done) { api.finishEarly(); spec.meta = { ...spec.meta, decor: true }; spec.duration = 10; return; }
+    // fold in the previous round's outcome
+    if (snapshot.hits + snapshot.errors > 0 && snapshot.lastEventCorrect !== undefined) {
+      if (!snapshot.lastEventCorrect) {
+        rrState.lives -= 1;
+        rrState.lastMilestone = 0;
+      } else if (snapshot.streak > 0 && snapshot.streak % 3 === 0 && snapshot.streak !== rrState.lastMilestone) {
+        rrState.lives = Math.min(RR_MAX_LIVES, rrState.lives + 1);
+        rrState.lastMilestone = snapshot.streak;
+      }
+    }
+    if (rrState.lives <= 0) { rrState.done = true; api.finishEarly(); spec.meta = { ...spec.meta, decor: true }; spec.duration = 10; return; }
+    spec.label = `${"\u2665 ".repeat(rrState.lives).trim()}`;
   },
+  analyze: (events) => {
+    const scored = events.filter((e) => e.errorType !== "correctRejection" && (e.correct || e.errorType));
+    const correct = scored.filter((e) => e.correct).length;
+    return [
+      `Rapid Recognition: survived ${correct} correct match(es) before running out of hearts.`,
+      "Lives-based endurance — content and speed ramp continuously within the run.",
+    ];
+  },
+  durationMs: () => 300000, // generous ceiling; the run ends on hearts = 0
 };

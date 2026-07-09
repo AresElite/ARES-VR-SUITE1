@@ -259,7 +259,7 @@ for (const def of ALL_DRILLS) {
   }
 
   // monotonicity across levels — composite multi-stream drills exempt
-  const composite = def.assessment || ["chaos-arena", "cognitive-crossfire", "sport-transfer"].some((x) => def.id.startsWith(x));
+  const composite = def.assessment || def.trialPaced || ["chaos-arena", "cognitive-crossfire", "sport-transfer"].some((x) => def.id.startsWith(x));
   const ease: number[] = [];
   for (let level = 1; level <= def.levels.length; level++) {
     let e = 0;

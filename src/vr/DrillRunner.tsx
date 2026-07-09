@@ -683,6 +683,64 @@ function HeadMotionTracker() {
   return null;
 }
 
+/**
+ * GazeAids — fixation dot + head-speed feedback ring for Gaze Stabilization.
+ * The ring fills and turns teal the instant the athlete's head is rotating
+ * fast enough (above the level gate) — turning an invisible mechanic into
+ * "fill the ring, read the arrow."
+ */
+function GazeAids() {
+  const engine = useAppStore((s) => s.engine);
+  const gate = (engine?.parameters.hvMinDegS as number) ?? 60;
+  const ring = useRef<THREE.Mesh>(null);
+  const ringMat = useRef<THREE.MeshBasicMaterial>(null);
+  const dotMat = useRef<THREE.MeshBasicMaterial>(null);
+  useFrame(({ clock }) => {
+    const frac = Math.min(1.4, headMotion.velDegS / Math.max(1, gate));
+    const ok = frac >= 1;
+    if (ring.current) ring.current.scale.setScalar(0.7 + Math.min(1, frac) * 0.5 + (ok ? Math.sin(clock.elapsedTime * 6) * 0.04 : 0));
+    if (ringMat.current) {
+      ringMat.current.color.set(ok ? "#2998AA" : "#38406B");
+      ringMat.current.opacity = ok ? 0.95 : 0.4;
+    }
+    if (dotMat.current) dotMat.current.color.set(ok ? "#7FD3DE" : "#9FA8D6");
+  });
+  return (
+    <group position={[0, 1.45, -1.3]}>
+      {/* fixation dot — lock your eyes here */}
+      <mesh>
+        <sphereGeometry args={[0.012, 12, 12]} />
+        <meshBasicMaterial ref={dotMat} color="#9FA8D6" />
+      </mesh>
+      {/* head-speed ring */}
+      <mesh ref={ring}>
+        <torusGeometry args={[0.11, 0.01, 8, 40]} />
+        <meshBasicMaterial ref={ringMat} color="#38406B" transparent opacity={0.4} />
+      </mesh>
+    </group>
+  );
+}
+
+/**
+ * DesktopTriggerKeys — desktop-only responder for trigger drills so yes/no and
+ * left/right answers are testable outside the headset.
+ *   Left  answer:  ArrowLeft  or  A
+ *   Right answer:  ArrowRight or  D
+ */
+function DesktopTriggerKeys() {
+  const engine = useAppStore((s) => s.engine);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const k = e.key.toLowerCase();
+      if (k === "arrowleft" || k === "a") engine?.registerTriggerResponse("left");
+      else if (k === "arrowright" || k === "d") engine?.registerTriggerResponse("right");
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [engine]);
+  return null;
+}
+
 export function DrillRunner() {
   const engine = useAppStore((s) => s.engine);
   const camera = useThree((s) => s.camera);
@@ -803,6 +861,8 @@ export function DrillRunner() {
       {/* strike interaction (VR): hands/controllers hit targets directly */}
       {inSession && engine.definition.responseMode === "strike" && <StrikeColliders />}
       {inSession && engine.definition.responseMode === "trigger" && <TriggerListener />}
+      {!inSession && engine.definition.responseMode === "trigger" && <DesktopTriggerKeys />}
+      {engine.definition.gazeStability && <GazeAids />}
       <HeadMotionTracker />
       {engine.definition.responseMode === "joystick" && <JoystickListener cursor={demCursor} />}
       {engine.definition.launcher && <LauncherProp />}

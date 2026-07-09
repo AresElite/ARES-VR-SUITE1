@@ -257,138 +257,112 @@ export const Stroop: DrillDefinition = {
 };
 
 // ============================== PATTERN-MEMORY ==============================
-// Exact base level from the suite: grid 3, pattern 2, display 3000ms.
+// Show a pattern, hide it, show the full grid, and the athlete POINTS + clicks
+// the cells that were lit. Lives-based: 3 hearts, a wrong/missed cell fails the
+// round and costs a heart; 3 clean rounds in a row restore FULL hearts. The
+// run ends when hearts hit zero.
+const PM_Z = -1.2; // pointer distance
+interface PMState { lives: number; done: boolean; prevErrors: number; cleanStreak: number; started: boolean }
+const pmState: PMState = { lives: 3, done: false, prevErrors: 0, cleanStreak: 0, started: false };
+
 export const PatternMemory: DrillDefinition = {
   id: "pattern-memory",
   name: "Pattern-Memory",
   shortName: "Pattern-Memory",
   phase: "Route",
-  description: "Memorize the lit pattern on the grid. When it disappears, re-create it by striking exactly those cells.",
-  purpose: "Visuospatial pattern memory and recall.",
-  interaction: "touch", environment: "arena", mvp: true,
+  description: "A pattern lights up on the grid - memorize it. It vanishes, the full grid appears, and you POINT + click exactly the cells that were lit. 3 hearts: a wrong or missed cell costs a heart; 3 clean rounds in a row restore full hearts. The run ends at zero hearts.",
+  purpose: "Visuospatial pattern memory and recall (lives-based endurance).",
+  interaction: "ray", responseMode: "pointer", environment: "arena", mvp: true, trialPaced: true,
   instructions: [
-    "1. A pattern of GOLD cells lights up on the grid. Memorize it.",
-    "2. The pattern disappears. Hold the image in your mind.",
-    "3. When the full grid returns, strike EXACTLY the cells that were lit.",
-    "4. The round completes when you have found them all - wrong cells count against you.",
+    "1. A pattern of TEAL cells lights up. Memorize which cells.",
+    "2. The pattern vanishes, then the full grid appears.",
+    "3. POINT your controller at each remembered cell and pull the TRIGGER.",
+    "4. A wrong cell or a missed cell fails the round and costs a heart (you have 3).",
+    "5. Three clean rounds in a row restore FULL hearts. The run ends at zero.",
   ],
-  controlsHint: "REBUILD THE PATTERN - STRIKE THE REMEMBERED CELLS",
+  controlsHint: "MEMORIZE - THEN POINT + TRIGGER THE LIT CELLS - 3 HEARTS",
   levels: levels50((i) => {
     const grid = i < 14 ? 3 : i < 30 ? 4 : i < 44 ? 5 : 6;
     return {
-      label: `${grid}×${grid} grid, ${Math.min(2 + Math.floor(i / 5), 10)} cells`,
+      label: `${grid}x${grid} grid, ${Math.min(2 + Math.floor(i / 5), 10)} cells`,
       parameters: {
-        rounds: 6, gridSize: grid, patternLength: Math.min(2 + Math.floor(i / 5), 10),
-        displayMs: ilerp50(3000, 1150, i), delayMs: ilerp50(100, 2000, i), recallMs: ilerp50(4400, 2600, i),
+        gridSize: grid, patternLength: Math.min(2 + Math.floor(i / 5), Math.max(3, grid * grid - 2)),
+        displayMs: ilerp50(3000, 1300, i), delayMs: ilerp50(400, 1400, i), recallMs: ilerp50(6000, 3800, i),
       },
     };
   }),
   buildTrials: (params, rng) => {
-    const p = params as { rounds: number; gridSize: number; patternLength: number; displayMs: number; delayMs: number; recallMs: number };
-    const trials: TrialSpec[] = [];
+    const p = params as { gridSize: number; patternLength: number; displayMs: number; delayMs: number; recallMs: number };
+    pmState.lives = 3; pmState.done = false; pmState.prevErrors = 0; pmState.cleanStreak = 0; pmState.started = false;
     const n = p.gridSize * p.gridSize;
-    const cell = Math.min(0.19, 0.66 / p.gridSize);
+    // wider spacing + bigger cells for clean pointing
+    const cell = Math.min(0.28, 1.15 / p.gridSize);
     const origin = -((p.gridSize - 1) * cell) / 2;
     const posOf = (idx: number): [number, number, number] => [
       origin + (idx % p.gridSize) * cell,
-      1.5 - 0.34 + Math.floor(idx / p.gridSize) * cell * 0.85,
-      Z,
+      1.5 + (((p.gridSize - 1) / 2) - Math.floor(idx / p.gridSize)) * cell * 0.9,
+      PM_Z,
     ];
+    const trials: TrialSpec[] = [];
     let t = 1500;
-    for (let r = 0; r < p.rounds; r++) {
+    const ROUNDS = 40;
+    for (let r = 0; r < ROUNDS; r++) {
       const groupId = `pm-g${r}`;
       const cells = range(n).sort(() => rng() - 0.5).slice(0, p.patternLength);
-      // display phase (decor)
+      // hearts marker + lives logic (spawns first each round)
+      trials.push({
+        id: `${groupId}-lives`, spawnAt: t, duration: p.displayMs + p.delayMs + p.recallMs, kind: "distractor",
+        zone: "center", position: [0, 1.98, PM_Z], color: "#EC4899", emissive: "#EC4899", shape: "diamond", scale: 0.001,
+        label: "HEARTS 3", meta: { decor: true, pmLivesFirst: true, labelInside: true, labelSize: 0.05, labelColor: "#EC4899" },
+      });
+      // display phase (teal, decor)
       cells.forEach((idx, k) => {
         trials.push({
           id: `${groupId}-d${k}`, spawnAt: t, duration: p.displayMs, kind: "distractor", decor: true,
-          zone: "center", position: posOf(idx), color: GOLD, emissive: GOLD, shape: "box", scale: cell * 0.34,
+          zone: "center", position: posOf(idx), color: "#2998AA", emissive: "#7FD3DE", shape: "box", scale: cell * 0.36,
         });
       });
-      // recall phase: full grid, groupMode 'all'
+      // recall phase: full grid, click the lit cells (groupMode all)
       const recallAt = t + p.displayMs + p.delayMs;
       for (let idx = 0; idx < n; idx++) {
         trials.push({
           id: `${groupId}-c${idx}`, spawnAt: recallAt, duration: p.recallMs,
           kind: cells.includes(idx) ? "go" : "distractor",
           zone: "center", position: posOf(idx), color: PURPLE, emissive: "#2D234F", shape: "box",
-          scale: cell * 0.34, groupId, groupMode: "all",
+          scale: cell * 0.36, groupId, groupMode: "all",
         });
       }
       t = recallAt + p.recallMs + 900;
     }
     return trials;
   },
-  durationMs: (params) => {
-    const p = params as { rounds: number; displayMs: number; delayMs: number; recallMs: number };
-    return 1500 + p.rounds * (p.displayMs + p.delayMs + p.recallMs + 900) + 1500;
-  },
-};
-
-// =============================== RANDOM-NUMBER ===============================
-// Digits scattered across the field — strike them in ascending order.
-export const RandomNumber: DrillDefinition = {
-  id: "random-number",
-  name: "Random-Number",
-  shortName: "Random-Number",
-  phase: "Route",
-  description: "Numbers are scattered randomly across the field. Strike them in ascending order as fast as possible.",
-  purpose: "Ordered visual search with number processing under time pressure.",
-  interaction: "touch", environment: "arena", mvp: true,
-  instructions: [
-    "1. Numbers are scattered randomly across your reach zone.",
-    "2. Strike them in ASCENDING order (smallest first).",
-    "3. Wrong-order strikes count against you but the round continues.",
-    "4. Numbers get denser and time gets shorter as you level.",
-  ],
-  controlsHint: "STRIKE THE NUMBERS SMALLEST TO LARGEST",
-  levels: levels50((i) => ({
-    label: `${Math.min(13, 5 + Math.floor(i / 4))} numbers, ${(ilerp50(2500, 1050, i) / 1000).toFixed(1)}s each`,
-    parameters: { rounds: 5, count: Math.min(13, 5 + Math.floor(i / 4)), perNumberMs: ilerp50(2500, 1050, i) },
-  })),
-  buildTrials: (params, rng) => {
-    const p = params as { rounds: number; count: number; perNumberMs: number };
-    const trials: TrialSpec[] = [];
-    let t = 1500;
-    for (let r = 0; r < p.rounds; r++) {
-      const groupId = `rn-g${r}`;
-      const values = new Set<number>();
-      while (values.size < p.count) values.add(1 + Math.floor(rng() * 89));
-      const sorted = [...values].sort((a, b) => a - b);
-      const roundMs = p.count * p.perNumberMs;
-      const placed: [number, number][] = [];
-      const scatter = (): [number, number] => {
-        for (let a = 0; a < 30; a++) {
-          const px = (rng() - 0.5) * 1.1;
-          const py = 1.12 + rng() * 0.68;
-          if (placed.every(([qx, qy]) => Math.hypot(px - qx, py - qy) >= 0.17)) {
-            placed.push([px, py]);
-            return [px, py];
-          }
-        }
-        const fx = (rng() - 0.5) * 1.1;
-        const fy = 1.12 + rng() * 0.68;
-        placed.push([fx, fy]);
-        return [fx, fy];
-      };
-      sorted.forEach((v, k) => {
-        const [px, py] = scatter();
-        trials.push({
-          id: `${groupId}-${k}`, spawnAt: t, duration: roundMs, kind: "go",
-          zone: "center",
-          position: [px, py, Z],
-          color: GRAY, emissive: TEAL, shape: "pad", scale: 0.055,
-          label: String(v), groupId, groupMode: "ordered", seq: k,
-        });
-      });
-      t += roundMs + 500;
+  onSpawnAdapt: (spec, snapshot, api) => {
+    if (!spec.meta?.pmLivesFirst) return;
+    if (pmState.done) { api.finishEarly(); spec.meta = { ...spec.meta, decor: true }; spec.duration = 10; return; }
+    if (pmState.started) {
+      // a round failed if the error count grew during it (wrong cell or miss)
+      const newErrors = snapshot.errors - pmState.prevErrors;
+      if (newErrors > 0) {
+        pmState.lives -= 1;
+        pmState.cleanStreak = 0;
+      } else {
+        pmState.cleanStreak += 1;
+        if (pmState.cleanStreak % 3 === 0) pmState.lives = 3; // full restore
+      }
     }
-    return trials;
+    pmState.prevErrors = snapshot.errors;
+    pmState.started = true;
+    if (pmState.lives <= 0) { pmState.done = true; api.finishEarly(); spec.meta = { ...spec.meta, decor: true }; spec.duration = 10; return; }
+    spec.label = "\u2665 ".repeat(pmState.lives).trim();
   },
-  durationMs: (params) => {
-    const p = params as { rounds: number; count: number; perNumberMs: number };
-    return 1500 + p.rounds * (p.count * p.perNumberMs + 1200) + 1500;
+  analyze: (events) => {
+    const clean = events.filter((e) => e.correct && e.errorType !== "correctRejection").length;
+    return [
+      `Pattern-Memory: recalled ${clean} cell(s) before running out of hearts.`,
+      "Lives-based endurance - a wrong or missed cell fails the round; 3 clean rounds restore full hearts.",
+    ];
   },
+  durationMs: () => 300000, // ceiling; the run ends on hearts = 0
 };
 
 // ======================== MULTIPLE OBJECT TRACKING ========================

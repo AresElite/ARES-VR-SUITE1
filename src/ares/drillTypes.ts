@@ -156,6 +156,10 @@ export interface DrillDefinition {
   /** timed completion protocol (DEM): HUD shows a stopwatch counting UP,
       and the clock stops the instant the final target is resolved */
   stopwatch?: boolean;
+  /** show a 3-2-1-GO countdown between completion-sequenced grids (Schulte) */
+  interTrialCountdown?: boolean;
+  /** gaze-stabilization drill: render fixation dot + head-speed feedback ring */
+  gazeStability?: boolean;
   /** completion-paced session (Schulte): length is trial-driven, not timed —
       the declared duration is only a generous ceiling */
   trialPaced?: boolean;

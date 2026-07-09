@@ -59,7 +59,7 @@ function gazeTrials(p: GazeParams, rng: () => number, idp: string): TrialSpec[] 
         ? { velocity: [(i % 2 === 0 ? 1 : -1) * p.counterDrift, 0, 0] }
         : {}),
       requiredDirection: dir,
-      color: WHITE, emissive: TEAL, shape: "arrow", scale: 0.05,
+      color: WHITE, emissive: TEAL, shape: "arrow", scale: 0.06,
       meta: { pointDir: dir, hvMinDegS: p.hvMinDegS },
     });
     t += p.cadenceMs + rng() * p.jitterMs;
@@ -79,13 +79,22 @@ function gazeAnalyze(idp: string, hv: number) {
   };
 }
 
-const GAZE_INSTRUCTIONS = (x2: boolean) => [
-  "1. A FAINT arrow sits at center. Rotate your head smoothly LEFT-RIGHT-LEFT, like shaking 'no'.",
-  `2. As your head speeds up, the arrow SHARPENS into focus${x2 ? " while drifting AGAINST your head motion" : ""} - that is when you can read it.`,
-  "3. Read the arrow while your head is moving and FLICK the dominant joystick that direction (up/down/left/right).",
-  "4. Let the stick return to center between flicks. This is a HEADSET drill - it needs real head motion.",
-  "5. Higher levels demand faster head speed, break the rhythm, and clutter the background. Keep turns smooth - never whip the head.",
-];
+const GAZE_INSTRUCTIONS = (x2: boolean) =>
+  x2
+    ? [
+        "1. A DOT drifts across your view. Track it with your EYES while turning your head.",
+        "2. The RING around the dot fills TEAL when your head is turning fast enough.",
+        "3. While the ring is teal, an ARROW flashes on the moving dot - read it and FLICK the dominant joystick that way.",
+        "4. Keep the dot sharp the whole time; if your gaze slips it blurs and you miss.",
+        "5. Purpose: keep a MOVING object clear while your head turns - the sport-real reflex.",
+      ]
+    : [
+        "1. Lock your EYES on the CENTER dot and do not look away.",
+        "2. Turn your head smoothly LEFT and RIGHT (like shaking 'no'). The RING fills TEAL when you are fast enough.",
+        "3. While the ring is teal, an ARROW flashes on the dot - read it and FLICK the dominant joystick that way.",
+        "4. Hold the dot sharp with your eyes as your head moves; let the stick recenter between flicks.",
+        "5. Purpose: train your eyes to hold a target sharp while your head moves.",
+      ];
 
 function makeGazeDrill(x2: boolean): DrillDefinition {
   const idp = x2 ? "vx2" : "vx1";
@@ -95,15 +104,16 @@ function makeGazeDrill(x2: boolean): DrillDefinition {
     shortName: x2 ? "Gaze Stab x2" : "Gaze Stab x1",
     phase: "Acquire",
     description: x2
-      ? "The VORx2 analog: the arrow counter-drifts AGAINST your head motion and is only readable while your head moves above the level's speed gate. Three graded axes: head velocity, cadence predictability, background clutter."
-      : "The VORx1 analog: a world-fixed arrow is only readable while your head rotates above the level's speed gate. Rotate to the metronome, read the arrow mid-motion, flick the joystick to match. Three graded axes: head velocity, cadence predictability, background clutter.",
+      ? "Track a MOVING dot with your eyes while turning your head. A ring shows when your head is turning fast enough; an arrow flashes on the moving dot - read it and flick the joystick. The harder, sport-real gaze-stabilization variant."
+      : "Lock your eyes on a fixed center dot and turn your head side to side. A ring shows when you are turning fast enough; an arrow flashes on the dot - read it and flick the joystick. Trains the reflex that keeps vision sharp during head motion.",
     purpose: "Gaze stability under head motion (behavioral DVA/GST analog - prototype).",
     interaction: "touch",
     responseMode: "joystick",
     environment: "arena",
     mvp: true,
+    gazeStability: true,
     instructions: GAZE_INSTRUCTIONS(x2),
-    controlsHint: "ROTATE HEAD TO THE BEAT - READ THE ARROW - FLICK TO MATCH",
+    controlsHint: x2 ? "TRACK THE MOVING DOT - FILL THE RING - FLICK THE ARROW" : "EYES ON THE DOT - FILL THE RING - FLICK THE ARROW",
     levels: levels50((i) => {
       const hv = Math.round(lerp50(25, x2 ? 110 : 130, i));
       const band = i < 17 ? "metronomic" : i < 34 ? "loosening cadence" : "random + clutter";
@@ -116,7 +126,7 @@ function makeGazeDrill(x2: boolean): DrillDefinition {
           cadenceMs: ilerp50(2600, 1700, i),
           jitterMs: i < 17 ? 0 : ilerp50(0, 1400, i),
           bgDensity: i < 34 ? lerp50(0, 0.35, i) : lerp50(0.35, 1, i),
-          counterDrift: x2 ? lerp50(0.08, 0.3, i) : 0,
+          counterDrift: x2 ? lerp50(0.22, 0.6, i) : 0,
         } as unknown as Record<string, unknown>,
       };
     }),

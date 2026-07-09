@@ -303,14 +303,29 @@ export class DrillEngine {
     const members = this.gridQueue.get(seq);
     if (!members || members.length === 0) return;
     this.gridQueue.delete(seq);
-    const at = this.timing.now + 250; // brief, fixed turnaround — trial-paced
-    let i = this.nextTrialIdx;
-    for (const m of members) {
-      const spec = { ...m, spawnAt: at };
+    const now = this.timing.now;
+    const insert = (spec: TrialSpec) => {
+      let i = this.nextTrialIdx;
       while (i < this.trials.length && this.trials[i].spawnAt <= spec.spawnAt) i++;
       this.trials.splice(i, 0, spec);
-      i++;
+    };
+    let cd = 0;
+    // 3-2-1-GO between grids so the athlete can recenter and prep
+    if (this.definition.interTrialCountdown) {
+      cd = 3000;
+      const z = members[0].position[2];
+      const steps: [string, number][] = [["3", 0], ["2", 800], ["1", 1600], ["GO", 2400]];
+      for (const [label, dt] of steps) {
+        insert({
+          id: `cd-${seq}-${label}`, spawnAt: now + dt, duration: 760, kind: "distractor",
+          zone: "center", position: [0, 1.5, z], color: "#2998AA", emissive: "#7FD3DE",
+          shape: "diamond", scale: 0.001, label,
+          meta: { decor: true, labelInside: true, labelSize: label === "GO" ? 0.14 : 0.2, labelColor: "#7FD3DE" },
+        });
+      }
     }
+    const at = now + cd + 200;
+    for (const m of members) insert({ ...m, spawnAt: at });
   }
 
   private expireAllActive(): void {
