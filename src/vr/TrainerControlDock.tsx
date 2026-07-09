@@ -353,7 +353,7 @@ export function TrainerControlDock() {
           position={[0, -0.52, 0]}
           width={1.18}
           height={0.15}
-          label="RUN CALIBRATION & SAFETY"
+          label="START DRILL"
           color={def ? ARES_ACCENTS.tealBright : ARES_COLORS.graphite}
           textColor={ARES_COLORS.nearBlack}
           disabled={!def}
