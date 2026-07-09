@@ -107,7 +107,7 @@ export interface ArenaGroup {
 export const ARENA_GROUPS: ArenaGroup[] = [
   { id: "assess", label: "Assess", tagline: "Performance baseline testing", color: "#EAF0FF", portalAngle: -0.52 },
   { id: "training", label: "A.R.E.S. Training", tagline: "Acquire · Route · Execute · Synchronize · Sport", color: "#8B5CF6", portalAngle: 0 },
-  { id: "perform", label: "Perform", tagline: "Beat-locked flow training", color: "#A78BFA", portalAngle: 0.52 },
+  { id: "perform", label: "Perform", tagline: "Beat-locked flow training", color: "#1A6B78", portalAngle: 0.52 },
 ];
 
 /** the four Performance-Loop training phases (live inside A.R.E.S. Training) */

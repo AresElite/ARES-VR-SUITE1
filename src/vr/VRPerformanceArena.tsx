@@ -130,15 +130,18 @@ function GroupPortal({ group }: { group: ArenaGroup }) {
       </mesh>
       {/* phase name INSIDE the portal — the whole disc reads as the button */}
       <Text
-        position={[0, 0.1, 0.01]}
+        position={[0, group.label.includes(" ") ? 0.13 : 0.1, 0.01]}
         rotation={[0, Math.PI, 0]}
-        fontSize={0.13}
+        fontSize={group.label.includes(" ") ? 0.115 : 0.13}
         color={hover ? ARES_COLORS.white : meta.color}
         anchorX="center"
         anchorY="middle"
-        letterSpacing={0.12}
+        textAlign="center"
+        lineHeight={1.15}
+        maxWidth={0.95}
+        letterSpacing={0.1}
       >
-        {group.label.toUpperCase()}
+        {group.label.toUpperCase().replace(/ /g, "\n")}
       </Text>
       <Text
         position={[0, -0.14, 0.01]}
