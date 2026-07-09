@@ -39,6 +39,10 @@ export interface TrialSpec {
   position: [number, number, number];
   /** world units/second — targets with velocity move (Depth Slice, Pathways) */
   velocity?: [number, number, number];
+  /** bounded oscillation around the spawn anchor (Focus-Frenzy): the target
+      moves in free space but stays within amplitude of its anchor, so streams
+      in separated anchors can never overlap */
+  wander?: { ax: number; ay: number; wx: number; wy: number; px: number; py: number };
   /** curved-lane parameter for Route drills */
   lane?: { radius: number; angularSpeed: number; phase: number; y: number };
   requiredHand?: HandRule;

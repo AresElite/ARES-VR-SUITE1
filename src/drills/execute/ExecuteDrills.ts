@@ -619,45 +619,60 @@ export const FocusFrenzy: DrillDefinition = {
   name: "Focus-Frenzy",
   shortName: "Focus-Frenzy",
   phase: "Execute",
-  description: "Drifting targets shift color to signal urgency: Purple → Teal → Blue → Orange → Red. Never let a red one expire.",
+  description: "Small targets drift through free space and ramp color to signal urgency: Purple → Teal → Blue → Orange → Red. They shrink, speed up, and race to red as levels climb. Never let a red one expire.",
   purpose: "Sustained attention, target triage, and clearing under pressure.",
   interaction: "touch",
   environment: "arena",
   mvp: true,
   instructions: [
-    "1. Targets drift across your reach zone and ramp through urgency colors:",
+    "1. Small targets drift through free space, each in its own region, ramping color:",
     "2. PURPLE (new) - TEAL - BLUE - ORANGE - RED (about to expire).",
-    "3. Strike them before they reach RED. A red expiry is the failure condition.",
+    "3. Strike them before they reach RED - they move, so lead your hand. A red expiry fails.",
     "4. Triage: always clear the most urgent colors first.",
   ],
   controlsHint: "CLEAR TARGETS BEFORE THEY TURN RED",
 levels: levels50((i) => ({
-    label: `${i < 16 ? 2 : i < 34 ? 3 : 4} live — ${(lerp50(4.4, 2.0, i)).toFixed(1)}s decay`,
+    label: `${i < 16 ? 2 : i < 34 ? 3 : 4} live — ${(ilerp50(5000, 1200, i) / 1000).toFixed(1)}s to red`,
     parameters: {
       streams: i < 16 ? 2 : i < 34 ? 3 : 4,
-      perStream: ilerp50(12, 18, i),
-      lifeMs: ilerp50(4400, 2000, i),
-      drift: lerp50(0.08, 0.34, i),
-      scale: lerp50(0.09, 0.05, i),
+      perStream: 22,
+      lifeMs: ilerp50(5000, 1200, i),   // faster color ramp to red as levels climb
+      scale: lerp50(0.062, 0.026, i),   // targets shrink sharply
+      amp: lerp50(0.10, 0.20, i),       // wider free-space travel
+      freq: lerp50(0.7, 3.1, i),        // faster oscillation — harder to hit exactly
     },
   })),
   buildTrials: (params, rng) => {
-    const p = params as { streams: number; perStream: number; lifeMs: number; drift: number; scale: number };
+    const p = params as { streams: number; perStream: number; lifeMs: number; scale: number; amp: number; freq: number };
+    // four well-separated anchors — a target wandering within `amp` of its
+    // anchor can never reach a neighbouring anchor's zone (spacing > 2*amp+size)
+    const ANCHORS: [number, number][] = [
+      [-0.46, 1.28], [0.46, 1.28], [-0.46, 1.70], [0.46, 1.70],
+    ];
+    const Z_FF = -0.85;
     const trials: TrialSpec[] = [];
     for (let sIdx = 0; sIdx < p.streams; sIdx++) {
+      const [ax0, ay0] = ANCHORS[sIdx];
       for (let i = 0; i < p.perStream; i++) {
-        const zone = pick(rng, PERIPHERAL_ZONES.concat(["center"]) as TargetZone[]);
+        // amplitude kept safely inside the anchor spacing; vertical is tighter
+        const ampX = Math.min(p.amp, 0.2);
+        const ampY = Math.min(p.amp * 0.6, 0.12);
         trials.push({
           id: `ff-${sIdx}-${i}`,
-          spawnAt: i === 0 ? 1000 + sIdx * 600 : -1,
+          spawnAt: i === 0 ? 1000 + sIdx * 500 : -1,
           chainId: `ff-${sIdx}`,
-          chainGapMs: 150,
+          chainGapMs: 120,
           seq: i,
           duration: p.lifeMs,
           kind: "go",
-          zone,
-          position: strikePosition(zone, 6 + rng() * 26, 0.14, rng),
-          velocity: [(rng() - 0.5) * 2 * p.drift, (rng() - 0.5) * 2 * p.drift * 0.6, 0],
+          zone: ax0 < -0.12 ? "left" : ax0 > 0.12 ? "right" : "center",
+          position: [ax0, ay0, Z_FF],
+          wander: {
+            ax: ampX, ay: ampY,
+            wx: p.freq * (0.85 + rng() * 0.4),
+            wy: p.freq * (0.7 + rng() * 0.4),
+            px: rng() * Math.PI * 2, py: rng() * Math.PI * 2,
+          },
           color: PURPLE,
           emissive: PURPLE,
           shape: "sphere",

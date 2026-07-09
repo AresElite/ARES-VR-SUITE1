@@ -189,7 +189,14 @@ export class DrillEngine {
       if (t.resolved) continue;
       const age = now - t.spawnClock;
       const slot = this.pool.get(id);
-      if (slot && t.spec.velocity) {
+      if (slot && t.spec.wander) {
+        // bounded free-space oscillation around the anchor position
+        const w = t.spec.wander;
+        const s = age / 1000;
+        slot.pos[0] = t.spec.position[0] + w.ax * Math.sin(w.wx * s + w.px);
+        slot.pos[1] = t.spec.position[1] + w.ay * Math.sin(w.wy * s + w.py);
+        slot.pos[2] = t.spec.position[2];
+      } else if (slot && t.spec.velocity) {
         slot.pos[0] = t.spec.position[0] + (t.spec.velocity[0] * age) / 1000;
         slot.pos[1] = t.spec.position[1] + (t.spec.velocity[1] * age) / 1000;
         slot.pos[2] = t.spec.position[2] + (t.spec.velocity[2] * age) / 1000;
@@ -296,12 +303,12 @@ export class DrillEngine {
    * moving stimuli are left exactly where their drill placed them.
    */
   private resolveSpawnOverlap(spec: TrialSpec): void {
-    if (spec.decor || spec.meta?.decor || spec.groupId || spec.velocity || spec.lane) return;
+    if (spec.decor || spec.meta?.decor || spec.groupId || spec.velocity || spec.lane || spec.wander) return;
     const minDist = (other: TrialSpec) => (spec.scale + other.scale) * 1.6 + 0.02;
     const clear = (px: number, py: number): number => {
       let worst = Number.POSITIVE_INFINITY;
       for (const t of this.active.values()) {
-        if (t.resolved || t.spec.decor || t.spec.meta?.decor || t.spec.velocity || t.spec.lane) continue;
+        if (t.resolved || t.spec.decor || t.spec.meta?.decor || t.spec.velocity || t.spec.lane || t.spec.wander) continue;
         const slot = this.pool.get(t.spec.id);
         const ox = slot ? slot.pos[0] : t.spec.position[0];
         const oy = slot ? slot.pos[1] : t.spec.position[1];
@@ -333,7 +340,7 @@ export class DrillEngine {
       let nd = Number.POSITIVE_INFINITY;
       let nSpec: TrialSpec | null = null;
       for (const t of this.active.values()) {
-        if (t.resolved || t.spec.decor || t.spec.meta?.decor || t.spec.velocity || t.spec.lane) continue;
+        if (t.resolved || t.spec.decor || t.spec.meta?.decor || t.spec.velocity || t.spec.lane || t.spec.wander) continue;
         const slot = this.pool.get(t.spec.id);
         const ox = slot ? slot.pos[0] : t.spec.position[0];
         const oy = slot ? slot.pos[1] : t.spec.position[1];

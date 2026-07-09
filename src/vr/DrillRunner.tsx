@@ -573,15 +573,27 @@ function JoystickListener({ cursor }: { cursor: { seq: number } }) {
     armed.current = false;
     const dir: SliceDirection =
       Math.abs(x) > Math.abs(y) ? (x > 0 ? "right" : "left") : y > 0 ? "down" : "up";
-    // resolve the CURRENT arrow in the ordered sequence
+    // DEM: resolve the CURRENT arrow in the ordered sequence.
+    // Gaze Stabilization / DVA: no ordered group — fall back to the earliest
+    // live go target so up/down/left/right flicks always register.
     let target: { id: string } | null = null;
+    let hasOrdered = false;
+    let earliest: { id: string; spawn: number } | null = null;
     for (const slot of engine.pool.slots) {
-      if (!slot.active || !slot.spec || slot.spec.groupMode !== "ordered") continue;
-      if ((slot.spec.seq ?? -1) === cursor.seq) {
-        target = { id: slot.spec.id };
-        break;
+      if (!slot.active || !slot.spec) continue;
+      if (slot.spec.groupMode === "ordered") {
+        hasOrdered = true;
+        if ((slot.spec.seq ?? -1) === cursor.seq) {
+          target = { id: slot.spec.id };
+          break;
+        }
+      } else if (slot.spec.kind === "go" && !slot.spec.decor && !slot.spec.meta?.decor) {
+        if (!earliest || slot.spawnClock < earliest.spawn) {
+          earliest = { id: slot.spec.id, spawn: slot.spawnClock };
+        }
       }
     }
+    if (!target && !hasOrdered && earliest) target = { id: earliest.id };
     if (target) engine.registerHit(target.id, dominant as Hand, dir);
   });
   return null;
