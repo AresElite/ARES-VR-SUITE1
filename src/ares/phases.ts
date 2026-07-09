@@ -35,7 +35,7 @@ export const PHASE_META: Record<ARESPhase, PhaseMeta> = {
     tagline: "Visual intake under pressure",
     description:
       "Target detection, peripheral awareness, contrast, glare, filtering, binocular input, visual search.",
-    color: ARES_ACCENTS.tealBright,
+    color: "#2998AA",
     portalAngle: -0.72,
   },
   Route: {
@@ -51,7 +51,7 @@ export const PHASE_META: Record<ARESPhase, PhaseMeta> = {
     tagline: "Motor output & inhibition",
     description:
       "Reaction, choice reaction, motor output, bimanual coordination, inhibition, timing, speed-accuracy control.",
-    color: ARES_COLORS.warningGold,
+    color: "#7FD3DE",
     portalAngle: 0.0,
   },
   Assess: {
@@ -67,7 +67,7 @@ export const PHASE_META: Record<ARESPhase, PhaseMeta> = {
     tagline: "Beat-locked flow training",
     description:
       "The measured track ladder: beat-mapped choreography where notes arrive on the musical beat. Timing precision, hand coordination, and flow under rising demand.",
-    color: "#F472B6",
+    color: "#A78BFA",
     portalAngle: 0.72,
   },
   Sport: {
@@ -75,7 +75,7 @@ export const PHASE_META: Record<ARESPhase, PhaseMeta> = {
     tagline: "Sport-specific training suites",
     description:
       "Curated top-7 drill suites per sport — Soccer, Volleyball, Hockey, Auto Racing — each tuned to the visual-cognitive skills that sport lives on.",
-    color: "#22C55E",
+    color: "#1A6B78",
     portalAngle: 1.08,
   },
   Synchronize: {
@@ -83,7 +83,7 @@ export const PHASE_META: Record<ARESPhase, PhaseMeta> = {
     tagline: "Full-system integration",
     description:
       "Integration under load, fatigue, rhythm, chaos, sport-specific transfer, decision stability.",
-    color: ARES_COLORS.errorRed,
+    color: "#C4B5FD",
     portalAngle: 0.36,
   },
 };
@@ -107,7 +107,7 @@ export interface ArenaGroup {
 export const ARENA_GROUPS: ArenaGroup[] = [
   { id: "assess", label: "Assess", tagline: "Performance baseline testing", color: "#EAF0FF", portalAngle: -0.52 },
   { id: "training", label: "A.R.E.S. Training", tagline: "Acquire · Route · Execute · Synchronize · Sport", color: "#8B5CF6", portalAngle: 0 },
-  { id: "perform", label: "Perform", tagline: "Beat-locked flow training", color: "#F472B6", portalAngle: 0.52 },
+  { id: "perform", label: "Perform", tagline: "Beat-locked flow training", color: "#A78BFA", portalAngle: 0.52 },
 ];
 
 /** the four Performance-Loop training phases (live inside A.R.E.S. Training) */

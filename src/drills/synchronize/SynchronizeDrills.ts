@@ -9,9 +9,9 @@ import { levels25, lerp25, ilerp25, levels50, lerp50, ilerp50 } from "../shared/
 
 const TEAL = "#2998AA";
 const PURPLE = "#8B5CF6";
-const GOLD = "#F5B648";
-const GREEN = "#22C55E";
-const RED = "#EF5A6F";
+const GOLD = "#C4B5FD";
+const GREEN = "#2998AA";
+const RED = "#4C1D95";
 const WHITE = "#EAF0FF";
 const Z = -0.62;
 

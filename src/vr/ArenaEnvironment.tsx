@@ -233,7 +233,7 @@ export function ArenaEnvironment({ environment = "arena" }: { environment?: Envi
       <directionalLight position={[3, 6, 2]} intensity={0.55} />
 
       <SkyDome />
-      <EnergyFloor tint={environment === "baseball" ? "#1a2e22" : "#EAF0FF"} />
+      <EnergyFloor tint={environment === "baseball" ? "#101828" : "#EAF0FF"} />
       {/* concentric guide rings */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
         <ringGeometry args={[1.15, 1.18, 40]} />

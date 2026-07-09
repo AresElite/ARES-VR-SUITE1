@@ -190,7 +190,7 @@ function StrikeColliders() {
   );
 }
 
-const URGENCY_COLORS = ["#8B5CF6", "#7FD3DE", "#3B82F6", "#F97316", "#EF5A6F"];
+const URGENCY_COLORS = ["#8B5CF6", "#7FD3DE", "#7FD3DE", "#007A8A", "#4C1D95"];
 
 function onHitProxy(
   spec: TrialSpecLike,
@@ -338,8 +338,8 @@ function TargetMesh({
         group.current.scale.setScalar(1.55 + Math.sin(age * 0.012) * 0.1);
       } else {
         const done = (spec.seq ?? 0) < demCursor.seq;
-        mat.current.emissive.set(done ? "#3FA96B" : "#9FA8D6");
-        mat.current.color.set(done ? "#3FA96B" : "#9FA8D6");
+        mat.current.emissive.set(done ? "#1A6B78" : "#9FA8D6");
+        mat.current.color.set(done ? "#1A6B78" : "#9FA8D6");
         mat.current.emissiveIntensity = done ? 0.55 : 0.4;
         group.current.scale.setScalar(1);
       }
@@ -706,7 +706,7 @@ export function DrillRunner() {
           if (ev.targetPosition) sparks.burst(ev.targetPosition.x, ev.targetPosition.y, ev.targetPosition.z, new THREE.Color("#7FD3DE"));
         } else {
           sfx.error(pan);
-          if (ev.targetPosition) sparks.burst(ev.targetPosition.x, ev.targetPosition.y, ev.targetPosition.z, new THREE.Color("#EF5A6F"), 8);
+          if (ev.targetPosition) sparks.burst(ev.targetPosition.x, ev.targetPosition.y, ev.targetPosition.z, new THREE.Color("#4C1D95"), 8);
         }
       }
       if (e.type === "stateChange") {

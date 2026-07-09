@@ -10,7 +10,7 @@ import { levels25, lerp25, ilerp25, levels50, lerp50, ilerp50 } from "../shared/
 
 const TEAL = "#2998AA";
 const TEAL_L = "#7FD3DE";
-const GOLD = "#F5B648";
+const GOLD = "#C4B5FD";
 const GRAY = "#111428";
 const WHITE = "#EAF0FF";
 const Z = -0.62;

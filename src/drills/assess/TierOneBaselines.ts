@@ -14,7 +14,7 @@ import { pick } from "@/utils/rng";
 const WHITE = "#EAF0FF";
 const TEAL = "#2998AA";
 const PURPLE = "#8B5CF6";
-const GOLD = "#F5B648";
+const GOLD = "#C4B5FD";
 const Z = -0.9;
 const DIRS = ["up", "down", "left", "right"] as const;
 

@@ -31,7 +31,7 @@ export const SPORT_PROFILES: SportProfile[] = [
   {
     id: "soccer",
     name: "Soccer",
-    color: "#3FA96B",
+    color: "#1A6B78",
     blurb: "Breadth + scanning: wide-field awareness, pre-reception scan cadence, pattern reading.",
     baselineIds: ["assess-ufov", "assess-dva-motion"],
     drills: [
@@ -47,7 +47,7 @@ export const SPORT_PROFILES: SportProfile[] = [
   {
     id: "volleyball",
     name: "Volleyball",
-    color: "#F5B648",
+    color: "#C4B5FD",
     blurb: "Fast anticipation + hands: block/dig timing, tracking, eye-hand under a short clock.",
     baselineIds: ["assess-cat", "assess-dva-motion"],
     drills: [
@@ -79,7 +79,7 @@ export const SPORT_PROFILES: SportProfile[] = [
   {
     id: "auto-racing",
     name: "Auto Racing",
-    color: "#EF5A6F",
+    color: "#4C1D95",
     blurb: "Speed-processing + inhibition: peripheral flow, split decisions, gaze stability under vibration.",
     baselineIds: ["assess-ufov", "assess-cat"],
     drills: [

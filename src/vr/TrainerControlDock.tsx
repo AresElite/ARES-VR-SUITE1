@@ -70,7 +70,7 @@ export function TrainerControlDock() {
   if (group === "training" && !phase) {
     const TRAIN = [
       ...TRAINING_PHASES.map((tp) => ({ id: tp, label: tp, color: PM[tp].color, tag: PM[tp].tagline, onClick: () => selectPhase(tp) })),
-      { id: "Sport", label: "Sport", color: "#22C55E", tag: "Sport-specific suites", onClick: () => selectPhase("Sport" as never) },
+      { id: "Sport", label: "Sport", color: "#2998AA", tag: "Sport-specific suites", onClick: () => selectPhase("Sport" as never) },
     ];
     return (
       <group>

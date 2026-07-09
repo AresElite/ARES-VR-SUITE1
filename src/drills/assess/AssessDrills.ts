@@ -10,7 +10,7 @@ import { pick } from "@/utils/rng";
 
 const PURPLE = "#8B5CF6";
 const TEAL = "#2998AA";
-const GOLD = "#F5B648";
+const GOLD = "#C4B5FD";
 const WHITE = "#EAF0FF";
 const GRAY = "#38406B";
 const LAUNCH_Z = -6;

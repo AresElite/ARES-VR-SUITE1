@@ -21,10 +21,10 @@ export const ARES_COLORS = {
   white: "#EAF0FF",
   /** Body Bright — reading text in cards */
   softGray: "#C3CBE6",
-  /** Warning */
-  warningGold: "#F5B648",
-  /** Danger */
-  errorRed: "#EF5A6F",
+  /** Accent — light purple (was gold); "either hand", highlights, contact lines */
+  warningGold: "#C4B5FD",
+  /** Alert — deep royal purple (was red); stop/no-go/error emphasis */
+  errorRed: "#4C1D95",
 } as const;
 
 /** Brand accents (glow, states, secondary text). */
@@ -35,8 +35,12 @@ export const ARES_ACCENTS = {
   purpleGlow: "#8B5CF6",
   /** Purple Light — purple text, eyebrows */
   purpleLight: "#C4B5FD",
+  /** Purple Mid — Perform accent */
+  purpleMid: "#A78BFA",
+  /** Dark Teal — dark teal accent */
+  darkTeal: "#1A6B78",
   /** Success */
-  goSignal: "#22C55E",
+  goSignal: "#2998AA",
   /** Hover surface lift */
   hoverLift: "#1A1E3D",
   /** Muted — ledes, secondary */

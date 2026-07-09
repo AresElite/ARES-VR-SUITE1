@@ -27,7 +27,7 @@ const LANE_COLORS = [
   { color: ARES_ACCENTS.tealBright, name: "TEAL" },
   { color: ARES_ACCENTS.purpleLight, name: "PURPLE" },
   { color: ARES_COLORS.warningGold, name: "GOLD" },
-  { color: "#22C55E", name: "GREEN" },
+  { color: "#2998AA", name: "GREEN" },
   { color: ARES_COLORS.white, name: "WHITE" },
 ];
 

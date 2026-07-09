@@ -12,12 +12,12 @@ import { levels25, lerp25, ilerp25, levels50, lerp50, ilerp50 } from "../shared/
  */
 
 const TEAL = "#2998AA";
-const BLUE = "#3B82F6";
-const ORANGE = "#F97316";
+const BLUE = "#7FD3DE";
+const ORANGE = "#007A8A";
 const PURPLE = "#8B5CF6";
-const CYAN = "#22D3EE";
+const CYAN = "#7FD3DE";
 const WHITE = "#EAF0FF";
-const RED = "#EF5A6F";
+const RED = "#4C1D95";
 
 const Z = -0.62;
 const px2scale = (px: number) => Math.max(0.035, Math.min(0.13, px * 0.00085));

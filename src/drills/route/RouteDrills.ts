@@ -10,9 +10,9 @@ import { levels25, lerp25, ilerp25, levels50, lerp50, ilerp50 } from "../shared/
 
 const TEAL = "#2998AA";
 const PURPLE = "#8B5CF6";
-const GOLD = "#F5B648";
-const GREEN = "#22C55E";
-const RED = "#EF5A6F";
+const GOLD = "#C4B5FD";
+const GREEN = "#2998AA";
+const RED = "#4C1D95";
 const WHITE = "#EAF0FF";
 const GRAY = "#38406B";
 const Z = -0.62;
@@ -106,7 +106,7 @@ export const Sternberg: DrillDefinition = {
   controlsHint: "RIGHT PAD = YES IN SET - LEFT PAD = NO",
   levels: sternbergLevels(),
   buildTrials: (params, rng) =>
-    buildSternberg([TEAL, PURPLE, GOLD, GREEN, RED, WHITE, "#3B82F6", "#F97316"], true, params as never, rng, "stc"),
+    buildSternberg([TEAL, PURPLE, GOLD, GREEN, RED, WHITE, "#7FD3DE", "#007A8A"], true, params as never, rng, "stc"),
   durationMs: sternbergDuration,
 };
 
