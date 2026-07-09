@@ -43,6 +43,9 @@ export interface TrialSpec {
       moves in free space but stays within amplitude of its anchor, so streams
       in separated anchors can never overlap */
   wander?: { ax: number; ay: number; wx: number; wy: number; px: number; py: number };
+  /** completion-sequenced grid index (Schulte): grid 0 spawns at start,
+      grid n spawns when grid n-1 is fully completed — trial-paced, not timed */
+  gridSeq?: number;
   /** curved-lane parameter for Route drills */
   lane?: { radius: number; angularSpeed: number; phase: number; y: number };
   requiredHand?: HandRule;
@@ -88,7 +91,7 @@ export interface ProgressionLevel {
 export type InteractionMode = "ray" | "touch";
 
 /** How the athlete responds: physical strike (default) or index-trigger click. */
-export type ResponseMode = "strike" | "trigger" | "joystick";
+export type ResponseMode = "strike" | "trigger" | "joystick" | "pointer";
 
 /** Trainer-configurable drill option (rendered as a dropdown on the dock). */
 export interface DrillOptionDef {
@@ -153,6 +156,9 @@ export interface DrillDefinition {
   /** timed completion protocol (DEM): HUD shows a stopwatch counting UP,
       and the clock stops the instant the final target is resolved */
   stopwatch?: boolean;
+  /** completion-paced session (Schulte): length is trial-driven, not timed —
+      the declared duration is only a generous ceiling */
+  trialPaced?: boolean;
   /** beat-locked track (Perform): timing windows scored against arrival */
   rhythm?: { approachMs: number; bpm: number; style: "pulse" | "drive" | "wave" | "storm"; lengthBeats: number; countInBeats: number };
   /** trainer-configurable dropdowns; selections merge into build parameters */

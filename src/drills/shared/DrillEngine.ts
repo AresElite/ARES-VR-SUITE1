@@ -64,6 +64,7 @@ export class DrillEngine {
   /** chainId -> pending members in order; head spawns on predecessor resolution */
   private chains = new Map<string, TrialSpec[]>();
   private orderedProgress = new Map<string, number>(); // groupId -> next seq expected
+  private gridQueue = new Map<number, TrialSpec[]>(); // gridSeq -> members (spawn on prev grid completion)
   private active = new Map<string, ActiveTarget>();
   private events: RawEvent[] = [];
   private listeners = new Set<(e: EngineEvent) => void>();
@@ -88,6 +89,12 @@ export class DrillEngine {
     const scheduled: TrialSpec[] = [];
     const byChain = new Map<string, TrialSpec[]>();
     for (const t of trials) {
+      if ((t.gridSeq ?? 0) > 0) {
+        const arr = this.gridQueue.get(t.gridSeq!) ?? [];
+        arr.push(t);
+        this.gridQueue.set(t.gridSeq!, arr);
+        continue;
+      }
       if (t.chainId) {
         const arr = byChain.get(t.chainId) ?? [];
         arr.push(t);
@@ -230,7 +237,7 @@ export class DrillEngine {
 
     // Complete as soon as every trial has spawned and resolved (fast athletes
     // finish early); the duration clock is only the outer bound.
-    if (this.active.size === 0 && this.nextTrialIdx >= this.trials.length && [...this.chains.values()].every((c) => c.length === 0)) {
+    if (this.active.size === 0 && this.nextTrialIdx >= this.trials.length && this.gridQueue.size === 0 && [...this.chains.values()].every((c) => c.length === 0)) {
       this.endedAtISO = new Date().toISOString();
       this.setState("complete");
     }
@@ -288,6 +295,21 @@ export class DrillEngine {
         while (i < this.trials.length && this.trials[i].spawnAt <= spec.spawnAt) i++;
         this.trials.splice(i, 0, spec);
       }
+    }
+  }
+
+  /** completion-driven grid advance (Schulte): spawn grid `seq` now. */
+  private spawnGrid(seq: number): void {
+    const members = this.gridQueue.get(seq);
+    if (!members || members.length === 0) return;
+    this.gridQueue.delete(seq);
+    const at = this.timing.now + 250; // brief, fixed turnaround — trial-paced
+    let i = this.nextTrialIdx;
+    for (const m of members) {
+      const spec = { ...m, spawnAt: at };
+      while (i < this.trials.length && this.trials[i].spawnAt <= spec.spawnAt) i++;
+      this.trials.splice(i, 0, spec);
+      i++;
     }
   }
 
@@ -504,6 +526,8 @@ export class DrillEngine {
               this.despawn(id);
             }
           }
+          // trial-paced advance: completing a grid spawns the next one
+          if (t.spec.gridSeq !== undefined) this.spawnGrid((t.spec.gridSeq ?? 0) + 1);
         }
       }
     }

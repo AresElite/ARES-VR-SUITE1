@@ -99,11 +99,11 @@ function staticChecks(def: DrillDefinition, level: number, trials: TrialSpec[], 
   if (dur < 15000) flag(`${key}|SESSION_UNDER_15S`);
   // stopwatch protocols end the instant the final target resolves — the
   // declared duration is only a generous ceiling, not the real session length
-  if (!def.stopwatch && dur > (def.assessment ? 260000 : 250000)) flag(`${key}|SESSION_OVER_4MIN`);
+  if (!def.stopwatch && !def.trialPaced && dur > (def.assessment ? 260000 : 250000)) flag(`${key}|SESSION_OVER_4MIN`);
 
   // reach envelope for static strike targets (joystick tests are read-only:
   // the athlete responds with a stick flick, never by touching the board)
-  if (def.responseMode !== "trigger" && def.responseMode !== "joystick") {
+  if (def.responseMode !== "trigger" && def.responseMode !== "joystick" && def.responseMode !== "pointer") {
     for (const t of scoreable) {
       if (!isStatic(t)) continue;
       if (Math.abs(t.position[0]) > 0.92) flag(`${key}|X_OUT_OF_REACH`);

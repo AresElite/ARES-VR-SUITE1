@@ -106,50 +106,56 @@ export const SpeedSearch: DrillDefinition = {
 };
 
 // ============================== SCHULTE TABLE ==============================
-// Fixate center, use peripheral vision, strike 1..N in ascending order.
-// Difficulty bands: <=20 3x3, <=45 4x4, <=75 5x5, <=90 6x6, else 7x7.
-function schulteSize(level: number): { size: number; label: string } {
-  if (level <= 20) return { size: 3, label: "Beginner" };
-  if (level <= 45) return { size: 4, label: "Intermediate" };
-  if (level <= 75) return { size: 5, label: "Advanced" };
-  if (level <= 90) return { size: 6, label: "Elite" };
-  return { size: 7, label: "Master" };
-}
+// Fixate center, use peripheral vision, POINT the controller ray at each
+// number and click the trigger in ascending order. Trial-paced (5 grids per
+// level) — each grid stays until completed, then the next appears. Grids grow
+// 3x3 -> 7x7 across the ladder; boxes shrink and spread wider each level.
+const SCHULTE_Z = -1.5; // pointer distance — you aim, you don't reach
+const SCHULTE_GRIDS = 5;
 
 export const SchulteTable: DrillDefinition = {
   id: "schulte-table",
   name: "Schulte Table",
   shortName: "Schulte Table",
   phase: "Acquire",
-  description: "Fixate the center of the grid, locate numbers with peripheral vision, and strike them in ascending order as fast as possible.",
+  description: "Fixate the grid center, find numbers with peripheral vision, and POINT-and-click them in ascending order. Five grids per level; each grid stays until you finish it. Grids grow 3x3 to 7x7 as levels climb, with smaller, wider-spaced boxes.",
   purpose: "Peripheral localization, visual span, ordered scanning speed.",
-  interaction: "touch",
+  interaction: "ray",
+  responseMode: "pointer",
   environment: "arena",
   mvp: true,
+  trialPaced: true,
   instructions: [
     "1. Fixate your gaze on the CENTER of the grid.",
     "2. Use PERIPHERAL vision to locate the numbers - do not scan with your head.",
-    "3. Strike the numbers in ascending order (1, 2, 3...) as fast as possible.",
-    "4. A wrong-order strike counts against you but the grid keeps going.",
-    "5. Complete every grid to finish the session.",
+    "3. POINT your controller at each number and pull the TRIGGER, in ascending order (1, 2, 3...).",
+    "4. A wrong-order click counts against you, but the grid keeps going.",
+    "5. Finish a grid and the next one appears - 5 grids per level.",
   ],
-  controlsHint: "EYES CENTER - STRIKE 1..N IN ORDER",
+  controlsHint: "EYES CENTER - POINT + TRIGGER 1..N IN ORDER",
   levels: levels50((i) => {
     const size = i < 14 ? 3 : i < 26 ? 4 : i < 38 ? 5 : i < 46 ? 6 : 7;
     const band = size === 3 ? "Beginner" : size === 4 ? "Intermediate" : size === 5 ? "Advanced" : size === 6 ? "Elite" : "Master";
+    // field widens (boxes spread further) and boxes shrink as the level climbs
     return {
-      label: `${size}×${size} ${band}`,
-      parameters: { gridSize: size, grids: size <= 4 ? 5 : 3, cellSeconds: Math.max(1.35, 2.5 - i * 0.023) },
+      label: `${size}x${size} ${band}`,
+      parameters: {
+        gridSize: size,
+        grids: SCHULTE_GRIDS,
+        fieldW: lerp50(0.95, 2.05, i),   // total spread — wider every level
+        boxFrac: lerp50(0.34, 0.18, i),  // box size vs cell — shrinks every level (pads render 2.4x wide)
+      },
     };
   }),
   buildTrials: (params, rng) => {
-    const p = params as { gridSize: number; grids: number; cellSeconds: number };
-    const trials: TrialSpec[] = [];
+    const p = params as { gridSize: number; grids: number; fieldW: number; boxFrac: number };
     const n = p.gridSize * p.gridSize;
-    const cell = Math.min(0.19, 0.72 / p.gridSize);
-    const origin = -((p.gridSize - 1) * cell) / 2;
-    let t = 1500;
-    const gridMs = n * p.cellSeconds * 1000;
+    const cellSpacing = p.fieldW / p.gridSize;
+    const originX = -((p.gridSize - 1) * cellSpacing) / 2;
+    const vSpacing = cellSpacing * 0.9;
+    const originY = 1.48 + ((p.gridSize - 1) * vSpacing) / 2;
+    const boxScale = Math.max(0.03, cellSpacing * p.boxFrac);
+    const trials: TrialSpec[] = [];
     for (let g = 0; g < p.grids; g++) {
       const groupId = `sch-g${g}`;
       const order = Array.from({ length: n }, (_, k) => k);
@@ -158,33 +164,34 @@ export const SchulteTable: DrillDefinition = {
         [order[k], order[j]] = [order[j], order[k]];
       }
       for (let cellIdx = 0; cellIdx < n; cellIdx++) {
-        const x = cellIdx % p.gridSize;
-        const y = Math.floor(cellIdx / p.gridSize);
+        const col = cellIdx % p.gridSize;
+        const row = Math.floor(cellIdx / p.gridSize);
         trials.push({
           id: `${groupId}-${cellIdx}`,
-          spawnAt: t,
-          duration: gridMs,
+          // grid 0 spawns at start; grids 1..4 spawn on completion of the prior
+          spawnAt: g === 0 ? 1500 : -1,
+          gridSeq: g,
+          duration: 120000, // effectively until struck — trial-paced, not timed
           kind: "go",
           zone: "center",
-          position: [origin + x * cell, 1.5 - 0.36 + y * cell * 0.85, Z],
+          position: [originX + col * cellSpacing, originY - row * vSpacing, SCHULTE_Z],
           color: GRAY,
           emissive: TEAL,
           shape: "pad",
-          scale: cell * 0.36,
+          scale: boxScale,
           label: String(order[cellIdx] + 1),
           groupId,
           groupMode: "ordered",
           seq: order[cellIdx],
         });
       }
-      t += gridMs + 600; // quick turnaround between grids
     }
     return trials;
   },
   durationMs: (params) => {
-    const p = params as { gridSize: number; grids: number; cellSeconds: number };
+    const p = params as { gridSize: number; grids: number };
     const n = p.gridSize * p.gridSize;
-    return 1500 + p.grids * (n * p.cellSeconds * 1000 + 1500) + 1000;
+    return 1500 + p.grids * n * 1600 + 3000; // generous ceiling; trial-paced, ends on completion
   },
 };
 

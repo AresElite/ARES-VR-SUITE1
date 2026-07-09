@@ -801,7 +801,7 @@ export function DrillRunner() {
       <HitSparks pool={sparks} />
 
       {/* strike interaction (VR): hands/controllers hit targets directly */}
-      {inSession && engine.definition.responseMode !== "trigger" && <StrikeColliders />}
+      {inSession && engine.definition.responseMode === "strike" && <StrikeColliders />}
       {inSession && engine.definition.responseMode === "trigger" && <TriggerListener />}
       <HeadMotionTracker />
       {engine.definition.responseMode === "joystick" && <JoystickListener cursor={demCursor} />}
@@ -831,7 +831,7 @@ export function DrillRunner() {
           slot={slot}
           segments={perf.sphereSegments}
           version={poolVersion}
-          desktopClicks={!inSession && engine.definition.responseMode !== "trigger"}
+          desktopClicks={engine.definition.responseMode === "pointer" || (!inSession && engine.definition.responseMode !== "trigger")}
           demCursor={engine.definition.responseMode === "joystick" ? demCursor : undefined}
         />
       ))}
