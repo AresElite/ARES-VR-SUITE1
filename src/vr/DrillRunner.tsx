@@ -348,11 +348,17 @@ function TargetMesh({
         if (isCurrent) demRing.current.rotation.z = age * 0.003;
       }
     }
-    // head-velocity gate (Gaze Stabilization): optotype readable ONLY while
-    // the head rotates above the level's speed threshold
+    // head-velocity gate (Gaze Stabilization): the optotype is a faint ghost
+    // at rest and SHARPENS to full clarity only while the head rotates above
+    // the level's speed threshold — that is the DVA/GST mechanic. It is always
+    // at least dimly visible so the athlete can see where to look and knows to
+    // move their head to read it.
     const hvMin = spec.meta?.hvMinDegS as number | undefined;
-    if (hvMin !== undefined && group.current) {
-      group.current.visible = headMotion.velDegS >= hvMin;
+    if (hvMin !== undefined && mat.current) {
+      const gated = headMotion.velDegS >= hvMin;
+      mat.current.transparent = true;
+      mat.current.opacity = gated ? 1 : 0.14;
+      mat.current.emissiveIntensity = gated ? 0.9 : 0.15;
     }
     // delayed label reveal (Pursuit-Pulse: direction shows AT the pulse)
     const labelAfter = spec.meta?.labelAfterMs as number | undefined;

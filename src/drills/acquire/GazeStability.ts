@@ -80,11 +80,11 @@ function gazeAnalyze(idp: string, hv: number) {
 }
 
 const GAZE_INSTRUCTIONS = (x2: boolean) => [
-  "1. Follow the metronome: rotate your head smoothly LEFT-RIGHT-LEFT like shaking 'no'.",
-  `2. The arrow at center is ONLY visible while your head is moving fast enough${x2 ? " - and it drifts AGAINST your motion" : ""}.`,
-  "3. Read the arrow mid-motion and FLICK the joystick in that direction.",
-  "4. Higher levels demand faster head speed, break the rhythm, and clutter the background.",
-  "5. Keep rotations comfortable - smooth quarter turns, never whip the head.",
+  "1. A FAINT arrow sits at center. Rotate your head smoothly LEFT-RIGHT-LEFT, like shaking 'no'.",
+  `2. As your head speeds up, the arrow SHARPENS into focus${x2 ? " while drifting AGAINST your head motion" : ""} - that is when you can read it.`,
+  "3. Read the arrow while your head is moving and FLICK the dominant joystick that direction (up/down/left/right).",
+  "4. Let the stick return to center between flicks. This is a HEADSET drill - it needs real head motion.",
+  "5. Higher levels demand faster head speed, break the rhythm, and clutter the background. Keep turns smooth - never whip the head.",
 ];
 
 function makeGazeDrill(x2: boolean): DrillDefinition {
