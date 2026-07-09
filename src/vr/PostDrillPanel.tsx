@@ -11,7 +11,7 @@ import { SpatialPanel, PanelButton, PanelText } from "./SpatialPanel";
  */
 export function PostDrillPanel() {
   const lastFinished = useAppStore((s) => s.lastFinished);
-  const { saveLastSession, runAgain, goHome } = useAppStore.getState();
+  const { saveLastSession, runAgain, goHome, selectPhase } = useAppStore.getState();
   const [saved, setSaved] = useState(false);
   if (!lastFinished) return null;
 
@@ -123,6 +123,15 @@ export function PostDrillPanel() {
           position={[0.62, -0.6, 0]}
           width={0.52}
           height={0.12}
+          label="DRILL MENU"
+          color={ARES_COLORS.deepPurple}
+          onClick={() => selectPhase(result.phase)}
+        />
+        <PanelButton
+          position={[0.62, -0.75, 0]}
+          width={0.52}
+          height={0.1}
+          fontSize={0.032}
           label="ARENA HOME"
           color={ARES_COLORS.graphite}
           onClick={goHome}

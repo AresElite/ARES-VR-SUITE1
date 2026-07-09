@@ -140,6 +140,9 @@ export interface DrillDefinition {
   ) => void;
   /** assessment-specific interpretation appended to result notes */
   analyze?: (events: RawEvent[]) => string[];
+  /** hand-color rules matter: strike orbs render purple(R)/teal(L); when
+      absent the hands stay neutral so target colors are unambiguous */
+  handIdentity?: boolean;
   /** timed completion protocol (DEM): HUD shows a stopwatch counting UP,
       and the clock stops the instant the final target is resolved */
   stopwatch?: boolean;

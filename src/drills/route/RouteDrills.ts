@@ -75,7 +75,7 @@ function sternbergLevels() {
   return levels50((i) => ({
     label: `set of ${2 + Math.floor(i / 6)}, ${ilerp50(2800, 1050, i)}ms study`,
     parameters: {
-      trials: 10, setSize: 2 + Math.floor(i / 6),
+      trials: 14, setSize: 2 + Math.floor(i / 6),
       memorizeMs: ilerp50(2800, 1050, i),
       retentionMs: ilerp50(800, 3200, i),
       probeMs: ilerp50(2600, 1350, i),
@@ -228,6 +228,7 @@ export const Stroop: DrillDefinition = {
       trials.push({
         id: `${groupId}-w`, spawnAt: t, duration: p.windowMs, kind: "distractor", decor: true,
         zone: "center", position: [0, 1.58, Z - 0.08], color: ink.hex, shape: "diamond", scale: 0.001, label: word.name,
+        meta: { labelColor: ink.hex, labelSize: 0.075 }, // the WORD wears the ink color
       });
       STROOP_COLORS.forEach((c, k) => {
         trials.push({
@@ -372,7 +373,7 @@ export const RandomNumber: DrillDefinition = {
           label: String(v), groupId, groupMode: "ordered", seq: k,
         });
       });
-      t += roundMs + 1200;
+      t += roundMs + 500;
     }
     return trials;
   },
@@ -443,7 +444,7 @@ export const MultipleObjectTracking: DrillDefinition = {
           },
         });
       }
-      t += total + 1200;
+      t += total + 500;
     }
     return trials;
   },

@@ -195,10 +195,11 @@ export class DrillEngine {
         slot.pos[2] = t.spec.position[2] + (t.spec.velocity[2] * age) / 1000;
       } else if (slot && t.spec.lane) {
         const { radius, angularSpeed, phase, y } = t.spec.lane;
+        // frontal orbit: a ring IN FRONT of the athlete, never around them
         const a = phase + (angularSpeed * age) / 1000;
         slot.pos[0] = Math.sin(a) * radius;
-        slot.pos[1] = y;
-        slot.pos[2] = -Math.cos(a) * radius;
+        slot.pos[1] = y + Math.cos(a) * radius * 0.55;
+        slot.pos[2] = -0.9;
       }
       if (t.spec.switchKindAt !== undefined && t.spec.switchKindTo && now >= t.spec.switchKindAt && t.kind !== t.spec.switchKindTo) {
         t.kind = t.spec.switchKindTo;

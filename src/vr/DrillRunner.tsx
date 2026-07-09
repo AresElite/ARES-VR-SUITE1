@@ -57,8 +57,8 @@ const DIR_ANGLE: Record<SliceDirection, number> = {
   downRight: (7 * Math.PI) / 4,
 };
 
-const STRIKE_ORB_RADIUS = 0.045;
-const HIT_PADDING = 0.075; // generous contact window around the target surface
+const STRIKE_ORB_RADIUS = 0.037; // trimmed per athlete feedback
+const HIT_PADDING = 0.042; // tightened: oversized hitboxes caused phantom errors
 const DIRECTION_MIN_SPEED = 0.6; // m/s of hand motion needed to read a slice direction
 
 interface HandTracker {
@@ -84,6 +84,8 @@ function StrikeColliders() {
   const rightCtl = useXRInputSourceState("controller", "right");
   const leftHand = useXRInputSourceState("hand", "left");
   const rightHand = useXRInputSourceState("hand", "right");
+  // hand identity ONLY where the drill uses hand rules; neutral elsewhere
+  const handColored = Boolean(engine?.definition.handIdentity || engine?.definition.rhythm);
   const orbL = useRef<THREE.Mesh>(null);
   const orbR = useRef<THREE.Mesh>(null);
 
@@ -133,7 +135,7 @@ function StrikeColliders() {
         const dx = slot.pos[0] - t.pos.x;
         const dy = slot.pos[1] - t.pos.y;
         const dz = slot.pos[2] - t.pos.z;
-        const reach = slot.spec.scale + STRIKE_ORB_RADIUS + HIT_PADDING;
+        const reach = slot.spec.scale + STRIKE_ORB_RADIUS + HIT_PADDING + ((slot.spec.meta?.hitBoost as number) ?? 0);
         if (dx * dx + dy * dy + dz * dz <= reach * reach) {
           stillTouching.add(slot.spec.id);
           const age = engine.timing.now - slot.spawnClock;
@@ -166,8 +168,8 @@ function StrikeColliders() {
       <mesh ref={orbL} visible={false}>
         <sphereGeometry args={[STRIKE_ORB_RADIUS, 12, 12]} />
         <meshStandardMaterial
-          color={ARES_COLORS.electricTeal}
-          emissive={ARES_COLORS.electricTeal}
+          color={handColored ? ARES_COLORS.electricTeal : "#C9D2EE"}
+          emissive={handColored ? ARES_COLORS.electricTeal : "#8C96BE"}
           emissiveIntensity={0.9}
           transparent
           opacity={0.85}
@@ -176,8 +178,8 @@ function StrikeColliders() {
       <mesh ref={orbR} visible={false}>
         <sphereGeometry args={[STRIKE_ORB_RADIUS, 12, 12]} />
         <meshStandardMaterial
-          color={ARES_ACCENTS.purpleGlow}
-          emissive={ARES_ACCENTS.purpleGlow}
+          color={handColored ? ARES_ACCENTS.purpleGlow : "#C9D2EE"}
+          emissive={handColored ? ARES_ACCENTS.purpleGlow : "#8C96BE"}
           emissiveIntensity={0.9}
           transparent
           opacity={0.85}
@@ -282,6 +284,7 @@ function TargetMesh({
   demCursor?: { seq: number };
 }) {
   const group = useRef<THREE.Group>(null);
+  const labelRef = useRef<{ visible: boolean } | null>(null);
   const demRing = useRef<THREE.Mesh>(null);
   const mat = useRef<THREE.MeshStandardMaterial>(null);
   const engine = useAppStore((s) => s.engine);
@@ -343,6 +346,11 @@ function TargetMesh({
         demRing.current.visible = isCurrent;
         if (isCurrent) demRing.current.rotation.z = age * 0.003;
       }
+    }
+    // delayed label reveal (Pursuit-Pulse: direction shows AT the pulse)
+    const labelAfter = spec.meta?.labelAfterMs as number | undefined;
+    if (labelAfter !== undefined && labelRef.current) {
+      labelRef.current.visible = age >= labelAfter;
     }
     // Neural Phase Lock: expanding/contracting pulse
     const pulseMs = spec.meta?.pulsePeriodMs as number | undefined;
@@ -494,12 +502,14 @@ function TargetMesh({
       )}
       {spec.label && (
         <Text
-          position={[0, spec.scale + 0.075, 0]}
-          fontSize={0.036}
-          color={ARES_COLORS.softGray}
+          ref={labelRef as never}
+          position={spec.meta?.labelInside ? [0, 0, 0.012] : [0, spec.scale + 0.075, 0]}
+          fontSize={(spec.meta?.labelSize as number) ?? 0.036}
+          color={(spec.meta?.labelColor as string) ?? ARES_COLORS.softGray}
           anchorX="center"
           anchorY="middle"
           font={FONT_MONO}
+          visible={spec.meta?.labelAfterMs === undefined}
         >
           {spec.label.toUpperCase()}
         </Text>

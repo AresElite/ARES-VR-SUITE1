@@ -175,6 +175,7 @@ export const PursuitPulse: DrillDefinition = {
         color: TEAL, emissive: TEAL, switchColor: GOLD,
         shape: "sphere", scale: 0.07,
         label: dir,
+        meta: { labelAfterMs: p.betweenMs }, // direction reveals ONLY at the gold pulse
       });
       phase += (i % 2 === 0 ? 1 : -1) * p.speed * (segMs / 1000);
       t += segMs + 300;

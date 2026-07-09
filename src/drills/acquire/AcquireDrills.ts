@@ -87,7 +87,7 @@ export const SpeedSearch: DrillDefinition = {
           zone,
           position: pos,
           color: isTarget ? TEAL_L : "#38406B",
-          emissive: isTarget ? TEAL : undefined,
+          emissive: undefined, // target must NOT light up — find the shape, not the glow
           shape: isTarget ? "cone" : pick(rng, decoyShapes),
           scale: p.scale,
           groupId,
@@ -175,7 +175,7 @@ export const SchulteTable: DrillDefinition = {
           seq: order[cellIdx],
         });
       }
-      t += gridMs + 1500;
+      t += gridMs + 600; // quick turnaround between grids
     }
     return trials;
   },
@@ -230,7 +230,8 @@ export const ContrastAssessment: DrillDefinition = {
         color: hex,
         shape: "arc",
         scale: 0.1,
-        meta: { pointDir: gap, gapRing: true },
+        // hitBoost: entering the C opening counts — not just dead center
+        meta: { pointDir: gap, gapRing: true, hitBoost: 0.06 },
       });
       t += p.showMs + 600 + rng() * 400;
     }
@@ -278,24 +279,28 @@ export const RapidRecognition: DrillDefinition = {
       const cue = pick(rng, chars);
       const matchIdx = Math.floor(rng() * p.rings);
       // persistent central cue
+      // cue sits DEAD CENTER at eye height, slightly behind the ring circle
       trials.push({
         id: `${groupId}-cue`, spawnAt: t, duration: p.flashMs + p.answerMs, kind: "distractor", decor: true,
-        zone: "center", position: [0, 1.62, Z - 0.1], color: WHITE, shape: "diamond", scale: 0.045, label: cue,
+        zone: "center", position: [0, 1.45, -1.05], color: WHITE, shape: "diamond", scale: 0.004,
+        label: cue, meta: { labelInside: true, labelColor: WHITE, labelSize: 0.07 },
       });
       for (let rIdx = 0; rIdx < p.rings; rIdx++) {
         const ang = (rIdx / p.rings) * Math.PI * 2 + rng() * 0.5;
-        const pos: [number, number, number] = [Math.cos(ang) * 0.38, 1.42 + Math.sin(ang) * 0.28, Z];
-        // brief character flash (decor)
+        const pos: [number, number, number] = [Math.cos(ang) * 0.44, 1.45 + Math.sin(ang) * 0.32, -0.85];
+        // character flashes INSIDE its ring
         trials.push({
           id: `${groupId}-f${rIdx}`, spawnAt: t, duration: p.flashMs, kind: "distractor", decor: true,
-          zone: "center", position: [pos[0], pos[1] + 0.09, pos[2]], color: GOLD, shape: "diamond", scale: 0.02,
+          zone: "center", position: [pos[0], pos[1], pos[2] + 0.015], color: GOLD, shape: "diamond", scale: 0.003,
           label: rIdx === matchIdx ? cue : CONFUSABLES[cue],
+          meta: { labelInside: true, labelColor: GOLD, labelSize: 0.05 },
         });
         // strikeable ring (answer window opens after the flash)
         trials.push({
           id: `${groupId}-r${rIdx}`, spawnAt: t, duration: p.flashMs + p.answerMs,
           kind: rIdx === matchIdx ? "go" : "distractor",
           zone: "center", position: pos, color: TEAL, emissive: TEAL, shape: "ring", scale: 0.06, groupId,
+          meta: { hitBoost: 0.02 },
         });
       }
       t += p.flashMs + p.answerMs + 700;

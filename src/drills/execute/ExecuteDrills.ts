@@ -76,6 +76,7 @@ export const ReactionGrid: DrillDefinition = {
   environment: "arena",
   mvp: true,
   hardStop: true,
+  handIdentity: true,
   options: [
     {
       id: "colorMode",
@@ -165,6 +166,7 @@ export const EyeHandCoordination: DrillDefinition = {
   environment: "arena",
   mvp: true,
   hardStop: true,
+  handIdentity: true,
   options: [
     {
       id: "colorMode",
@@ -357,7 +359,7 @@ export const ChoiceRT: DrillDefinition = {
   levels: levels50((i) => ({
     label: `${(lerp50(5.5, 13, i)).toFixed(1)} m/s launches, delays up to ${(ilerp50(1500, 3400, i) / 1000).toFixed(1)}s`,
     parameters: {
-      trials: 50,
+      trials: 24, // rep limit per athlete feedback — 50+ ran way too long
       speed: lerp50(5.5, 13, i),
       minDelay: 600,
       maxDelay: ilerp50(1500, 3400, i),
@@ -596,7 +598,7 @@ export const StopSignal: DrillDefinition = {
         position: [px, py, Z],
         color: isNoGo ? PURPLE : TEAL,
         emissive: isNoGo ? PURPLE : TEAL,
-        shape: isNoGo ? "ring" : "sphere",
+        shape: "sphere", // no-go is a proper orb now (was a flat ring)
         scale: p.size,
       });
       t += p.deadline * 0.55 + rng() * 600;

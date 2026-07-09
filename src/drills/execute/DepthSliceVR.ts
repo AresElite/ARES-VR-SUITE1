@@ -36,9 +36,10 @@ const DIRECTIONS: SliceDirection[] = [
 ];
 
 const HAND_COLOR: Record<string, { color: string; emissive: string }> = {
-  left: { color: ARES_ACCENTS.purpleGlow, emissive: ARES_COLORS.deepPurple },
-  right: { color: ARES_COLORS.warningGold, emissive: ARES_COLORS.warningGold },
-  either: { color: ARES_ACCENTS.tealBright, emissive: ARES_COLORS.electricTeal },
+  // suite hand identity: PURPLE = RIGHT, TEAL = LEFT, gold = either
+  left: { color: ARES_COLORS.electricTeal, emissive: ARES_COLORS.electricTeal },
+  right: { color: ARES_ACCENTS.purpleGlow, emissive: ARES_ACCENTS.purpleGlow },
+  either: { color: ARES_COLORS.warningGold, emissive: ARES_COLORS.warningGold },
   both: { color: ARES_COLORS.softGray, emissive: ARES_COLORS.electricTeal },
 };
 
@@ -109,12 +110,12 @@ export const DepthSliceVR: DrillDefinition = {
   shortName: "Depth Slice",
   phase: "Execute",
   description:
-    "Targets fly at you through depth. Strike in the contact window — purple = LEFT hand, gold = RIGHT hand, teal = either, gray = both. Cones demand an 8-way directional slice. Rhythm levels lock to the beat.",
+    "Targets fly at you through depth. Strike in the contact window — PURPLE = RIGHT hand, TEAL = LEFT hand, gold = either, gray = both. Cones demand an 8-way directional slice. Rhythm levels lock to the beat.",
   purpose: "Depth timing, slicing, bimanual coordination, cross-midline control.",
   interaction: "touch",
   instructions: [
     "1. Targets fly toward you through depth. Let them come into range, then STRIKE THROUGH them.",
-    "2. PURPLE = LEFT hand. GOLD = RIGHT hand. TEAL = either hand. GRAY = both hands.",
+    "2. PURPLE = RIGHT hand. TEAL = LEFT hand. GOLD = either hand. GRAY = both hands.",
     "3. CONES must be sliced in the direction they point — swing your hand THROUGH the cone along its arrow.",
     "4. Time your contact for the moment the target reaches you. Too early or too late is a miss.",
     "5. Rhythm levels lock targets to a beat — find the tempo and stay on it.",
@@ -122,6 +123,7 @@ export const DepthSliceVR: DrillDefinition = {
   controlsHint: "STRIKE THROUGH TARGETS AS THEY ARRIVE - MATCH HAND COLORS",
   environment: "arena",
   mvp: true,
+  handIdentity: true,
   levels,
   buildTrials: (params, rng) => buildDepthSliceTrials(params as Params, rng),
   durationMs: (params) => {

@@ -93,6 +93,7 @@ export const FineMotorChoiceRT: DrillDefinition = {
   environment: "arena",
   mvp: true,
   assessment: true,
+  handIdentity: true,
   instructions: [
     "1. Balls fire from the central hole after COMPLETELY RANDOM delays - some fast, some slow.",
     "2. PURPLE ball - click the RIGHT top trigger. TEAL ball - click the LEFT top trigger.",
@@ -203,6 +204,7 @@ export const GrossMotorRawRT: DrillDefinition = {
   environment: "arena",
   mvp: true,
   assessment: true,
+  handIdentity: true,
   hardStop: true,
   options: [
     { id: "dominantHand", label: "Dominant hand", defaultValue: "right",
@@ -234,6 +236,7 @@ export const GrossMotorChoiceRT: DrillDefinition = {
   environment: "arena",
   mvp: true,
   assessment: true,
+  handIdentity: true,
   hardStop: true,
   instructions: [
     "1. 120 seconds. Balls fire from random hexagon portholes.",
