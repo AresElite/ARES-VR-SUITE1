@@ -1,7 +1,7 @@
 import type { DrillDefinition, TrialSpec } from "@/ares/drillTypes";
 import { ARES_COLORS, ARES_ACCENTS } from "@/ares/colors";
 import { EYE_Y } from "../shared/zones";
-import { levels25, lerp25, ilerp25 } from "../shared/levels";
+import { levels50, lerp50, ilerp50, levels25, lerp25, ilerp25 } from "../shared/levels";
 
 /**
  * ROUTE — Predictive Pathway VR
@@ -101,15 +101,15 @@ export function buildPathwayTrials(p: Params, rng: () => number, idPrefix = "pp"
   return trials;
 }
 
-const levels = levels25((i) => ({
-  label: `${3 + Math.floor(i / 9)} routes, ${ilerp25(0, 55, i)}% late switches`,
+const levels = levels50((i) => ({
+  label: `${3 + Math.floor(i / 16)} routes, ${ilerp50(0, 65, i)}% late switches`,
   parameters: {
-    decisionCount: ilerp25(8, 14, i),
-    objectsPerDecision: 3 + Math.floor(i / 9),
-    windowMs: ilerp25(3400, 2000, i),
-    gapMs: ilerp25(1500, 900, i),
-    lateSwitchRatio: lerp25(0, 0.55, i),
-    speedSpread: lerp25(0.5, 0.15, i),
+    decisionCount: ilerp50(8, 15, i),
+    objectsPerDecision: 3 + Math.floor(i / 16),
+    windowMs: ilerp50(3400, 1800, i),
+    gapMs: ilerp50(1500, 850, i),
+    lateSwitchRatio: lerp50(0, 0.65, i),
+    speedSpread: lerp50(0.5, 0.12, i),
   },
 }));
 

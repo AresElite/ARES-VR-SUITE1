@@ -1,4 +1,7 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useFrame } from "@react-three/fiber";
+import { useXRInputSourceState } from "@react-three/xr";
+import { sfx } from "@/utils/audio";
 import { ARES_COLORS, ARES_ACCENTS } from "@/ares/colors";
 import { PHASE_META } from "@/ares/phases";
 import { useAppStore } from "@/app/providers/appStore";
@@ -8,6 +11,36 @@ import { PERF_MODES, type PerfModeId } from "@/utils/performance";
 import { SpatialPanel, PanelButton, PanelText } from "./SpatialPanel";
 
 const PAGE_SIZE = 7;
+
+/**
+ * Thumbstick list scrolling — push either stick UP/DOWN to scroll the drill
+ * list one row at a time (auto-repeats while held, ticks as it moves).
+ * The PREV/NEXT buttons remain as a page-jump fallback.
+ */
+function StickScroll({ onStep }: { onStep: (d: number) => void }) {
+  const left = useXRInputSourceState("controller", "left");
+  const right = useXRInputSourceState("controller", "right");
+  const nextAt = useRef(0);
+  const held = useRef(false);
+  useFrame(({ clock }) => {
+    const ly = left?.inputSource?.gamepad?.axes?.[3] ?? 0;
+    const ry = right?.inputSource?.gamepad?.axes?.[3] ?? 0;
+    const y = Math.abs(ly) > Math.abs(ry) ? ly : ry;
+    const t = clock.elapsedTime;
+    if (Math.abs(y) > 0.6) {
+      if (t >= nextAt.current) {
+        onStep(y > 0 ? 1 : -1); // stick down (+y) scrolls down the list
+        sfx.uiClick();
+        nextAt.current = t + (held.current ? 0.22 : 0.4);
+        held.current = true;
+      }
+    } else if (Math.abs(y) < 0.3) {
+      held.current = false;
+      nextAt.current = 0;
+    }
+  });
+  return null;
+}
 
 /**
  * Trainer Control Dock.
@@ -25,13 +58,15 @@ export function TrainerControlDock() {
   const drillOptions = useAppStore((s) => s.drillOptions);
   const { selectDrill, setLevel, setDrillOption, setAthlete, setSeated, setPerfMode, goHome, proceedToCalibration } =
     useAppStore.getState();
-  const [page, setPage] = useState(0);
+  const [offset, setOffset] = useState(0);
+  useEffect(() => setOffset(0), [phase]);
 
   if (!phase) return null;
   const meta = PHASE_META[phase];
   const drills = drillsForPhase(phase);
-  const pages = Math.max(1, Math.ceil(drills.length / PAGE_SIZE));
-  const pageDrills = drills.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const maxOffset = Math.max(0, drills.length - PAGE_SIZE);
+  const scroll = (d: number) => setOffset((o) => Math.max(0, Math.min(maxOffset, o + d)));
+  const pageDrills = drills.slice(offset, offset + PAGE_SIZE);
   const def = drillId ? drillById(drillId) : undefined;
   const maxLevel = def ? def.levels.length : 1;
   const levelLabel = def?.levels.find((l) => l.level === level)?.label ?? "";
@@ -68,9 +103,10 @@ export function TrainerControlDock() {
         rotation={[0, 0.28, 0]}
         width={1.3}
         height={1.5}
-        title={`${phase} — Drills ${pages > 1 ? `(${page + 1}/${pages})` : ""}`}
+        title={`${phase} — Drills ${drills.length > PAGE_SIZE ? `(${offset + 1}-${Math.min(offset + PAGE_SIZE, drills.length)} of ${drills.length})` : ""}`}
         accent={meta.color}
       >
+        {drills.length > PAGE_SIZE && <StickScroll onStep={scroll} />}
         {pageDrills.map((d, i) => (
           <PanelButton
             key={d.id}
@@ -83,23 +119,31 @@ export function TrainerControlDock() {
             onClick={() => selectDrill(d.id)}
           />
         ))}
-        {pages > 1 && (
+        {drills.length > PAGE_SIZE && (
           <>
             <PanelButton
               position={[-0.3, -0.6, 0]}
               width={0.5}
               height={0.1}
-              label="< PREV"
+              label="^ UP"
               color={ARES_COLORS.graphite}
-              onClick={() => setPage((page + pages - 1) % pages)}
+              onClick={() => scroll(-PAGE_SIZE)}
             />
             <PanelButton
               position={[0.3, -0.6, 0]}
               width={0.5}
               height={0.1}
-              label="NEXT >"
+              label="v DOWN"
               color={ARES_COLORS.graphite}
-              onClick={() => setPage((page + 1) % pages)}
+              onClick={() => scroll(PAGE_SIZE)}
+            />
+            <PanelText
+              position={[0, -0.685, 0]}
+              text="TIP: FLICK EITHER THUMBSTICK UP / DOWN TO SCROLL"
+              size={0.026}
+              color={ARES_COLORS.softGray}
+              maxWidth={1.2}
+              mono
             />
           </>
         )}
