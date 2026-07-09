@@ -158,7 +158,7 @@ export const EyeHandCoordination: DrillDefinition = {
   name: "Eye-Hand Coordination",
   shortName: "Eye-Hand Coordination",
   phase: "Execute",
-  description: "60 seconds. Multiple targets live at once across the strike wall — clear them as they appear; each strike spawns the next. Central/peripheral distribution, stimulus size, and color/hand rules are trainer-selectable.",
+  description: "60 seconds. THREE targets always live across the strike wall — clear them as they appear; each strike spawns the next. Central/peripheral distribution, stimulus size, and color/hand rules are trainer-selectable.",
   purpose: "Continuous eye-hand mapping, bimanual coverage, scan-and-strike speed.",
   interaction: "touch",
   responseMode: "strike",
@@ -204,18 +204,18 @@ export const EyeHandCoordination: DrillDefinition = {
     },
   ],
   instructions: [
-    "1. 60 seconds on the clock. Up to three targets live at once on the strike wall at full arm's reach.",
-    "2. STRIKE any live target - a new one appears elsewhere the moment you do.",
+    "1. 60 seconds on the clock. THREE targets are always live on the strike wall at full arm's reach.",
+    "2. STRIKE any live target - a replacement instantly spawns in a DIFFERENT section of the field.",
     "3. Color rules: PURPLE = RIGHT hand. TEAL = LEFT hand. BLUE = either. Purple-only = any hand.",
     "4. The central/peripheral mix follows the selected distribution.",
     "5. Use BOTH hands - left covers left field, right covers right. Clear as many as you can before time expires.",
   ],
   controlsHint: "60s - CLEAR THE WALL - PURPLE=R TEAL=L BLUE=ANY",
   levels: levels50((i) => ({
-    label: `${i < 16 ? 2 : 3} live targets — ${(ilerp50(2500, 1150, i) / 1000).toFixed(1)}s windows`,
+    label: `3 live targets — ${(ilerp50(2500, 1150, i) / 1000).toFixed(1)}s windows`,
     parameters: {
       spreadDeg: lerp50(14, 46, i),
-      streams: i < 16 ? 2 : 3,
+      streams: 3, // ALWAYS three concurrent stimuli — strike one, another spawns
       timeoutMs: ilerp50(2500, 1150, i),
     },
   })),
@@ -230,10 +230,17 @@ export const EyeHandCoordination: DrillDefinition = {
     const trials: TrialSpec[] = [];
     for (let sIdx = 0; sIdx < p.streams; sIdx++) {
       const deck = colorDeck(p.colorMode ?? "purple-only", perStream, rng);
+      let prevZone: TargetZone | null = null;
       for (let i = 0; i < perStream; i++) {
         const central = rng() < centralFrac;
-        const zone = central ? "center" : (pick(rng, PERIPHERAL_ZONES) as TargetZone);
-        const ecc = central ? 2 + rng() * 9 : 16 + rng() * Math.max(10, p.spreadDeg - 16);
+        // the replacement always populates a NEW section: never repeat the
+        // zone the struck target occupied
+        let zone: TargetZone = central ? "center" : (pick(rng, PERIPHERAL_ZONES) as TargetZone);
+        for (let a = 0; a < 4 && zone === prevZone; a++) {
+          zone = pick(rng, PERIPHERAL_ZONES.concat(["center"]) as TargetZone[]);
+        }
+        prevZone = zone;
+        const ecc = zone === "center" ? 2 + rng() * 9 : 16 + rng() * Math.max(10, p.spreadDeg - 16);
         const c = deck[i];
         trials.push({
           id: `ehc-${sIdx}-${i}`,
