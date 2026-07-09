@@ -1,6 +1,6 @@
 /**
  * A.R.E.S. audio engine — fully synthesized (zero assets, zero network).
- * WebAudio oscillators tuned to the brand: precise, clinical, satisfying.
+ * WebAudio oscillators tuned to the brand: precise, performance-lab, satisfying.
  * Spatialized subtly via stereo pan; volumes kept low for training focus.
  */
 let ctx: AudioContext | null = null;

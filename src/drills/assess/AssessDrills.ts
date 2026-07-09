@@ -2,8 +2,10 @@ import type { DrillDefinition, RawEvent, TrialSpec } from "@/ares/drillTypes";
 import { pick } from "@/utils/rng";
 
 /**
- * ASSESS — the clinical baseline suite (v2).
+ * ASSESS — the performance baseline suite (v2).
  * Standardized protocols with adaptive ladders and threshold staircases.
+ * PHASE 1 PROTOTYPE: design validation only — outputs are not validated
+ * measurements and are never treatment, screening, or diagnosis.
  */
 
 const PURPLE = "#8B5CF6";
@@ -262,7 +264,7 @@ export const ColorVisionAssessment: DrillDefinition = {
   shortName: "Color Vision",
   phase: "Assess",
   description: "14 pseudo-isochromatic plates fly through your view — left, right, up, down, diagonal, even straight at you. Answer and the plate clears for the next. Axis-specific errors classify the deficit pattern.",
-  purpose: "Color-discrimination screening with axis classification.",
+  purpose: "Color-discrimination performance baseline with axis pattern.",
   interaction: "touch",
   responseMode: "strike",
   environment: "arena",
@@ -333,12 +335,12 @@ export const ColorVisionAssessment: DrillDefinition = {
       notes.push(`Control plates missed (${ctl.wrong}/${ctl.total}) - verify comprehension before interpreting axes.`);
     }
     if (rg.total && rg.wrong / rg.total >= 0.375) {
-      notes.push(`Red-green axis: ${rg.wrong}/${rg.total} missed - protan/deutan pattern. Refer for formal anomaloscope or printed plate testing.`);
+      notes.push(`Red-green axis: ${rg.wrong}/${rg.total} missed - reduced red-green discrimination pattern (training-design input only).`);
     } else if (rg.wrong > 0) {
       notes.push(`Red-green axis: ${rg.wrong}/${rg.total} missed - borderline; consider retest.`);
     }
     if (by.total && by.wrong / by.total >= 0.5) {
-      notes.push(`Blue-yellow axis: ${by.wrong}/${by.total} missed - tritan pattern (rare; consider acquired etiology).`);
+      notes.push(`Blue-yellow axis: ${by.wrong}/${by.total} missed - reduced blue-yellow discrimination pattern (training-design input only).`);
     }
     if (notes.length === 0) notes.push("Color discrimination within normal limits on both confusion axes.");
     return notes;
@@ -443,7 +445,7 @@ export const StereopsisAssessment: DrillDefinition = {
     // fold in the final trial's outcome via best already tracked at spawns;
     // report the finest disparity that was answered correctly
     if (stereoState.best === null) {
-      return ["No disparity level was reliably resolved - gross stereopsis deficit pattern; refer for full binocular workup."];
+      return ["No disparity level was reliably resolved - depth-cue drills will start at the easiest rung."];
     }
     return [
       `Stereoacuity threshold achieved: ${stereoState.best} arcsec (staircase ${stereoState.done ? "terminated on 3 consecutive misses" : "completed"}).`,
@@ -451,7 +453,7 @@ export const StereopsisAssessment: DrillDefinition = {
         ? "Fine global stereopsis - within elite athletic norms."
         : stereoState.best <= 100
           ? "Moderate stereoacuity - trainable range."
-          : "Reduced stereoacuity - consider binocular vision evaluation.",
+          : "Reduced depth discrimination - depth-focused drills prescribed at foundation levels.",
     ];
   },
   durationMs: (params) => {
@@ -555,7 +557,7 @@ export const ContrastSensitivityAssessment: DrillDefinition = {
   },
   analyze: () => {
     if (csState.best === null) {
-      return ["Highest-contrast grating not detected - screen for media opacity or refractive blur before interpreting."];
+      return ["Highest-contrast grating not detected - retest recommended; verify headset fit and lens cleanliness first."];
     }
     const logCS = Math.round(Math.log10(100 / csState.best) * 100) / 100;
     return [
@@ -564,7 +566,7 @@ export const ContrastSensitivityAssessment: DrillDefinition = {
         ? "Excellent contrast sensitivity - elite athletic range."
         : logCS >= 1.4
           ? "Normal contrast sensitivity."
-          : "Reduced contrast sensitivity - consider ocular-health and refractive evaluation.",
+          : "Reduced contrast performance - low-contrast pickup drills prescribed at foundation levels.",
     ];
   },
   durationMs: (params) => {

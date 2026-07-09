@@ -67,8 +67,8 @@ export interface AQBlock {
 
 /**
  * Standardized session result. Every VR drill produces exactly this shape.
- * EMR-ready: flat, typed, serializable — the placeholder API layer in
- * `src/data/api.ts` will ship these objects unchanged when EMR sync lands.
+ * Flat, typed, serializable — the placeholder API layer in
+ * `src/data/api.ts` will ship these objects unchanged when future sync lands.
  */
 export interface ARESDrillSessionResult {
   sessionId: string;

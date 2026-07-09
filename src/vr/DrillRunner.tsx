@@ -14,6 +14,7 @@ import { PERF_MODES } from "@/utils/performance";
 import { makeGratingTexture, makePlateTexture, makeRDSTexture } from "@/utils/platePainter";
 import { sfx } from "@/utils/audio";
 import { rhythmMusic } from "@/perform/rhythmMusic";
+import { headMotion } from "./headMotion";
 import { FONT_MONO } from "@/utils/fonts";
 
 /**
@@ -347,6 +348,12 @@ function TargetMesh({
         if (isCurrent) demRing.current.rotation.z = age * 0.003;
       }
     }
+    // head-velocity gate (Gaze Stabilization): optotype readable ONLY while
+    // the head rotates above the level's speed threshold
+    const hvMin = spec.meta?.hvMinDegS as number | undefined;
+    if (hvMin !== undefined && group.current) {
+      group.current.visible = headMotion.velDegS >= hvMin;
+    }
     // delayed label reveal (Pursuit-Pulse: direction shows AT the pulse)
     const labelAfter = spec.meta?.labelAfterMs as number | undefined;
     if (labelAfter !== undefined && labelRef.current) {
@@ -650,6 +657,13 @@ function FixationMarker() {
   );
 }
 
+/** feeds head angular velocity from the XR camera every frame */
+function HeadMotionTracker() {
+  const camera = useThree((s) => s.camera);
+  useFrame((_, dt) => headMotion.update(camera.quaternion, dt));
+  return null;
+}
+
 export function DrillRunner() {
   const engine = useAppStore((s) => s.engine);
   const camera = useThree((s) => s.camera);
@@ -770,6 +784,7 @@ export function DrillRunner() {
       {/* strike interaction (VR): hands/controllers hit targets directly */}
       {inSession && engine.definition.responseMode !== "trigger" && <StrikeColliders />}
       {inSession && engine.definition.responseMode === "trigger" && <TriggerListener />}
+      <HeadMotionTracker />
       {engine.definition.responseMode === "joystick" && <JoystickListener cursor={demCursor} />}
       {engine.definition.launcher && <LauncherProp />}
       {engine.definition.hexWall && <HexLauncherWall />}

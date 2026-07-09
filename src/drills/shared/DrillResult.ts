@@ -73,7 +73,7 @@ export function buildSessionResult(
     if (scored.length) metrics.completionTimeMs = Math.max(0, Math.round(Math.max(...scored.map((e) => e.timestamp)) - 600));
   }
 
-  // assessment-specific clinical interpretation
+  // assessment-specific performance interpretation
   if (def.analyze) notes.push(...def.analyze(events));
 
   const aq = buildAQBlock(def.phase, metrics, ACTION_LABELS[recommendation.action], notes);

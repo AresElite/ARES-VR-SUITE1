@@ -129,7 +129,7 @@ export interface DrillDefinition {
   hexWall?: boolean;
   /** drill ends exactly at durationMs even if trials remain (60s formats) */
   hardStop?: boolean;
-  /** clinical assessment: fixed standardized protocol (single level) */
+  /** baseline assessment: fixed standardized protocol (single level) */
   assessment?: boolean;
   /** adaptive hook: mutate a trial at the moment it spawns (speed ladders,
       staircases) using the live snapshot; api.finishEarly() ends the plan */

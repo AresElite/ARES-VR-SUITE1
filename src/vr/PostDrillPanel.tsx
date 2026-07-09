@@ -99,6 +99,14 @@ export function PostDrillPanel() {
           maxWidth={1.7}
         />
 
+        <PanelText
+          position={[-0.86, -0.51, 0]}
+          text="PHASE 1 PROTOTYPE — DESIGN VALIDATION ONLY. NON-VALIDATING NUMBERS."
+          size={0.024}
+          color="#6B749C"
+          maxWidth={1.75}
+          mono
+        />
         <PanelButton
           position={[-0.62, -0.6, 0]}
           width={0.52}

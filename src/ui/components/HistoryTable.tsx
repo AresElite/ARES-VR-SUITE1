@@ -8,7 +8,7 @@ export function HistoryTable() {
   const refresh = useAppStore((s) => s.refreshSessions);
 
   if (sessions.length === 0) {
-    return <p className="ares-sub">No saved sessions yet. Run a drill and save it — results persist locally and stay EMR-ready.</p>;
+    return <p className="ares-sub">No saved sessions yet. Run a drill and save it — results persist locally and stay sync-ready.</p>;
   }
 
   return (

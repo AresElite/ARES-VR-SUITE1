@@ -1,11 +1,11 @@
 import * as THREE from "three";
 
 /**
- * Procedural clinical stimulus painters.
+ * Procedural established plate-design stimulus painters.
  *
  * ISHIHARA-STYLE PLATES: pseudo-isochromatic dot fields. Figure and ground
  * dots are matched in luminance but separated along dichromatic confusion
- * lines (red-green axis for protan/deutan screening, blue-yellow for tritan)
+ * lines (red-green axis for protan/deutan performance-baseline testing, blue-yellow for tritan)
  * so the digit is invisible without normal color discrimination. Control
  * plates separate figure/ground by luminance so every athlete can read them
  * (malingering / comprehension check). Headset note: this is a SCREENING

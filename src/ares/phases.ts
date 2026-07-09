@@ -16,7 +16,7 @@ export const ARES_PHASES: ARESPhase[] = [
   "Synchronize",
 ];
 
-/** All portals in the arena — the Loop plus the clinical Assess suite. */
+/** All portals in the arena — the Loop plus the Assess baseline suite. */
 export const ARES_ALL_PHASES: ARESPhase[] = ["Assess", ...ARES_PHASES, "Perform"];
 
 export interface PhaseMeta {
@@ -56,9 +56,9 @@ export const PHASE_META: Record<ARESPhase, PhaseMeta> = {
   },
   Assess: {
     phase: "Assess",
-    tagline: "Clinical baseline testing",
+    tagline: "Performance baseline testing",
     description:
-      "Standardized reaction, eye-hand, color vision, stereopsis, and oculomotor assessments. Fixed protocols, clinical metrics, EMR-ready baselines.",
+      "Standardized reaction, eye-hand, color discrimination, depth, and eye-movement performance baselines. Fixed protocols, repeatable numbers, training-design inputs.",
     color: "#EAF0FF",
     portalAngle: -0.9,
   },

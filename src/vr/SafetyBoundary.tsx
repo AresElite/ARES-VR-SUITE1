@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import { useThree } from "@react-three/fiber";
 import { ARES_COLORS, ARES_ACCENTS } from "@/ares/colors";
 import { useAppStore } from "@/app/providers/appStore";
 import { drillById } from "@/drills/registry";
@@ -12,6 +14,14 @@ import { SpatialPanel, PanelButton, PanelText } from "./SpatialPanel";
  */
 export function SafetyBoundary() {
   const drillId = useAppStore((s) => s.drillId);
+  const camera = useThree((s) => s.camera);
+  const [eyeHeight, setEyeHeight] = useState<number | null>(null);
+  useEffect(() => {
+    // per-session calibration UX (prototype): capture standing eye height
+    // from the headset pose; validated IPD/vergence baselines are Phase 2
+    const t = setTimeout(() => setEyeHeight(Math.round(camera.position.y * 100) / 100), 600);
+    return () => clearTimeout(t);
+  }, [camera]);
   const seated = useAppStore((s) => s.seated);
   const level = useAppStore((s) => s.level);
   const { startDrill, selectPhase, setSeated } = useAppStore.getState();
@@ -52,6 +62,32 @@ export function SafetyBoundary() {
           size={0.032}
           color={ARES_ACCENTS.tealBright}
           maxWidth={1.42}
+          mono
+        />
+      </SpatialPanel>
+
+      {/* Session calibration (prototype UX — the screens, not the validated routine) */}
+      <SpatialPanel
+        position={[0, 2.42, -2.0]}
+        rotation={[-0.1, 0, 0]}
+        width={1.5}
+        height={0.34}
+        title="Session calibration"
+        accent={ARES_ACCENTS.purpleGlow}
+      >
+        <PanelText
+          position={[-0.68, 0.045, 0]}
+          text={`Eye height ${eyeHeight !== null ? `${eyeHeight}m captured` : "capturing..."}   •   IPD: headset-applied   •   1:1 world scale`}
+          size={0.037}
+          color={ARES_COLORS.white}
+          maxWidth={1.4}
+        />
+        <PanelText
+          position={[-0.68, -0.07, 0]}
+          text="PROTOTYPE CALIBRATION UX — validated baselines ship in the native build"
+          size={0.026}
+          color="#6B749C"
+          maxWidth={1.4}
           mono
         />
       </SpatialPanel>

@@ -13,6 +13,7 @@ import { ChaosArenaVR } from "./synchronize/ChaosArenaVR";
 import { SportTransferLabVR, sportLabVariant } from "./synchronize/SportTransferLabVR";
 import { ASSESS_DRILLS } from "./assess/AssessDrills";
 import { PERFORM_DRILLS } from "@/perform/performDrills";
+import { GazeStabilizationX1, GazeStabilizationX2 } from "./acquire/GazeStability";
 
 /**
  * Drill registry — single source of truth.
@@ -20,9 +21,11 @@ import { PERFORM_DRILLS } from "@/perform/performDrills";
  * progression structure; VR-native drills extend the system in depth.
  */
 export const ALL_DRILLS: DrillDefinition[] = [
-  // ================= ASSESS (clinical baselines) =================
+  // ================= ASSESS (baseline baselines) =================
   ...ASSESS_DRILLS,
   ...PERFORM_DRILLS,
+  GazeStabilizationX1,
+  GazeStabilizationX2,
   // ================= ACQUIRE =================
   ReactionGrid, // categorized EXECUTE, ACQUIRE in the suite — listed under Execute below
   SpeedSearch,

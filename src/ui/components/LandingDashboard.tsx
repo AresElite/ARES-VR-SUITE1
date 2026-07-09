@@ -188,7 +188,7 @@ export function LandingDashboard({ onEnterDesktop }: { onEnterDesktop: () => voi
         <p className="footer-note">
           {APP_NAME} · <b style={{ color: "var(--ares-teal-200)", fontWeight: 600 }}>{APP_VERSION}</b> ·
           A.R.E.S. Immersive Performance Engine · WebXR requires HTTPS — use the Netlify deploy URL
-          in the Meta Quest Browser. Results stored locally, EMR-sync ready.
+          in the Meta Quest Browser. PHASE 1 PROTOTYPE — design validation only. Numbers shown are non-validating; production measurement ships in the native build.
         </p>
       </div>
     </div>
