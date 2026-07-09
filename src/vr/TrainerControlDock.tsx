@@ -6,6 +6,7 @@ import { ARES_COLORS, ARES_ACCENTS } from "@/ares/colors";
 import { PHASE_META } from "@/ares/phases";
 import { useAppStore } from "@/app/providers/appStore";
 import { drillsForPhase, drillById } from "@/drills/registry";
+import { SPORT_PROFILES, sportById } from "@/sport/sportProfiles";
 import { MOCK_ATHLETES } from "@/data/mockAthletes";
 import { PERF_MODES, type PerfModeId } from "@/utils/performance";
 import { SpatialPanel, PanelButton, PanelText } from "./SpatialPanel";
@@ -58,12 +59,21 @@ export function TrainerControlDock() {
   const drillOptions = useAppStore((s) => s.drillOptions);
   const { selectDrill, setLevel, setDrillOption, setAthlete, setSeated, setPerfMode, goHome, proceedToCalibration } =
     useAppStore.getState();
+  const sport = useAppStore((s) => s.sport);
+  const { selectSport } = useAppStore.getState();
   const [offset, setOffset] = useState(0);
-  useEffect(() => setOffset(0), [phase]);
+  useEffect(() => setOffset(0), [phase, sport]);
 
   if (!phase) return null;
   const meta = PHASE_META[phase];
-  const drills = drillsForPhase(phase);
+  const profile = phase === "Sport" ? sportById(sport) : undefined;
+  const sportLevelBias = (id: string) => profile?.drills.find((d) => d.drillId === id)?.levelBias ?? 1;
+  const drills =
+    phase === "Sport"
+      ? (profile
+          ? (profile.drills.map((d) => drillById(d.drillId)).filter(Boolean) as NonNullable<ReturnType<typeof drillById>>[])
+          : [])
+      : drillsForPhase(phase);
   const maxOffset = Math.max(0, drills.length - PAGE_SIZE);
   const scroll = (d: number) => setOffset((o) => Math.max(0, Math.min(maxOffset, o + d)));
   const pageDrills = drills.slice(offset, offset + PAGE_SIZE);
@@ -95,6 +105,43 @@ export function TrainerControlDock() {
     return o.values.find((v) => v.id === cur)?.label ?? "";
   };
 
+  // Sport portal, no sport chosen yet: show the sport picker.
+  if (phase === "Sport" && !profile) {
+    return (
+      <group>
+        <SpatialPanel
+          position={[-0.88, 1.6, -1.9]}
+          rotation={[0, 0.28, 0]}
+          width={1.3}
+          height={1.5}
+          title="Sport — Choose a suite"
+          accent={meta.color}
+        >
+          {SPORT_PROFILES.map((sp, i) => (
+            <group key={sp.id}>
+              <PanelButton
+                position={[0, 0.5 - i * 0.28, 0]}
+                width={1.14}
+                height={0.13}
+                label={sp.name}
+                color={sp.color}
+                textColor={ARES_COLORS.nearBlack}
+                onClick={() => selectSport(sp.id)}
+              />
+              <PanelText
+                position={[-0.55, 0.5 - i * 0.28 - 0.095, 0]}
+                text={sp.blurb}
+                size={0.026}
+                color={ARES_COLORS.softGray}
+                maxWidth={1.12}
+              />
+            </group>
+          ))}
+        </SpatialPanel>
+      </group>
+    );
+  }
+
   return (
     <group>
       {/* Drill selection panel (paged) */}
@@ -103,21 +150,50 @@ export function TrainerControlDock() {
         rotation={[0, 0.28, 0]}
         width={1.3}
         height={1.5}
-        title={`${phase} — Drills ${drills.length > PAGE_SIZE ? `(${offset + 1}-${Math.min(offset + PAGE_SIZE, drills.length)} of ${drills.length})` : ""}`}
-        accent={meta.color}
+        title={
+          profile
+            ? `${profile.name} — Top 7`
+            : `${phase} — Drills ${drills.length > PAGE_SIZE ? `(${offset + 1}-${Math.min(offset + PAGE_SIZE, drills.length)} of ${drills.length})` : ""}`
+        }
+        accent={profile ? profile.color : meta.color}
       >
+        {profile && (
+          <PanelButton
+            position={[0.42, 0.68, 0]}
+            width={0.4}
+            height={0.085}
+            fontSize={0.03}
+            label="< SPORTS"
+            color={ARES_COLORS.graphite}
+            onClick={() => selectSport(null)}
+          />
+        )}
         {drills.length > PAGE_SIZE && <StickScroll onStep={scroll} />}
         {pageDrills.map((d, i) => (
-          <PanelButton
-            key={d.id}
-            position={[0, 0.54 - i * 0.135, 0]}
-            width={1.14}
-            height={0.115}
-            label={d.name}
-            color={d.id === drillId ? meta.color : ARES_COLORS.deepPurple}
-            textColor={d.id === drillId ? ARES_COLORS.nearBlack : ARES_COLORS.white}
-            onClick={() => selectDrill(d.id)}
-          />
+          <group key={d.id}>
+            <PanelButton
+              position={[0, 0.54 - i * (profile ? 0.145 : 0.135), 0]}
+              width={1.14}
+              height={profile ? 0.1 : 0.115}
+              fontSize={profile ? 0.032 : undefined}
+              label={d.name}
+              color={d.id === drillId ? (profile ? profile.color : meta.color) : ARES_COLORS.deepPurple}
+              textColor={d.id === drillId ? ARES_COLORS.nearBlack : ARES_COLORS.white}
+              onClick={() => {
+                selectDrill(d.id);
+                if (profile) setLevel(sportLevelBias(d.id));
+              }}
+            />
+            {profile && (
+              <PanelText
+                position={[-0.55, 0.54 - i * 0.145 - 0.062, 0]}
+                text={profile.drills.find((x) => x.drillId === d.id)?.why ?? ""}
+                size={0.022}
+                color={ARES_COLORS.softGray}
+                maxWidth={1.1}
+              />
+            )}
+          </group>
         ))}
         {drills.length > PAGE_SIZE && (
           <>

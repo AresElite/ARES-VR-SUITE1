@@ -23,6 +23,7 @@ interface AppState {
   // session setup
   athlete: Athlete;
   phase: ARESPhase | null;
+  sport: string | null;
   drillId: string | null;
   level: number;
   drillOptions: Record<string, string>;
@@ -39,6 +40,7 @@ interface AppState {
   setSeated(seated: boolean): void;
   setAthlete(a: Athlete): void;
   selectPhase(phase: ARESPhase | null): void;
+  selectSport(id: string | null): void;
   launchPrescribed(drillId: string, level: number): void;
   selectDrill(drillId: string | null): void;
   setLevel(level: number): void;
@@ -72,6 +74,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   seated: false,
   athlete: MOCK_ATHLETES[0],
   phase: null,
+  sport: null,
   drillId: null,
   level: 1,
   drillOptions: {},
@@ -88,7 +91,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   setAthlete: (athlete) => set({ athlete }),
 
   selectPhase: (phase) =>
-    set({ phase, drillId: null, level: 1, arenaMode: phase ? "setup" : "home" }),
+    set({ phase, sport: null, drillId: null, level: 1, arenaMode: phase ? "setup" : "home" }),
+
+  selectSport: (id) => set({ sport: id, drillId: null, level: 1 }),
 
   selectDrill: (drillId) => set({ drillId, level: 1, drillOptions: {} }),
 
@@ -103,7 +108,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   goHome: () => {
     get().engine?.stop();
-    set({ arenaMode: "home", phase: null, drillId: null, engine: null, snapshot: null });
+    set({ arenaMode: "home", phase: null, sport: null, drillId: null, engine: null, snapshot: null });
   },
 
   proceedToCalibration: () => {

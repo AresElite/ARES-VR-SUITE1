@@ -6,7 +6,7 @@ import { ARES_COLORS, ARES_ACCENTS } from "./colors";
  * This vocabulary is canonical across the entire suite — never replace it
  * with generic phrasing.
  */
-export type ARESPhase = "Acquire" | "Route" | "Execute" | "Synchronize" | "Assess" | "Perform";
+export type ARESPhase = "Acquire" | "Route" | "Execute" | "Synchronize" | "Assess" | "Perform" | "Sport";
 
 /** The four training phases of the Performance Loop. */
 export const ARES_PHASES: ARESPhase[] = [
@@ -17,7 +17,7 @@ export const ARES_PHASES: ARESPhase[] = [
 ];
 
 /** All portals in the arena — the Loop plus the Assess baseline suite. */
-export const ARES_ALL_PHASES: ARESPhase[] = ["Assess", ...ARES_PHASES, "Perform"];
+export const ARES_ALL_PHASES: ARESPhase[] = ["Assess", ...ARES_PHASES, "Perform", "Sport"];
 
 export interface PhaseMeta {
   phase: ARESPhase;
@@ -36,7 +36,7 @@ export const PHASE_META: Record<ARESPhase, PhaseMeta> = {
     description:
       "Target detection, peripheral awareness, contrast, glare, filtering, binocular input, visual search.",
     color: ARES_ACCENTS.tealBright,
-    portalAngle: -0.54,
+    portalAngle: -0.72,
   },
   Route: {
     phase: "Route",
@@ -44,7 +44,7 @@ export const PHASE_META: Record<ARESPhase, PhaseMeta> = {
     description:
       "Visual processing, spatial mapping, working memory, predictive recognition, central-peripheral integration, route selection.",
     color: ARES_ACCENTS.purpleGlow,
-    portalAngle: -0.18,
+    portalAngle: -0.36,
   },
   Execute: {
     phase: "Execute",
@@ -52,7 +52,7 @@ export const PHASE_META: Record<ARESPhase, PhaseMeta> = {
     description:
       "Reaction, choice reaction, motor output, bimanual coordination, inhibition, timing, speed-accuracy control.",
     color: ARES_COLORS.warningGold,
-    portalAngle: 0.18,
+    portalAngle: 0.0,
   },
   Assess: {
     phase: "Assess",
@@ -60,7 +60,7 @@ export const PHASE_META: Record<ARESPhase, PhaseMeta> = {
     description:
       "Standardized reaction, eye-hand, color discrimination, depth, and eye-movement performance baselines. Fixed protocols, repeatable numbers, training-design inputs.",
     color: "#EAF0FF",
-    portalAngle: -0.9,
+    portalAngle: -1.08,
   },
   Perform: {
     phase: "Perform",
@@ -68,7 +68,15 @@ export const PHASE_META: Record<ARESPhase, PhaseMeta> = {
     description:
       "The measured track ladder: beat-mapped choreography where notes arrive on the musical beat. Timing precision, hand coordination, and flow under rising demand.",
     color: "#F472B6",
-    portalAngle: 0.9,
+    portalAngle: 0.72,
+  },
+  Sport: {
+    phase: "Sport",
+    tagline: "Sport-specific training suites",
+    description:
+      "Curated top-7 drill suites per sport — Soccer, Volleyball, Hockey, Auto Racing — each tuned to the visual-cognitive skills that sport lives on.",
+    color: "#22C55E",
+    portalAngle: 1.08,
   },
   Synchronize: {
     phase: "Synchronize",
@@ -76,6 +84,6 @@ export const PHASE_META: Record<ARESPhase, PhaseMeta> = {
     description:
       "Integration under load, fatigue, rhythm, chaos, sport-specific transfer, decision stability.",
     color: ARES_COLORS.errorRed,
-    portalAngle: 0.54,
+    portalAngle: 0.36,
   },
 };

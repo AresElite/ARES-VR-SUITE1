@@ -43,6 +43,7 @@ export function computePhaseAQ(phase: ARESPhase, m: SessionMetrics): number {
     Synchronize: { acc: 0.35, lat: 0.2, con: 0.25, fat: 0.2 },
     Assess: { acc: 0.6, lat: 0.25, con: 0.15, fat: 0 },
     Perform: { acc: 0.35, lat: 0.1, con: 0.4, fat: 0.15 },
+    Sport: { acc: 0.4, lat: 0.3, con: 0.2, fat: 0.1 },
   };
   const w = weights[phase];
 

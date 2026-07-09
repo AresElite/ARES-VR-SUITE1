@@ -125,7 +125,7 @@ export function LandingDashboard({ onEnterDesktop }: { onEnterDesktop: () => voi
 
         <p className="ares-section-title">The A.R.E.S. Performance Loop</p>
         <div className="ares-grid">
-          {ARES_ALL_PHASES.map((p) => {
+          {ARES_ALL_PHASES.filter((p) => p !== "Sport").map((p) => {
             const meta = PHASE_META[p];
             const drills = drillsForPhase(p);
             return (
@@ -145,7 +145,7 @@ export function LandingDashboard({ onEnterDesktop }: { onEnterDesktop: () => voi
 
         <p className="ares-section-title">Drill library</p>
         <div className="ares-grid">
-          {ARES_ALL_PHASES.map((p) => {
+          {ARES_ALL_PHASES.filter((p) => p !== "Sport").map((p) => {
             const meta = PHASE_META[p];
             return (
               <div className="ares-card" key={`lib-${p}`}>
