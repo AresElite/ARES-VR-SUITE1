@@ -160,35 +160,45 @@ export function TrainerControlDock() {
           title="Sport — Choose a suite"
           accent={meta.color}
         >
-          <PanelButton
-            position={[0.42, 0.68, 0]}
-            width={0.44}
-            height={0.085}
-            fontSize={0.028}
-            label="< TRAINING"
-            color={ARES_COLORS.graphite}
-            onClick={() => selectGroup("training")}
-          />
           {SPORT_PROFILES.map((sp, i) => (
             <group key={sp.id}>
               <PanelButton
-                position={[0, 0.5 - i * 0.28, 0]}
+                position={[0, 0.54 - i * 0.26, 0]}
                 width={1.14}
-                height={0.13}
+                height={0.12}
                 label={sp.name}
                 color={sp.color}
                 textColor={ARES_COLORS.nearBlack}
                 onClick={() => selectSport(sp.id)}
               />
               <PanelText
-                position={[-0.55, 0.5 - i * 0.28 - 0.095, 0]}
+                position={[-0.55, 0.54 - i * 0.26 - 0.088, 0]}
                 text={sp.blurb}
-                size={0.026}
+                size={0.025}
                 color={ARES_COLORS.softGray}
                 maxWidth={1.12}
               />
             </group>
           ))}
+          {/* bottom navigation row — back to Training, exit to Arena */}
+          <PanelButton
+            position={[-0.3, -0.62, 0]}
+            width={0.52}
+            height={0.11}
+            fontSize={0.034}
+            label="< TRAINING"
+            color={ARES_COLORS.deepPurple}
+            onClick={() => selectGroup("training")}
+          />
+          <PanelButton
+            position={[0.3, -0.62, 0]}
+            width={0.52}
+            height={0.11}
+            fontSize={0.034}
+            label="EXIT TO ARENA"
+            color={ARES_COLORS.graphite}
+            onClick={goHome}
+          />
         </SpatialPanel>
       </group>
     );
