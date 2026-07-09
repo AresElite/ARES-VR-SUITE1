@@ -3,7 +3,7 @@ import { useFrame } from "@react-three/fiber";
 import { Text, useTexture } from "@react-three/drei";
 import * as THREE from "three";
 import { ARES_COLORS } from "@/ares/colors";
-import { ARES_PHASES, ARES_ALL_PHASES, PHASE_META, type ARESPhase } from "@/ares/phases";
+import { ARES_PHASES, PHASE_META, ARENA_GROUPS, type ArenaGroup } from "@/ares/phases";
 import { APP_NAME, APP_VERSION } from "@/ares/constants";
 import { useAppStore } from "@/app/providers/appStore";
 import { SpatialPanel, PanelText } from "./SpatialPanel";
@@ -70,9 +70,9 @@ function FloatingPerformanceLoop() {
   );
 }
 
-function PhasePortal({ phase }: { phase: ARESPhase }) {
-  const meta = PHASE_META[phase];
-  const selectPhase = useAppStore((s) => s.selectPhase);
+function GroupPortal({ group }: { group: ArenaGroup }) {
+  const meta = group;
+  const selectGroup = useAppStore((s) => s.selectGroup);
   const [hover, setHover] = useState(false);
   const ring = useRef<THREE.Mesh>(null);
   const outer = useRef<THREE.Group>(null);
@@ -103,7 +103,7 @@ function PhasePortal({ phase }: { phase: ARESPhase }) {
         onClick={(e) => {
           e.stopPropagation();
           sfx.portal();
-          selectPhase(phase);
+          selectGroup(group.id);
         }}
         onPointerOver={(e) => {
           e.stopPropagation();
@@ -138,7 +138,7 @@ function PhasePortal({ phase }: { phase: ARESPhase }) {
         anchorY="middle"
         letterSpacing={0.12}
       >
-        {phase.toUpperCase()}
+        {group.label.toUpperCase()}
       </Text>
       <Text
         position={[0, -0.14, 0.01]}
@@ -199,8 +199,8 @@ export function VRPerformanceArena() {
     <group>
       <FloatingPerformanceLoop />
       <TodaysPlanPanel />
-      {ARES_ALL_PHASES.map((p) => (
-        <PhasePortal key={p} phase={p} />
+      {ARENA_GROUPS.map((g) => (
+        <GroupPortal key={g.id} group={g} />
       ))}
 
       {/* welcome / status panel below the loop */}
@@ -221,7 +221,7 @@ export function VRPerformanceArena() {
         />
         <PanelText
           position={[-0.6, -0.09, 0]}
-          text="Select a phase portal to begin. Acquire. Route. Execute. Synchronize."
+          text="Choose a portal: Assess, A.R.E.S. Training, or Perform."
           size={0.042}
           maxWidth={1.25}
         />

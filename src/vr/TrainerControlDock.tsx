@@ -7,6 +7,7 @@ import { PHASE_META } from "@/ares/phases";
 import { useAppStore } from "@/app/providers/appStore";
 import { drillsForPhase, drillById } from "@/drills/registry";
 import { SPORT_PROFILES, sportById } from "@/sport/sportProfiles";
+import { TRAINING_PHASES, PHASE_META as PM } from "@/ares/phases";
 import { MOCK_ATHLETES } from "@/data/mockAthletes";
 import { PERF_MODES, type PerfModeId } from "@/utils/performance";
 import { SpatialPanel, PanelButton, PanelText } from "./SpatialPanel";
@@ -60,9 +61,51 @@ export function TrainerControlDock() {
   const { selectDrill, setLevel, setDrillOption, setAthlete, setSeated, setPerfMode, goHome, proceedToCalibration } =
     useAppStore.getState();
   const sport = useAppStore((s) => s.sport);
-  const { selectSport } = useAppStore.getState();
+  const group = useAppStore((s) => s.group);
+  const { selectSport, selectGroup, selectPhase } = useAppStore.getState();
   const [offset, setOffset] = useState(0);
   useEffect(() => setOffset(0), [phase, sport]);
+
+  // A.R.E.S. Training sub-menu — the four Loop phases plus Sport
+  if (group === "training" && !phase) {
+    const TRAIN = [
+      ...TRAINING_PHASES.map((tp) => ({ id: tp, label: tp, color: PM[tp].color, tag: PM[tp].tagline, onClick: () => selectPhase(tp) })),
+      { id: "Sport", label: "Sport", color: "#22C55E", tag: "Sport-specific suites", onClick: () => selectPhase("Sport" as never) },
+    ];
+    return (
+      <group>
+        <SpatialPanel
+          position={[-0.88, 1.6, -1.9]}
+          rotation={[0, 0.28, 0]}
+          width={1.3}
+          height={1.5}
+          title="A.R.E.S. Training"
+          accent="#8B5CF6"
+        >
+          {TRAIN.map((tp, i) => (
+            <group key={tp.id}>
+              <PanelButton
+                position={[0, 0.52 - i * 0.235, 0]}
+                width={1.14}
+                height={0.12}
+                label={tp.label}
+                color={tp.color}
+                textColor={ARES_COLORS.nearBlack}
+                onClick={tp.onClick}
+              />
+              <PanelText
+                position={[-0.55, 0.52 - i * 0.235 - 0.088, 0]}
+                text={tp.tag}
+                size={0.024}
+                color={ARES_COLORS.softGray}
+                maxWidth={1.12}
+              />
+            </group>
+          ))}
+        </SpatialPanel>
+      </group>
+    );
+  }
 
   if (!phase) return null;
   const meta = PHASE_META[phase];
@@ -117,6 +160,15 @@ export function TrainerControlDock() {
           title="Sport — Choose a suite"
           accent={meta.color}
         >
+          <PanelButton
+            position={[0.42, 0.68, 0]}
+            width={0.44}
+            height={0.085}
+            fontSize={0.028}
+            label="< TRAINING"
+            color={ARES_COLORS.graphite}
+            onClick={() => selectGroup("training")}
+          />
           {SPORT_PROFILES.map((sp, i) => (
             <group key={sp.id}>
               <PanelButton
@@ -157,7 +209,7 @@ export function TrainerControlDock() {
         }
         accent={profile ? profile.color : meta.color}
       >
-        {profile && (
+        {profile ? (
           <PanelButton
             position={[0.42, 0.68, 0]}
             width={0.4}
@@ -167,7 +219,17 @@ export function TrainerControlDock() {
             color={ARES_COLORS.graphite}
             onClick={() => selectSport(null)}
           />
-        )}
+        ) : group === "training" ? (
+          <PanelButton
+            position={[0.4, 0.68, 0]}
+            width={0.44}
+            height={0.085}
+            fontSize={0.028}
+            label="< TRAINING"
+            color={ARES_COLORS.graphite}
+            onClick={() => selectGroup("training")}
+          />
+        ) : null}
         {drills.length > PAGE_SIZE && <StickScroll onStep={scroll} />}
         {pageDrills.map((d, i) => (
           <group key={d.id}>

@@ -5,6 +5,7 @@ import { MOCK_ATHLETES } from "@/data/mockAthletes";
 import { loadSessions, saveSession } from "@/data/sessionStore";
 import { syncSessionToEMR } from "@/data/api";
 import { drillById } from "@/drills/registry";
+import { groupForPhase as groupForPhaseLocal } from "@/ares/phases";
 import { createDrillSession } from "@/drills/shared/DrillSession";
 import { buildSessionResult, type FinishedDrill } from "@/drills/shared/DrillResult";
 import { levelFor } from "@/drills/shared/ProgressionEngine";
@@ -22,6 +23,7 @@ interface AppState {
   seated: boolean;
   // session setup
   athlete: Athlete;
+  group: import("@/ares/phases").ArenaGroupId | null;
   phase: ARESPhase | null;
   sport: string | null;
   drillId: string | null;
@@ -39,6 +41,7 @@ interface AppState {
   setPerfMode(id: PerfModeId): void;
   setSeated(seated: boolean): void;
   setAthlete(a: Athlete): void;
+  selectGroup(id: import("@/ares/phases").ArenaGroupId | null): void;
   selectPhase(phase: ARESPhase | null): void;
   selectSport(id: string | null): void;
   launchPrescribed(drillId: string, level: number): void;
@@ -73,6 +76,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   perfModeId: defaultPerfMode(),
   seated: false,
   athlete: MOCK_ATHLETES[0],
+  group: null,
   phase: null,
   sport: null,
   drillId: null,
@@ -90,8 +94,22 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSeated: (seated) => set({ seated }),
   setAthlete: (athlete) => set({ athlete }),
 
+  selectGroup: (id) => {
+    if (id === "assess") set({ group: id, phase: "Assess", sport: null, drillId: null, level: 1, arenaMode: "setup" });
+    else if (id === "perform") set({ group: id, phase: "Perform", sport: null, drillId: null, level: 1, arenaMode: "setup" });
+    else if (id === "training") set({ group: id, phase: null, sport: null, drillId: null, level: 1, arenaMode: "setup" });
+    else set({ group: null, phase: null, sport: null, drillId: null, arenaMode: "home" });
+  },
+
   selectPhase: (phase) =>
-    set({ phase, sport: null, drillId: null, level: 1, arenaMode: phase ? "setup" : "home" }),
+    set({
+      phase,
+      group: phase ? groupForPhaseLocal(phase) : null,
+      sport: null,
+      drillId: null,
+      level: 1,
+      arenaMode: phase ? "setup" : "home",
+    }),
 
   selectSport: (id) => set({ sport: id, drillId: null, level: 1 }),
 
@@ -100,7 +118,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   launchPrescribed: (drillId, level) => {
     const def = drillById(drillId);
     if (!def) return;
-    set({ phase: def.phase, drillId, level, drillOptions: {}, arenaMode: "calibration" });
+    set({ phase: def.phase, group: groupForPhaseLocal(def.phase), drillId, level, drillOptions: {}, arenaMode: "calibration" });
   },
   setLevel: (level) => set({ level }),
   setDrillOption: (id, value) =>
@@ -108,7 +126,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   goHome: () => {
     get().engine?.stop();
-    set({ arenaMode: "home", phase: null, sport: null, drillId: null, engine: null, snapshot: null });
+    set({ arenaMode: "home", group: null, phase: null, sport: null, drillId: null, engine: null, snapshot: null });
   },
 
   proceedToCalibration: () => {

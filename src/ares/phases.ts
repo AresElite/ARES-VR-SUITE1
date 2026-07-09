@@ -87,3 +87,34 @@ export const PHASE_META: Record<ARESPhase, PhaseMeta> = {
     portalAngle: 0.36,
   },
 };
+
+
+/**
+ * TOP-LEVEL ARENA GROUPS — the three portals the athlete sees first.
+ * Assess (baseline), A.R.E.S. Training (the Loop phases + Sport), Perform.
+ * Phases still drive drill lists; groups are the front-door hierarchy.
+ */
+export type ArenaGroupId = "assess" | "training" | "perform";
+
+export interface ArenaGroup {
+  id: ArenaGroupId;
+  label: string;
+  tagline: string;
+  color: string;
+  portalAngle: number;
+}
+
+export const ARENA_GROUPS: ArenaGroup[] = [
+  { id: "assess", label: "Assess", tagline: "Performance baseline testing", color: "#EAF0FF", portalAngle: -0.52 },
+  { id: "training", label: "A.R.E.S. Training", tagline: "Acquire · Route · Execute · Synchronize · Sport", color: "#8B5CF6", portalAngle: 0 },
+  { id: "perform", label: "Perform", tagline: "Beat-locked flow training", color: "#F472B6", portalAngle: 0.52 },
+];
+
+/** the four Performance-Loop training phases (live inside A.R.E.S. Training) */
+export const TRAINING_PHASES: ARESPhase[] = ["Acquire", "Route", "Execute", "Synchronize"];
+
+export function groupForPhase(phase: ARESPhase): ArenaGroupId {
+  if (phase === "Assess") return "assess";
+  if (phase === "Perform") return "perform";
+  return "training"; // Acquire/Route/Execute/Synchronize/Sport
+}
