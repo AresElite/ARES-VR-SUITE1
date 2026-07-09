@@ -67,6 +67,25 @@ export function buildSessionResult(
     }
   }
 
+  // coincidence-anticipation timing: signed error vs the fixed arrival
+  if (def.anticipation) {
+    const errs = events
+      .filter((e) => e.reactionMs !== undefined && e.errorType !== "correctRejection")
+      .map((e) => e.reactionMs! - def.anticipation!.arriveMs);
+    if (errs.length) {
+      const mean = errs.reduce((a, b) => a + b, 0) / errs.length;
+      const absMean = errs.reduce((a, b) => a + Math.abs(b), 0) / errs.length;
+      const sd = Math.sqrt(errs.reduce((a, b) => a + (b - mean) ** 2, 0) / errs.length);
+      metrics.catBiasMs = Math.round(mean);
+      metrics.catAbsErrorMs = Math.round(absMean);
+      metrics.catVariabilityMs = Math.round(sd);
+      notes.push(
+        `Coincidence-anticipation: ${mean >= 0 ? "+" : ""}${Math.round(mean)}ms bias (${mean > 25 ? "late" : mean < -25 ? "early" : "on-time"}), ±${Math.round(sd)}ms variability over ${errs.length} contacts.`,
+        "PROTOTYPE (design validation) — non-validating timing.",
+      );
+    }
+  }
+
   // stopwatch protocols: completion time = GO to the final resolved target
   if (def.stopwatch) {
     const scored = events.filter((e) => e.errorType !== "correctRejection");

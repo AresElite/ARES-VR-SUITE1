@@ -51,6 +51,16 @@ export interface SessionMetrics {
   avgAbsTimingMs?: number;
   /** stopwatch protocols (DEM): GO-to-final-answer completion time */
   completionTimeMs?: number;
+  /** coincidence-anticipation: signed timing error (bias), + = late/- = early */
+  catBiasMs?: number;
+  /** coincidence-anticipation: mean absolute timing error */
+  catAbsErrorMs?: number;
+  /** coincidence-anticipation: SD of signed error (consistency of timing) */
+  catVariabilityMs?: number;
+  /** dynamic visual acuity: highest target angular velocity still identified (deg/s) */
+  dvaThresholdDegS?: number;
+  /** useful field of view: shortest exposure with correct peripheral localization (ms) */
+  ufovThresholdMs?: number;
 }
 
 export interface AQBlock {

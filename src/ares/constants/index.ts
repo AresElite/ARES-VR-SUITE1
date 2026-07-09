@@ -7,7 +7,7 @@ export const ORG_NAME = "Ares Elite Sports Vision";
  * Version stamp — visible in the site footer and the VR arena so anyone can
  * instantly tell which build is live. Bump on every deploy.
  */
-export const APP_VERSION = "v0.23.1 — Assess adds Go/No Go, Flanker, Sternberg baselines";
+export const APP_VERSION = "v0.24.0 — Tier-1 baselines: anticipation timing, dynamic acuity, UFOV";
 
 /** Spatial UI distances (meters) — panels live 1.5–2.5m from the athlete. */
 export const PANEL_NEAR = 1.6;

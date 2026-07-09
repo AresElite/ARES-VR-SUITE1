@@ -143,6 +143,9 @@ export interface DrillDefinition {
   /** hand-color rules matter: strike orbs render purple(R)/teal(L); when
       absent the hands stay neutral so target colors are unambiguous */
   handIdentity?: boolean;
+  /** coincidence-anticipation protocol: signed timing error scored against a
+      fixed arrival time (reactionMs - arriveMs); + = late, - = early */
+  anticipation?: { arriveMs: number };
   /** timed completion protocol (DEM): HUD shows a stopwatch counting UP,
       and the clock stops the instant the final target is resolved */
   stopwatch?: boolean;
