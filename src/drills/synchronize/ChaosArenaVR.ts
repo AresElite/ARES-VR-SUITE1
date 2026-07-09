@@ -1,5 +1,5 @@
 import type { DrillDefinition, TrialSpec } from "@/ares/drillTypes";
-import { levels25, lerp25, ilerp25 } from "../shared/levels";
+import { levels25, lerp25, ilerp25, levels50, lerp50, ilerp50 } from "../shared/levels";
 import { buildPeripheralTrials } from "../acquire/PeripheralFieldVR";
 import { buildReactionTrials } from "../execute/ReactionStrikeVR";
 import { buildDepthSliceTrials } from "../execute/DepthSliceVR";
@@ -41,27 +41,27 @@ export function buildChaosTrials(p: Params, rng: () => number): TrialSpec[] {
   return streams.flat().sort((a, b) => a.spawnAt - b.spawnAt);
 }
 
-const levels = levels25((i) => ({
-  label: `${i < 8 ? "dual" : "triple"} stream${i >= 13 ? `, ${ilerp25(95, 125, i)} BPM` : ""}`,
+const levels = levels50((i) => ({
+  label: `${i < 16 ? "dual" : "triple"} stream${i >= 26 ? `, ${ilerp25(95, 125, (i * 24) / 49)} BPM` : ""}`,
   parameters: {
     durationScale: 1,
     peripheral: {
-      trialCount: ilerp25(12, 18, i), eccentricityDeg: lerp25(22, 38, i),
-      targetDurationMs: ilerp25(1500, 950, i), isiMinMs: ilerp25(1400, 1100, i), isiMaxMs: ilerp25(2400, 2000, i),
-      distractorRatio: lerp25(0.1, 0.35, i), fixationLoad: i >= 9, contrast: lerp25(1, 0.5, i),
+      trialCount: ilerp25(12, 18, (i * 24) / 49), eccentricityDeg: lerp25(22, 38, (i * 24) / 49),
+      targetDurationMs: ilerp25(1500, 950, (i * 24) / 49), isiMinMs: ilerp25(1400, 1100, (i * 24) / 49), isiMaxMs: ilerp25(2400, 2000, (i * 24) / 49),
+      distractorRatio: lerp25(0.1, 0.35, (i * 24) / 49), fixationLoad: i >= 18, contrast: lerp25(1, 0.5, (i * 24) / 49),
     },
     reaction: {
-      trialCount: ilerp25(12, 18, i), targetDurationMs: ilerp25(1400, 900, i),
-      isiMinMs: ilerp25(1400, 1100, i), isiMaxMs: ilerp25(2400, 2000, i),
-      noGoRatio: lerp25(0.15, 0.3, i), handRuleRatio: lerp25(0, 0.7, i), spreadDeg: lerp25(12, 24, i),
+      trialCount: ilerp25(12, 18, (i * 24) / 49), targetDurationMs: ilerp25(1400, 900, (i * 24) / 49),
+      isiMinMs: ilerp25(1400, 1100, (i * 24) / 49), isiMaxMs: ilerp25(2400, 2000, (i * 24) / 49),
+      noGoRatio: lerp25(0.15, 0.3, (i * 24) / 49), handRuleRatio: lerp25(0, 0.7, (i * 24) / 49), spreadDeg: lerp25(12, 24, (i * 24) / 49),
     },
-    ...(i >= 8
+    ...(i >= 16
       ? {
           depth: {
-            trialCount: ilerp25(8, 14, i), approachSpeed: lerp25(2.6, 3.4, i), spawnDepth: 8,
+            trialCount: ilerp25(8, 14, (i * 24) / 49), approachSpeed: lerp25(2.6, 3.4, (i * 24) / 49), spawnDepth: 8,
             handRules: i < 13 ? ["either"] : ["left", "right", "both"],
-            directionRatio: lerp25(0, 0.5, i), crossMidlineRatio: lerp25(0, 0.35, i),
-            ...(i >= 13 ? { bpm: ilerp25(95, 125, i) } : {}), isiMs: ilerp25(3200, 2400, i),
+            directionRatio: lerp25(0, 0.5, (i * 24) / 49), crossMidlineRatio: lerp25(0, 0.35, (i * 24) / 49),
+            ...(i >= 26 ? { bpm: ilerp25(95, 125, (i * 24) / 49) } : {}), isiMs: ilerp25(3200, 2400, (i * 24) / 49),
           },
         }
       : {}),

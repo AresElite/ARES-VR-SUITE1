@@ -2,7 +2,7 @@ import type { DrillDefinition, SportId, TrialSpec } from "@/ares/drillTypes";
 import { ARES_COLORS, ARES_ACCENTS } from "@/ares/colors";
 import { pick } from "@/utils/rng";
 import { EYE_Y, strikePosition } from "../shared/zones";
-import { levels25, lerp25, ilerp25 } from "../shared/levels";
+import { levels25, lerp25, ilerp25, levels50, lerp50, ilerp50 } from "../shared/levels";
 
 /**
  * SYNCHRONIZE — Sport-Transfer Reality Labs
@@ -199,17 +199,17 @@ export function buildSportTrials(p: Params, rng: () => number): TrialSpec[] {
   return trials.sort((a, b) => a.spawnAt - b.spawnAt);
 }
 
-const levels = levels25((i) => ({
-  label: `${lerp25(0.8, 1.45, i).toFixed(2)}x game speed, ${ilerp25(3, 9, i)} peripheral cues`,
+const levels = levels50((i) => ({
+  label: `${lerp25(0.8, 1.45, (i * 24) / 49).toFixed(2)}x game speed, ${ilerp25(3, 9, (i * 24) / 49)} peripheral cues`,
   parameters: {
     sport: "baseball",
-    primaryCount: ilerp25(12, 20, i),
-    noGoRatio: lerp25(0.25, 0.45, i),
-    peripheralCount: ilerp25(3, 9, i),
-    peripheralEccentricityDeg: lerp25(24, 38, i),
-    peripheralDurationMs: ilerp25(1500, 900, i),
-    isiMs: ilerp25(2600, 1600, i),
-    speedScale: lerp25(0.8, 1.45, i),
+    primaryCount: ilerp25(12, 20, (i * 24) / 49),
+    noGoRatio: lerp25(0.25, 0.45, (i * 24) / 49),
+    peripheralCount: ilerp25(3, 9, (i * 24) / 49),
+    peripheralEccentricityDeg: lerp25(24, 38, (i * 24) / 49),
+    peripheralDurationMs: ilerp25(1500, 900, (i * 24) / 49),
+    isiMs: ilerp25(2600, 1600, (i * 24) / 49),
+    speedScale: lerp25(0.8, 1.45, (i * 24) / 49),
   },
 }));
 

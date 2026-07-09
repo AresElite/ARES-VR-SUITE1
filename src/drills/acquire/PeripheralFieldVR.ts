@@ -2,7 +2,7 @@ import type { DrillDefinition, TrialSpec, TargetZone } from "@/ares/drillTypes";
 import { ARES_COLORS, ARES_ACCENTS } from "@/ares/colors";
 import { pick } from "@/utils/rng";
 import { PERIPHERAL_ZONES, strikePosition } from "../shared/zones";
-import { levels25, lerp25, ilerp25 } from "../shared/levels";
+import { levels25, lerp25, ilerp25, levels50, lerp50, ilerp50 } from "../shared/levels";
 
 /**
  * ACQUIRE — Peripheral Field VR
@@ -69,17 +69,17 @@ export function buildPeripheralTrials(p: Params, rng: () => number, idPrefix = "
   return trials;
 }
 
-const levels = levels25((i) => ({
-  label: `${ilerp25(15, 42, i)}° field, ${ilerp25(100, 40, i)}% contrast`,
+const levels = levels50((i) => ({
+  label: `${ilerp50(15, 46, i)}° field, ${ilerp50(100, 35, i)}% contrast`,
   parameters: {
-    trialCount: ilerp25(16, 28, i),
-    eccentricityDeg: lerp25(15, 42, i),
-    targetDurationMs: ilerp25(1650, 800, i),
-    isiMinMs: ilerp25(700, 400, i),
-    isiMaxMs: ilerp25(1400, 850, i),
-    distractorRatio: lerp25(0, 0.45, i),
-    fixationLoad: i >= 9,
-    contrast: lerp25(1, 0.4, i),
+    trialCount: ilerp50(16, 30, i),
+    eccentricityDeg: lerp50(15, 46, i),
+    targetDurationMs: ilerp50(1650, 750, i),
+    isiMinMs: ilerp50(700, 380, i),
+    isiMaxMs: ilerp50(1400, 800, i),
+    distractorRatio: lerp50(0, 0.5, i),
+    fixationLoad: i >= 18,
+    contrast: lerp50(1, 0.35, i),
   },
 }));
 

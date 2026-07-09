@@ -1,7 +1,7 @@
 import type { DrillDefinition, TrialSpec, TargetZone } from "@/ares/drillTypes";
 import { pick } from "@/utils/rng";
 import { strikePosition, PERIPHERAL_ZONES } from "../shared/zones";
-import { levels25, lerp25, ilerp25 } from "../shared/levels";
+import { levels25, lerp25, ilerp25, levels50, lerp50, ilerp50 } from "../shared/levels";
 
 /**
  * ACQUIRE — direct ports of the A.R.E.S. Performance Suite drills.
@@ -35,13 +35,13 @@ export const SpeedSearch: DrillDefinition = {
     "4. Striking any decoy counts against you. Higher levels: smaller shapes, wider field.",
   ],
   controlsHint: "FIND THE TRIANGLE - STRIKE IT FAST",
-  levels: levels25((i) => ({
-    label: `field of ${6 + Math.floor(i / 3)} — ${Math.round(lerp25(60, 20, i))}px`,
+  levels: levels50((i) => ({
+    label: `field of ${6 + Math.floor(i / 6)} — ${Math.round(lerp50(60, 18, i))}px`,
     parameters: {
-      searches: 10, fieldSize: 6 + Math.floor(i / 3),
-      exposureMs: ilerp25(3000, 1400, i), gapMs: 1000,
-      scale: Math.max(0.042, lerp25(60, 20, i) * 0.0011),
-      spreadDeg: lerp25(12, 36, i),
+      searches: 10, fieldSize: 6 + Math.floor(i / 6),
+      exposureMs: ilerp50(3000, 1250, i), gapMs: 1000,
+      scale: Math.max(0.042, lerp50(60, 18, i) * 0.0011),
+      spreadDeg: lerp50(12, 40, i),
     },
   })),
   buildTrials: (params, rng) => {
@@ -132,12 +132,12 @@ export const SchulteTable: DrillDefinition = {
     "5. Complete every grid to finish the session.",
   ],
   controlsHint: "EYES CENTER - STRIKE 1..N IN ORDER",
-  levels: levels25((i) => {
-    const size = i < 8 ? 3 : i < 14 ? 4 : i < 20 ? 5 : i < 23 ? 6 : 7;
+  levels: levels50((i) => {
+    const size = i < 14 ? 3 : i < 26 ? 4 : i < 38 ? 5 : i < 46 ? 6 : 7;
     const band = size === 3 ? "Beginner" : size === 4 ? "Intermediate" : size === 5 ? "Advanced" : size === 6 ? "Elite" : "Master";
     return {
       label: `${size}×${size} ${band}`,
-      parameters: { gridSize: size, grids: size <= 4 ? 5 : 3, cellSeconds: Math.max(1.5, 2.5 - i * 0.04) },
+      parameters: { gridSize: size, grids: size <= 4 ? 5 : 3, cellSeconds: Math.max(1.35, 2.5 - i * 0.023) },
     };
   }),
   buildTrials: (params, rng) => {
@@ -206,9 +206,9 @@ export const ContrastAssessment: DrillDefinition = {
     "4. Do not guess - be as precise as possible. About 25 trials.",
   ],
   controlsHint: "STRIKE THROUGH THE RING TOWARD THE GAP",
-  levels: levels25((i) => ({
-    label: `${Math.round(lerp25(92, 10, i))}% contrast`,
-    parameters: { trials: 25, contrast: lerp25(0.92, 0.1, i), showMs: ilerp25(2300, 1300, i) },
+  levels: levels50((i) => ({
+    label: `${Math.round(lerp50(92, 7, i))}% contrast`,
+    parameters: { trials: 25, contrast: lerp50(0.92, 0.07, i), showMs: ilerp50(2300, 1200, i) },
   })),
   buildTrials: (params, rng) => {
     const p = params as { trials: number; contrast: number; showMs: number };
@@ -264,9 +264,9 @@ export const RapidRecognition: DrillDefinition = {
     "4. Strike the ring that held the MATCH after the characters vanish.",
   ],
   controlsHint: "READ FAST - STRIKE THE RING THAT HELD THE MATCH",
-  levels: levels25((i) => ({
-    label: `${3 + Math.floor(i / 7)} rings — ${ilerp25(750, 260, i)}ms flash`,
-    parameters: { trials: 12, rings: 3 + Math.floor(i / 7), flashMs: ilerp25(750, 260, i), answerMs: ilerp25(2400, 1500, i) },
+  levels: levels50((i) => ({
+    label: `${Math.min(6, 3 + Math.floor(i / 12))} rings — ${ilerp50(750, 220, i)}ms flash`,
+    parameters: { trials: 12, rings: Math.min(6, 3 + Math.floor(i / 12)), flashMs: ilerp50(750, 220, i), answerMs: ilerp50(2400, 1400, i) },
   })),
   buildTrials: (params, rng) => {
     const p = params as { trials: number; rings: number; flashMs: number; answerMs: number };
