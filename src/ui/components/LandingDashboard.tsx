@@ -78,6 +78,14 @@ export function LandingDashboard({ onEnterDesktop }: { onEnterDesktop: () => voi
                 </option>
               ))}
             </select>
+            <p style={{ marginTop: 10, fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: "0.08em" }}>
+              {athlete.externalProfileId
+                ? <>CONNECTED PROFILE: <b style={{ color: "var(--ares-teal-200)" }}>{athlete.externalProfileId}</b></>
+                : <span style={{ color: "var(--ares-dim)" }}>No linked profile — anonymous session</span>}
+            </p>
+            <p style={{ marginTop: 4, fontSize: 11, color: "var(--ares-dim)" }}>
+              Session metrics route to this profile in Phase 2 (validated build). Prototype does not transmit.
+            </p>
           </div>
           <div className="ares-card">
             <h3 style={{ color: "var(--ares-teal-bright)" }}>Performance mode</h3>

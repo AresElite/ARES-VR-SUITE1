@@ -432,3 +432,58 @@ label.ares-label {
   font-size: 12px;
   letter-spacing: 0.06em;
 }
+
+/* ================= PIN GATE ================= */
+.pin-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(1200px 700px at 50% -10%, rgba(139, 92, 246, 0.14), transparent 60%),
+    var(--ares-bg);
+  z-index: 50;
+}
+.pin-card {
+  width: 340px;
+  max-width: 90vw;
+  text-align: center;
+  padding: 34px 30px 24px;
+  border: 1px solid rgba(45, 35, 79, 0.6);
+  border-radius: var(--r-2xl);
+  background: rgba(17, 20, 40, 0.72);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+}
+.pin-logo { width: 54px; height: 54px; object-fit: contain; filter: drop-shadow(var(--glow-purple-strong)); }
+.pin-kicker {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--ares-teal);
+  margin: 12px 0 2px;
+}
+.pin-title { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; margin: 4px 0 4px; color: var(--ares-white); }
+.pin-sub { color: var(--ares-muted); font-size: 13px; margin: 0 0 18px; }
+.pin-dots { display: flex; gap: 14px; justify-content: center; margin: 6px 0 8px; }
+.pin-dots.err .pin-dot { border-color: var(--danger); }
+.pin-dot { width: 14px; height: 14px; border-radius: var(--r-full); border: 2px solid var(--ares-indigo); transition: all 0.2s var(--ease); }
+.pin-dot.on { background: var(--ares-purple); border-color: var(--ares-purple); box-shadow: var(--glow-purple); }
+.pin-err { color: var(--danger); font-size: 12px; margin: 4px 0 0; }
+.pin-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 18px 0 14px; }
+.pin-key {
+  height: 60px;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--ares-indigo);
+  background: var(--ares-panel);
+  color: var(--ares-white);
+  font-size: 22px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+}
+.pin-key:hover { background: rgba(139, 92, 246, 0.18); border-color: var(--ares-purple); }
+.pin-key-ghost { font-size: 13px; color: var(--ares-muted); }
+.pin-note { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.1em; color: var(--ares-dim); margin: 6px 0 0; }

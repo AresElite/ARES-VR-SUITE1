@@ -76,3 +76,20 @@ export function drillById(id: string): DrillDefinition | undefined {
 }
 
 export const MVP_DRILLS = ALL_DRILLS.filter((d) => d.mvp);
+
+/**
+ * Stroboscopic occlusion is offered on drills with meaningful MOTION or
+ * prediction — where seeing only glimpses actually trains anticipation.
+ */
+const STROBE_IDS = new Set<string>([
+  "reaction-grid", "eye-hand-coordination", "raw-reaction", "choice-rt",
+  "go-no-go", "stop-signal", "focus-frenzy", "depth-slice",
+  "mot", "predictive-pathway",
+  "occlusion", "neural-collider", "pursuit-pulse", "cognitive-crossfire",
+  "chaos-arena", "sport-transfer",
+  "assess-cat", "assess-gm-raw-rt", "assess-gm-choice-rt",
+  ...Array.from({ length: 10 }, (_, i) => PERFORM_DRILLS[i]?.id).filter(Boolean) as string[],
+]);
+for (const d of ALL_DRILLS) {
+  if (STROBE_IDS.has(d.id)) (d as { supportsStrobe?: boolean }).supportsStrobe = true;
+}

@@ -56,6 +56,8 @@ export function TrainerControlDock() {
   const level = useAppStore((s) => s.level);
   const athlete = useAppStore((s) => s.athlete);
   const seated = useAppStore((s) => s.seated);
+  const strobeLevel = useAppStore((s) => s.strobeLevel);
+  const setStrobeLevel = useAppStore((s) => s.setStrobeLevel);
   const perfModeId = useAppStore((s) => s.perfModeId);
   const drillOptions = useAppStore((s) => s.drillOptions);
   const { selectDrill, setLevel, setDrillOption, setAthlete, setSeated, setPerfMode, goHome, proceedToCalibration } =
@@ -347,6 +349,24 @@ export function TrainerControlDock() {
         {opts.length === 0 && def && (
           <PanelText position={[-0.6, 0.3, 0]} text="No drill options — standard format." size={0.028}
             color={ARES_ACCENTS.dim} maxWidth={1.2} />
+        )}
+
+        {/* Stroboscopic occlusion — pre-drill, motion drills only, binocular */}
+        {def?.supportsStrobe && (
+          <group>
+            <PanelText position={[-0.6, -0.02, 0]} text="STROBE (BINOCULAR)" size={0.026}
+              color={ARES_ACCENTS.dim} mono />
+            <PanelButton
+              position={[0.13, -0.02, 0]}
+              width={0.86}
+              height={0.105}
+              fontSize={0.032}
+              label={strobeLevel === 0 ? "Off" : `Level ${strobeLevel} of 5`}
+              color={strobeLevel > 0 ? ARES_ACCENTS.purpleGlow : ARES_COLORS.deepPurple}
+              textColor={strobeLevel > 0 ? ARES_COLORS.nearBlack : ARES_COLORS.white}
+              onClick={() => setStrobeLevel((strobeLevel + 1) % 6)}
+            />
+          </group>
         )}
 
         {/* Session controls */}

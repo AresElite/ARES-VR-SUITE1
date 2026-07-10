@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useAppStore } from "@/app/providers/appStore";
 import { detectXRSupport } from "@/utils/xrSupport";
 import { LandingDashboard } from "@/ui/components/LandingDashboard";
+import { PinGate } from "@/ui/components/PinGate";
 
 /**
  * ScreenRouter — DOM-level view state.
@@ -28,6 +29,9 @@ export function ScreenRouter() {
     window.addEventListener("ares-xr-session-ended", onEnd);
     return () => window.removeEventListener("ares-xr-session-ended", onEnd);
   }, []);
+
+  const orgUnlocked = useAppStore((s) => s.orgUnlocked);
+  if (!orgUnlocked) return <PinGate />;
 
   if (view === "landing") {
     return <LandingDashboard onEnterDesktop={() => setView("immersive")} />;

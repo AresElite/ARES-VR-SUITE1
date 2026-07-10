@@ -15,6 +15,7 @@ import { makeGratingTexture, makePlateTexture, makeRDSTexture } from "@/utils/pl
 import { sfx } from "@/utils/audio";
 import { rhythmMusic } from "@/perform/rhythmMusic";
 import { headMotion } from "./headMotion";
+import { STROBE_LEVELS } from "@/ares/constants";
 import { FONT_MONO } from "@/utils/fonts";
 
 /**
@@ -676,6 +677,39 @@ function FixationMarker() {
   );
 }
 
+/**
+ * StroboscopicLayer — binocular occlusion. A full-field black quad locked to
+ * the camera toggles opaque/clear on the drill's frame clock (so it pauses
+ * with the drill). Level 1 = quick/sparse occlusion; Level 5 = long/frequent.
+ */
+function StroboscopicLayer() {
+  const engine = useAppStore((s) => s.engine);
+  const level = useAppStore((s) => s.strobeLevel);
+  const camera = useThree((s) => s.camera);
+  const mesh = useRef<THREE.Mesh>(null);
+  const fwd = useMemo(() => new THREE.Vector3(), []);
+  const cfg = STROBE_LEVELS[Math.max(0, Math.min(5, level))];
+  useFrame(() => {
+    const m = mesh.current;
+    if (!m || !engine) return;
+    // sit the panel just in front of the eyes, covering the whole field
+    fwd.set(0, 0, -1).applyQuaternion(camera.quaternion);
+    m.position.copy(camera.position).add(fwd.multiplyScalar(0.28));
+    m.quaternion.copy(camera.quaternion);
+    const period = cfg.clearMs + cfg.occludeMs;
+    if (period <= 0) { m.visible = false; return; }
+    const now = engine.timing.now;
+    const phase = ((now % period) + period) % period;
+    m.visible = phase < cfg.occludeMs; // opaque during the occlusion window
+  });
+  return (
+    <mesh ref={mesh} renderOrder={9999} frustumCulled={false}>
+      <planeGeometry args={[3, 3]} />
+      <meshBasicMaterial color="#000000" depthTest={false} depthWrite={false} toneMapped={false} />
+    </mesh>
+  );
+}
+
 /** feeds head angular velocity from the XR camera every frame */
 function HeadMotionTracker() {
   const camera = useThree((s) => s.camera);
@@ -752,6 +786,7 @@ export function DrillRunner() {
   useEffect(() => () => rhythmMusic.stop(), [engine]);
   const perf = PERF_MODES[useAppStore((s) => s.perfModeId)];
   const inSession = useXR((s) => s.session);
+  const strobeLevel = useAppStore((s) => s.strobeLevel);
   const [poolVersion, setPoolVersion] = useState(0);
   const [countdown, setCountdown] = useState<number | null>(null);
   const sparks = useMemo(() => new SparkPool(), []);
@@ -863,6 +898,7 @@ export function DrillRunner() {
       {inSession && engine.definition.responseMode === "trigger" && <TriggerListener />}
       {!inSession && engine.definition.responseMode === "trigger" && <DesktopTriggerKeys />}
       {engine.definition.gazeStability && <GazeAids />}
+      {strobeLevel > 0 && engine.definition.supportsStrobe && <StroboscopicLayer />}
       <HeadMotionTracker />
       {engine.definition.responseMode === "joystick" && <JoystickListener cursor={demCursor} />}
       {engine.definition.launcher && <LauncherProp />}

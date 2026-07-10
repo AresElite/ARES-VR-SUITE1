@@ -106,4 +106,6 @@ export interface Athlete {
   sport: string;
   position?: string;
   notes?: string;
+  /** external record/EMR profile id — where validated (Phase 2) metrics route */
+  externalProfileId?: string;
 }

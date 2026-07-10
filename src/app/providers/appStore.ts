@@ -6,6 +6,7 @@ import { loadSessions, saveSession } from "@/data/sessionStore";
 import { syncSessionToEMR } from "@/data/api";
 import { drillById } from "@/drills/registry";
 import { groupForPhase as groupForPhaseLocal } from "@/ares/phases";
+import { ORG_PIN } from "@/ares/constants";
 import { createDrillSession } from "@/drills/shared/DrillSession";
 import { buildSessionResult, type FinishedDrill } from "@/drills/shared/DrillResult";
 import { levelFor } from "@/drills/shared/ProgressionEngine";
@@ -21,6 +22,8 @@ interface AppState {
   xrSupport: XRSupportInfo;
   perfModeId: PerfModeId;
   seated: boolean;
+  strobeLevel: number;
+  orgUnlocked: boolean;
   // session setup
   athlete: Athlete;
   group: import("@/ares/phases").ArenaGroupId | null;
@@ -40,6 +43,8 @@ interface AppState {
   setXRSupport(info: XRSupportInfo): void;
   setPerfMode(id: PerfModeId): void;
   setSeated(seated: boolean): void;
+  setStrobeLevel(level: number): void;
+  unlockOrg(pin: string): boolean;
   setAthlete(a: Athlete): void;
   selectGroup(id: import("@/ares/phases").ArenaGroupId | null): void;
   selectPhase(phase: ARESPhase | null): void;
@@ -75,6 +80,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   xrSupport: EMPTY_XR_SUPPORT,
   perfModeId: defaultPerfMode(),
   seated: false,
+  strobeLevel: 0,
+  orgUnlocked: false,
   athlete: MOCK_ATHLETES[0],
   group: null,
   phase: null,
@@ -92,6 +99,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   setXRSupport: (info) => set({ xrSupport: info }),
   setPerfMode: (id) => set({ perfModeId: id }),
   setSeated: (seated) => set({ seated }),
+  setStrobeLevel: (level) => set({ strobeLevel: Math.max(0, Math.min(5, level)) }),
+  unlockOrg: (pin) => {
+    const ok = pin === ORG_PIN;
+    if (ok) set({ orgUnlocked: true });
+    return ok;
+  },
   setAthlete: (athlete) => set({ athlete }),
 
   selectGroup: (id) => {
@@ -177,6 +190,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       levelLabel: lvl.label,
       device: deviceInfo(xrSupport),
     });
+    finished.result.progression.parameters = {
+      ...finished.result.progression.parameters,
+      strobeLevel: get().strobeLevel,
+    };
     set({ lastFinished: finished, arenaMode: "results", engine: null, snapshot: null });
   },
 
