@@ -160,17 +160,14 @@ export function TrainerControlDock() {
     return o.values.find((v) => v.id === cur)?.label ?? "";
   };
 
-  // ---- Session Setup vertical layout (cursor-based, never overlaps) ----
+  // ---- Session Setup: FIXED slots (never collapse, never overlap) ----
   const shownOpts = opts.slice(0, 3);
-  const OPT_TOP = 0.44;
-  const OPT_STEP = 0.135;
-  const optY = (i: number) => OPT_TOP - i * OPT_STEP;
-  const afterOpts = shownOpts.length > 0 ? optY(shownOpts.length - 1) - OPT_STEP : OPT_TOP - 0.02;
-  const strobeY = afterOpts;
-  const ctrlTop = (def?.supportsStrobe ? strobeY - OPT_STEP : afterOpts) - 0.02;
-  const ctrlRow2 = ctrlTop - 0.135;
-  const startY = ctrlRow2 - 0.18;
-  const setupHeight = 0.9 - startY + 0.42; // panel grows to fit content
+  const SETUP_H = 1.98;
+  const optY = (i: number) => 0.38 - i * 0.13; // slots 0.38 / 0.25 / 0.12
+  const STROBE_Y = -0.02;
+  const CTRL1_Y = -0.17;
+  const CTRL2_Y = -0.30;
+  const START_Y = -0.54;
 
   // Sport portal, no sport chosen yet: show the sport picker.
   if (phase === "Sport" && !profile) {
@@ -326,12 +323,12 @@ export function TrainerControlDock() {
         position={[0.9, 1.55, -1.95]}
         rotation={[0, -0.28, 0]}
         width={1.34}
-        height={setupHeight}
+        height={SETUP_H}
         title="Session Setup"
         accent={ARES_ACCENTS.tealBright}
       >
         <PanelText
-          position={[-0.6, setupHeight / 2 - 0.2, 0]}
+          position={[-0.6, 0.78, 0]}
           text={def ? def.name : "Select a drill"}
           size={0.046}
           color={ARES_COLORS.white}
@@ -339,23 +336,23 @@ export function TrainerControlDock() {
         />
 
         {/* Level stepper */}
-        <PanelButton position={[-0.45, 0.6, 0]} width={0.2} height={0.1} label="−" fontSize={0.055}
+        <PanelButton position={[-0.45, 0.62, 0]} width={0.2} height={0.1} label="−" fontSize={0.055}
           disabled={!def || level <= 1} onClick={() => step(-1)} />
-        <PanelButton position={[-0.22, 0.6, 0]} width={0.2} height={0.08} label="−10" fontSize={0.03}
+        <PanelButton position={[-0.22, 0.62, 0]} width={0.2} height={0.08} label="−10" fontSize={0.03}
           disabled={!def || level <= 1} onClick={() => step(-10)} />
-        <PanelText position={[0.08, 0.6, 0]} text={def ? `LV ${level}/${maxLevel}` : "—"} size={0.045}
+        <PanelText position={[0.08, 0.62, 0]} text={def ? `LV ${level}/${maxLevel}` : "—"} size={0.045}
           color={ARES_ACCENTS.tealBright} anchorX="center" align="center" mono />
-        <PanelButton position={[0.38, 0.6, 0]} width={0.2} height={0.08} label="+10" fontSize={0.03}
+        <PanelButton position={[0.38, 0.62, 0]} width={0.2} height={0.08} label="+10" fontSize={0.03}
           disabled={!def || level >= maxLevel} onClick={() => step(10)} />
-        <PanelButton position={[0.58, 0.6, 0]} width={0.16} height={0.1} label="+" fontSize={0.055}
+        <PanelButton position={[0.58, 0.62, 0]} width={0.16} height={0.1} label="+" fontSize={0.055}
           disabled={!def || level >= maxLevel} onClick={() => step(1)} />
-        <PanelText position={[-0.6, 0.5, 0]} text={levelLabel} size={0.028}
+        <PanelText position={[-0.6, 0.51, 0]} text={levelLabel} size={0.026}
           color={ARES_COLORS.warningGold} maxWidth={1.2} />
 
-        {/* Drill option dropdowns (cycle on click) */}
+        {/* Drill option dropdowns (cycle on click) — fixed slots */}
         {shownOpts.map((o, i) => (
           <group key={o.id}>
-            <PanelText position={[-0.6, optY(i) + 0.05, 0]} text={o.label.toUpperCase()} size={0.024}
+            <PanelText position={[-0.6, optY(i) + 0.05, 0]} text={o.label.toUpperCase()} size={0.022}
               color={ARES_ACCENTS.dim} mono />
             <PanelButton
               position={[0.13, optY(i), 0]}
@@ -369,17 +366,17 @@ export function TrainerControlDock() {
           </group>
         ))}
         {shownOpts.length === 0 && def && (
-          <PanelText position={[-0.6, OPT_TOP, 0]} text="No drill options — standard format." size={0.026}
+          <PanelText position={[-0.6, 0.38, 0]} text="No drill options — standard format." size={0.026}
             color={ARES_ACCENTS.dim} maxWidth={1.2} />
         )}
 
-        {/* Stroboscopic occlusion — pre-drill, motion drills only, binocular */}
+        {/* Stroboscopic occlusion — fixed slot below the options */}
         {def?.supportsStrobe && (
           <group>
-            <PanelText position={[-0.6, strobeY + 0.05, 0]} text="STROBE (BINOCULAR)" size={0.024}
+            <PanelText position={[-0.6, STROBE_Y + 0.05, 0]} text="STROBE (BINOCULAR)" size={0.022}
               color={ARES_ACCENTS.dim} mono />
             <PanelButton
-              position={[0.13, strobeY, 0]}
+              position={[0.13, STROBE_Y, 0]}
               width={0.86}
               height={0.1}
               fontSize={0.03}
@@ -391,18 +388,18 @@ export function TrainerControlDock() {
           </group>
         )}
 
-        {/* Session controls */}
-        <PanelButton position={[-0.32, ctrlTop, 0]} width={0.58} height={0.1}
+        {/* Session controls — fixed slots */}
+        <PanelButton position={[-0.32, CTRL1_Y, 0]} width={0.58} height={0.1}
           label={`Athlete: ${athlete.name}`} fontSize={0.03} onClick={cycleAthlete} />
-        <PanelButton position={[0.32, ctrlTop, 0]} width={0.58} height={0.1}
+        <PanelButton position={[0.32, CTRL1_Y, 0]} width={0.58} height={0.1}
           label={seated ? "Seated" : "Standing"} fontSize={0.03} onClick={() => setSeated(!seated)} />
-        <PanelButton position={[-0.32, ctrlRow2, 0]} width={0.58} height={0.1}
+        <PanelButton position={[-0.32, CTRL2_Y, 0]} width={0.58} height={0.1}
           label={PERF_MODES[perfModeId].label.replace(" Mode", "")} fontSize={0.03} onClick={cyclePerf} />
-        <PanelButton position={[0.32, ctrlRow2, 0]} width={0.58} height={0.1}
+        <PanelButton position={[0.32, CTRL2_Y, 0]} width={0.58} height={0.1}
           label="< Back to Arena" fontSize={0.03} color={ARES_COLORS.graphite} onClick={goHome} />
 
         <PanelButton
-          position={[0, startY, 0]}
+          position={[0, START_Y, 0]}
           width={1.18}
           height={0.14}
           label="START DRILL"
