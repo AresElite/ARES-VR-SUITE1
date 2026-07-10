@@ -7,7 +7,7 @@ export const ORG_NAME = "Ares Elite Sports Vision";
  * Version stamp — visible in the site footer and the VR arena so anyone can
  * instantly tell which build is live. Bump on every deploy.
  */
-export const APP_VERSION = "v0.32.0 — Stroboscopic occlusion (levels 1-5) + org PIN gate & profile link";
+export const APP_VERSION = "v0.32.1 — Org PIN updated";
 
 /** Spatial UI distances (meters) — panels live 1.5–2.5m from the athlete. */
 export const PANEL_NEAR = 1.6;
@@ -39,4 +39,4 @@ export const STROBE_LEVELS: { clearMs: number; occludeMs: number }[] = [
 ];
 
 /** Universal org/clinic unlock PIN (prototype). Phase 2 replaces with real auth. */
-export const ORG_PIN = "2468";
+export const ORG_PIN = "9876";
