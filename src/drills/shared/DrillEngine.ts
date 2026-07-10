@@ -273,6 +273,16 @@ export class DrillEngine {
         zone: t.spec.zone,
       });
     }
+    // trial-paced grids: if a go plate times out, still advance + clear the group
+    if (t.kind === "go" && t.spec.gridSeq !== undefined && t.spec.groupId) {
+      for (const [id, sibling] of [...this.active]) {
+        if (sibling.spec.groupId === t.spec.groupId && !sibling.resolved) {
+          sibling.resolved = true;
+          this.despawn(id);
+        }
+      }
+      this.spawnGrid((t.spec.gridSeq ?? 0) + 1);
+    }
     // distractors expire silently
     this.despawn(targetId);
   }
@@ -517,6 +527,8 @@ export class DrillEngine {
             this.despawn(id);
           }
         }
+        // trial-paced advance: answering spawns the next plate immediately
+        if (t.spec.gridSeq !== undefined) this.spawnGrid((t.spec.gridSeq ?? 0) + 1);
       } else if (mode === "all") {
         // group completes when no go members remain
         const goLeft = [...this.active.values()].some(

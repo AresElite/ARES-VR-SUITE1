@@ -265,18 +265,19 @@ export const ColorVisionAssessment: DrillDefinition = {
   phase: "Assess",
   description: "14 pseudo-isochromatic plates fly through your view — left, right, up, down, diagonal, even straight at you. Answer and the plate clears for the next. Axis-specific errors classify the deficit pattern.",
   purpose: "Color-discrimination performance baseline with axis pattern.",
-  interaction: "touch",
-  responseMode: "strike",
+  interaction: "ray",
+  responseMode: "pointer",
   environment: "arena",
   mvp: true,
   assessment: true,
+  trialPaced: true,
   instructions: [
     "1. A dotted plate flies through your view - direction changes every time. Somewhere in the dots is a NUMBER.",
-    "2. Read it and strike the matching answer pad. The plate clears instantly and the next appears.",
-    "3. If you truly cannot see a number, strike the '?' pad - never guess.",
-    "4. 14 plates. Reaction time, accuracy, and the deficit axis pattern are reported.",
+    "2. Read it, POINT your controller at the matching answer pad and pull the TRIGGER. The next plate appears instantly.",
+    "3. If you truly cannot see a number, point + trigger the '?' pad - never guess.",
+    "4. 14 plates. Accuracy and the deficit-axis pattern are reported.",
   ],
-  controlsHint: "READ THE FLYING NUMBER - STRIKE THE PAD - NEXT ONE COMES",
+  controlsHint: "READ THE NUMBER - POINT + TRIGGER THE PAD - NEXT COMES FAST",
   levels: STANDARD({ plates: 14, exposureMs: 6000 }),
   buildTrials: (params, rng) => {
     const p = params as { plates: number; exposureMs: number };
@@ -299,7 +300,7 @@ export const ColorVisionAssessment: DrillDefinition = {
       ];
       const path = paths[Math.floor(rng() * paths.length)];
       trials.push({
-        id: `${groupId}-plate`, spawnAt: t, duration: p.exposureMs, kind: "distractor", decor: true,
+        id: `${groupId}-plate`, spawnAt: i === 0 ? t : -1, gridSeq: i, duration: p.exposureMs, kind: "distractor", decor: true,
         zone: "center", position: path.pos, velocity: path.vel,
         color: WHITE, shape: "plate", scale: 0.24,
         plate: { digit, axis, seed: 1000 + i * 77 + digit },
@@ -311,13 +312,12 @@ export const ColorVisionAssessment: DrillDefinition = {
       const answers = shuffle([String(digit), String(wrong1), String(wrong2), "?"], rng);
       answers.forEach((label, k) => {
         trials.push({
-          id: `${groupId}-p${k}`, spawnAt: t + 500, duration: p.exposureMs - 500,
-          kind: label === String(digit) ? "go" : "distractor",
-          zone: "center", position: [-0.51 + k * 0.34, 1.02, -0.62],
+          // answer pads: closer (arm's reach) and raised for comfortable striking
+          id: `${groupId}-p${k}`, spawnAt: i === 0 ? t + 500 : -1, gridSeq: i, duration: p.exposureMs, kind: label === String(digit) ? "go" : "distractor",
+          zone: "center", position: [-0.45 + k * 0.3, 1.22, -0.5],
           color: GRAY, emissive: TEAL, shape: "pad", scale: 0.06, label, groupId,
         });
       });
-      t += p.exposureMs + 800;
     }
     return trials;
   },
@@ -367,19 +367,19 @@ export const StereopsisAssessment: DrillDefinition = {
   phase: "Assess",
   description: "Adaptive staircase: begins with unmistakable depth (800 arcsec) and steps finer after every correct pick. Three consecutive misses end the test — the finest disparity you resolved is your threshold.",
   purpose: "Global stereopsis threshold via adaptive staircase.",
-  interaction: "touch",
-  responseMode: "strike",
+  interaction: "ray",
+  responseMode: "pointer",
   environment: "arena",
   mvp: true,
   assessment: true,
   instructions: [
     "1. Four dotted discs appear. ONE floats in depth - at first it is obvious.",
-    "2. Strike the floating disc. Every correct pick makes the depth subtler.",
+    "2. POINT at the floating disc and pull the TRIGGER. Every correct pick makes the depth subtler.",
     "3. A wrong pick steps back to an easier level. Three misses in a row ends the test.",
     "4. Your threshold - the finest disparity you resolved - is recorded in arcseconds.",
     "5. Headset required: the depth physically cannot appear on a flat screen.",
   ],
-  controlsHint: "STRIKE THE FLOATING DISC - IT GETS SUBTLER EVERY TIME",
+  controlsHint: "POINT + TRIGGER THE FLOATING DISC - IT GETS SUBTLER",
   levels: STANDARD({ maxTrials: 24, exposureMs: 6500 }),
   buildTrials: (params, rng) => {
     // reset the staircase for this session
@@ -477,18 +477,18 @@ export const ContrastSensitivityAssessment: DrillDefinition = {
   phase: "Assess",
   description: "Four discs — one hides a faint striped grating, three are blank. Strike the striped one (or '?' if you truly cannot see it). Contrast falls on a log ladder until three straight misses. Threshold reported as logCS, the metric elite athletes are benchmarked on.",
   purpose: "Contrast sensitivity threshold (logCS) via 4-AFC staircase.",
-  interaction: "touch",
-  responseMode: "strike",
+  interaction: "ray",
+  responseMode: "pointer",
   environment: "arena",
   mvp: true,
   assessment: true,
   instructions: [
     "1. Four gray discs appear. Exactly ONE contains faint stripes.",
-    "2. Strike the striped disc. Every correct pick makes the stripes fainter.",
-    "3. If you truly cannot see any stripes, strike the '?' pad - never guess.",
+    "2. POINT at the striped disc and pull the TRIGGER. Every correct pick makes the stripes fainter.",
+    "3. If you truly cannot see any stripes, point + trigger the '?' pad - never guess.",
     "4. Three misses in a row ends the test. Your contrast threshold (logCS) is recorded.",
   ],
-  controlsHint: "FIND THE STRIPED DISC - IT FADES EVERY ROUND",
+  controlsHint: "POINT + TRIGGER THE STRIPED DISC - IT FADES EVERY ROUND",
   levels: STANDARD({ maxTrials: 22, exposureMs: 6500 }),
   buildTrials: (params, rng) => {
     csState.idx = 0;
