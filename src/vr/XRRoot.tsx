@@ -5,6 +5,7 @@ import { XR, XROrigin, createXRStore, useXR } from "@react-three/xr";
 import { useAppStore } from "@/app/providers/appStore";
 import { AegisSession, AegisSetup, AegisResultsPanel } from "@/vr/AegisSession";
 import { SequenceSession, SequenceSetup, SequenceResultsPanel } from "@/vr/SequenceSession";
+import { KeystoneSession, KeystoneSetup, KeystoneResultsPanel } from "@/vr/KeystoneSession";
 import { drillById } from "@/drills/registry";
 import { PERF_MODES, defaultPerfMode } from "@/utils/performance";
 import { pointerStoreOptions } from "./InteractionRay";
@@ -73,6 +74,9 @@ function SceneContent() {
           <AthleteHUD />
         </>
       )}
+      {arenaMode === "keySetup" && <KeystoneSetup />}
+      {arenaMode === "keystone" && <KeystoneSession />}
+      {arenaMode === "keyResults" && <KeystoneResultsPanel />}
       {arenaMode === "seqSetup" && <SequenceSetup />}
       {arenaMode === "sequence" && <SequenceSession />}
       {arenaMode === "seqResults" && <SequenceResultsPanel />}

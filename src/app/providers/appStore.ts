@@ -34,7 +34,7 @@ import { detectHeadset, detectBrowser } from "@/utils/questDetection";
 import { EMPTY_XR_SUPPORT, type XRSupportInfo } from "@/utils/xrSupport";
 import { PERF_MODES, defaultPerfMode, type PerfModeId } from "@/utils/performance";
 
-export type ArenaMode = "home" | "setup" | "calibration" | "drill" | "results" | "aegisSetup" | "aegis" | "aegisResults" | "seqSetup" | "sequence" | "seqResults";
+export type ArenaMode = "home" | "setup" | "calibration" | "drill" | "results" | "aegisSetup" | "aegis" | "aegisResults" | "seqSetup" | "sequence" | "seqResults" | "keySetup" | "keystone" | "keyResults";
 
 interface AppState {
   // device & support
@@ -51,6 +51,9 @@ interface AppState {
   /** SEQUENCE COMMAND — peripheral intake -> central decision -> bilateral execution */
   sequence: import("@/sequence/types").SeqSettings;
   sequenceResult: import("@/sequence/metrics").SeqMetrics | null;
+  /** KEYSTONE — whole-body visual-motor integration */
+  keystone: import("@/keystone/types").KeySettings;
+  keystoneResult: import("@/keystone/metrics").KeyMetrics | null;
   // session setup
   athlete: Athlete;
   group: import("@/ares/phases").ArenaGroupId | null;
@@ -79,6 +82,9 @@ interface AppState {
   setSequence(p: Partial<import("@/sequence/types").SeqSettings>): void;
   startSequence(): void;
   finishSequence(m: import("@/sequence/metrics").SeqMetrics): void;
+  setKeystone(p: Partial<import("@/keystone/types").KeySettings>): void;
+  startKeystone(): void;
+  finishKeystone(m: import("@/keystone/metrics").KeyMetrics): void;
   setAthlete(a: Athlete): void;
   selectGroup(id: import("@/ares/phases").ArenaGroupId | null): void;
   selectPhase(phase: ARESPhase | null): void;
@@ -127,6 +133,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   aegisResult: null,
   sequence: { tier: "intermediate", mode: "training", bonusEnabled: true },
   sequenceResult: null,
+  keystone: { tier: "intermediate", mode: "training", bonusEnabled: true },
+  keystoneResult: null,
   drillOptions: {},
   arenaMode: "home",
   engine: null,
@@ -162,6 +170,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   startSequence: () => set({ arenaMode: "sequence", sequenceResult: null }),
   finishSequence: (m) => set({ arenaMode: "seqResults", sequenceResult: m }),
+
+  setKeystone: (p) => {
+    const next = { ...get().keystone, ...p };
+    // Assessment never runs a bonus round — a bonus-until-fail tail is adaptive by
+    // construction, and adaptation destroys the fixed protocol a baseline requires.
+    if (next.mode === "assessment") next.bonusEnabled = false;
+    set({ keystone: next });
+  },
+  startKeystone: () => set({ arenaMode: "keystone", keystoneResult: null }),
+  finishKeystone: (m) => set({ arenaMode: "keyResults", keystoneResult: m }),
   unlockOrg: (pin) => {
     const ok = pin === ORG_PIN;
     if (ok) set({ orgUnlocked: true });

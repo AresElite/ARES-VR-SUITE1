@@ -91,20 +91,23 @@ export function TrainerControlDock() {
       { id: "Sequence", label: "Sequence Command", color: "#2998AA",
         tag: "Peripheral intake · central decision · sequencing",
         onClick: () => useAppStore.setState({ arenaMode: "seqSetup" }) },
+      { id: "Keystone", label: "Keystone", color: "#C9A6FF",
+        tag: "Whole-body integration · arriving is easy, stopping is the drill",
+        onClick: () => useAppStore.setState({ arenaMode: "keySetup" }) },
     ];
     return (
       <group>
         <SpatialPanel
           position={[0, 1.6, -1.75]}
           width={1.5}
-          height={1.18}
+          height={1.42}
           title="Perform"
           accent="#1A6B78"
         >
           {PERF.map((p, i) => (
             <group key={p.id}>
               <PanelButton
-                position={[0, 0.4 - i * 0.26, 0]}
+                position={[0, 0.5 - i * 0.26, 0]}
                 width={1.3}
                 height={0.14}
                 fontSize={0.05}
@@ -113,7 +116,7 @@ export function TrainerControlDock() {
                 onClick={p.onClick}
               />
               <PanelText
-                position={[0, 0.29 - i * 0.26, 0]}
+                position={[0, 0.39 - i * 0.26, 0]}
                 text={p.tag}
                 size={0.028}
                 color={ARES_COLORS.softGray}
@@ -124,7 +127,7 @@ export function TrainerControlDock() {
             </group>
           ))}
           <PanelButton
-            position={[0, -0.44, 0]}
+            position={[0, -0.56, 0]}
             width={0.6}
             height={0.11}
             fontSize={0.034}
