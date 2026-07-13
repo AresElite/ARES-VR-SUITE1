@@ -97,6 +97,31 @@ export function computeMetrics(events: RawEvent[]): SessionMetrics {
   }
   const misses = events.filter((e) => e.errorType === "miss").length;
 
+  // ---- Signal-detection sensitivity d' (two-choice / forced-choice tasks) ----
+  // Treat "right" as the signal class and "left" as the noise class:
+  //   hit         = correctly answered RIGHT when RIGHT was required
+  //   false alarm = answered RIGHT when LEFT was required
+  //   d' = z(hitRate) - z(falseAlarmRate)   (log-linear corrected)
+  // d' separates true discriminability from a left/right response bias.
+  let dPrime: number | undefined;
+  let criterionC: number | undefined;
+  {
+    const sig = scoreable.filter((e) => e.expectedAction === "hit:right");
+    const noi = scoreable.filter((e) => e.expectedAction === "hit:left");
+    if (sig.length >= 3 && noi.length >= 3) {
+      const hits = sig.filter((e) => e.correct).length;
+      // a wrong answer on a LEFT trial means they said RIGHT
+      const fas = noi.filter((e) => !e.correct).length;
+      // log-linear correction keeps z() finite at ceiling/floor
+      const hr = (hits + 0.5) / (sig.length + 1);
+      const far = (fas + 0.5) / (noi.length + 1);
+      const zH = probit(hr);
+      const zF = probit(far);
+      dPrime = Math.round((zH - zF) * 100) / 100;
+      criterionC = Math.round((-0.5 * (zH + zF)) * 100) / 100;
+    }
+  }
+
   // Per-hand split (choice protocols): required side from expectedAction
   const sideOf = (e: RawEvent): "left" | "right" | null =>
     e.expectedAction === "hit:left" ? "left" : e.expectedAction === "hit:right" ? "right" : null;
@@ -116,22 +141,26 @@ export function computeMetrics(events: RawEvent[]): SessionMetrics {
   const precisions = events.filter((e) => e.precisionM !== undefined).map((e) => e.precisionM! * 100);
   const avgPrecisionCm = precisions.length ? Math.round(mean(precisions)! * 10) / 10 : undefined;
 
-  // Post-error slowing: inter-response interval after an error vs overall
+  // Post-error slowing (true PES): mean REACTION TIME on the trial immediately
+  // after an error, minus mean reaction time on trials after a correct.
+  // Positive = they slowed down after a mistake (adaptive control).
+  // (The old version differenced inter-response intervals, which in a fixed
+  //  trial schedule mostly measures the schedule, not the athlete.)
   let postErrorSlowingMs: number | undefined;
   {
     const seq = events
-      .filter((e) => e.errorType !== "correctRejection" && e.actualAction !== "none")
+      .filter((e) => e.errorType !== "correctRejection" && e.reactionMs !== undefined && e.actualAction !== "none")
       .sort((a, b) => a.timestamp - b.timestamp);
-    const intervals: number[] = [];
     const postErr: number[] = [];
+    const postCorrect: number[] = [];
     for (let i = 1; i < seq.length; i++) {
-      const iv = seq[i].timestamp - seq[i - 1].timestamp;
-      if (iv <= 0 || iv > 8000) continue;
-      intervals.push(iv);
-      if (!seq[i - 1].correct) postErr.push(iv);
+      const rt = seq[i].reactionMs!;
+      if (!Number.isFinite(rt)) continue;
+      if (seq[i - 1].correct) postCorrect.push(rt);
+      else postErr.push(rt);
     }
-    if (postErr.length >= 2 && intervals.length >= 6) {
-      postErrorSlowingMs = Math.round(mean(postErr)! - mean(intervals)!);
+    if (postErr.length >= 1 && postCorrect.length >= 1) {
+      postErrorSlowingMs = Math.round(mean(postErr)! - mean(postCorrect)!);
     }
   }
 
@@ -166,6 +195,8 @@ export function computeMetrics(events: RawEvent[]): SessionMetrics {
     speedAccuracyIndex,
     avgPrecisionCm,
     postErrorSlowingMs,
+    dPrime,
+    criterionC,
     bestStreak: bestStreak || undefined,
     misses,
     leftAvgReactionMs: L.rt,
@@ -173,4 +204,33 @@ export function computeMetrics(events: RawEvent[]): SessionMetrics {
     leftAccuracyPct: L.acc,
     rightAccuracyPct: R.acc,
   };
+}
+
+/**
+ * probit — inverse standard-normal CDF (Acklam's rational approximation).
+ * Used for d' / criterion. Accurate to ~1e-9 across (0,1).
+ */
+function probit(p: number): number {
+  if (p <= 0) return -Infinity;
+  if (p >= 1) return Infinity;
+  const a = [-3.969683028665376e1, 2.209460984245205e2, -2.759285104469687e2, 1.38357751867269e2, -3.066479806614716e1, 2.506628277459239];
+  const b = [-5.447609879822406e1, 1.615858368580409e2, -1.556989798598866e2, 6.680131188771972e1, -1.328068155288572e1];
+  const c = [-7.784894002430293e-3, -3.223964580411365e-1, -2.400758277161838, -2.549732539343734, 4.374664141464968, 2.938163982698783];
+  const d = [7.784695709041462e-3, 3.224671290700398e-1, 2.445134137142996, 3.754408661907416];
+  const pl = 0.02425;
+  let q: number, r: number;
+  if (p < pl) {
+    q = Math.sqrt(-2 * Math.log(p));
+    return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) /
+      ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1);
+  }
+  if (p > 1 - pl) {
+    q = Math.sqrt(-2 * Math.log(1 - p));
+    return -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) /
+      ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1);
+  }
+  q = p - 0.5;
+  r = q * q;
+  return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q /
+    (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
 }

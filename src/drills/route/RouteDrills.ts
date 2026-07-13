@@ -179,7 +179,7 @@ export const FlankerCompatibility: DrillDefinition = {
   shortName: "Flanker",
   phase: "Route",
   responseMode: "trigger",
-  description: "A row of five arrows appears. Respond ONLY to the CENTER arrow — strike the pad on the side it points to. Flankers lie.",
+  description: "20 trials. A row of five arrows appears — respond ONLY to the CENTER arrow: RIGHT trigger if it points right, LEFT trigger if it points left. The flankers lie. Reports average / fastest / slowest reaction time, accuracy, d-prime sensitivity, and post-error slowing.",
   purpose: "Selective attention and conflict resolution.",
   interaction: "touch", environment: "arena", mvp: true,
   instructions: [
@@ -187,11 +187,12 @@ export const FlankerCompatibility: DrillDefinition = {
     "2. Only the CENTER arrow matters. Ignore the flankers.",
     "3. Center points RIGHT - pull the RIGHT-hand TRIGGER. Points LEFT - LEFT-hand TRIGGER.",
     "4. Incompatible rows (flankers pointing the other way) are the test. Stay on the center.",
+    "5. 20 trials. Speed AND accuracy both count.",
   ],
   controlsHint: "CENTER ARROW: RIGHT TRIGGER = >  /  LEFT TRIGGER = <",
   levels: levels50((i) => ({
     label: `${ilerp50(50, 95, i)}% incompatible, ${ilerp50(2200, 950, i)}ms`,
-    parameters: { trials: i < 30 ? 16 : 20, incompatibleRatio: lerp50(0.5, 0.95, i), windowMs: ilerp50(2200, 950, i) },
+    parameters: { trials: 20, incompatibleRatio: lerp50(0.5, 0.95, i), windowMs: ilerp50(2200, 950, i) },
   })),
   buildTrials: (params, rng) => {
     const p = params as { trials: number; incompatibleRatio: number; windowMs: number };

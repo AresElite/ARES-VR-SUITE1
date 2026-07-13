@@ -7,7 +7,7 @@ export const ORG_NAME = "Ares Elite Sports Vision";
  * Version stamp — visible in the site footer and the VR arena so anyone can
  * instantly tell which build is live. Bump on every deploy.
  */
-export const APP_VERSION = "v0.39.0 — Sternberg-Digits: text-only, 2-6 randomized span, 20 trials, full RT metrics";
+export const APP_VERSION = "v0.40.0 — Flanker: 20 trials + d-prime sensitivity; true post-error slowing";
 
 /** Spatial UI distances (meters) — panels live 1.5–2.5m from the athlete. */
 export const PANEL_NEAR = 1.6;

@@ -37,6 +37,11 @@ export interface SessionMetrics {
   avgPrecisionCm?: number;
   /** mean slowdown of the response following an error vs overall pace (ms) */
   postErrorSlowingMs?: number;
+  /** signal-detection sensitivity d' for two-choice tasks (higher = cleaner
+      discrimination, independent of any response bias) */
+  dPrime?: number;
+  /** response bias (criterion c): + = conservative, - = liberal */
+  criterionC?: number;
   /** longest run of consecutive correct responses */
   bestStreak?: number;
   /** go targets that expired unanswered */
