@@ -169,104 +169,151 @@ export const DynamicVisualAcuity: DrillDefinition = {
   durationMs: (params) => 2000 + (params as { maxTrials: number }).maxTrials * 2900 + 1500,
 };
 
-// ================= 3. USEFUL FIELD OF VIEW (UFOV, staircase) =================
-// Central identification load + a simultaneous peripheral target, both flashed
-// for a shrinking exposure. Strike the peripheral location. Exposure descends
-// on a correct localization, rises on a miss, terminates after 3 consecutive
-// misses. Threshold = shortest exposure with correct peripheral localization —
-// the processing-speed-under-load index.
-const UFOV_LADDER = [500, 400, 320, 250, 200, 160, 120, 90, 70, 50, 35];
-const ufovState: Stair = { idx: 0, wrongRun: 0, applied: UFOV_LADDER[0], best: null, done: false };
-const UFOV_ECC: [number, number][] = [
-  [0, 0.42], [0, -0.42], [0.5, 0], [-0.5, 0],
-  [0.4, 0.32], [-0.4, 0.32], [0.4, -0.32], [-0.4, -0.32],
-];
+// ================= 3. USEFUL FIELD OF VIEW (monocular) =================
+// MONOCULAR protocol. One eye is fully occluded (true per-eye render layer);
+// the other is tested. LEFT eye is covered first (RIGHT eye tested), then they
+// swap. 15 trials per eye = 30 total.
+//
+// Within each eye the demand ramps two ways at once:
+//   - the flash moves progressively OUTWARD (central -> far periphery)
+//   - the flash gets progressively FASTER (long exposure -> very brief)
+// Sector order is fully randomized from a balanced deck so every one of the 8
+// field sectors is probed at least once and most are probed twice per eye.
+const UFOV_TRIALS_PER_EYE = 15;
+const UFOV_SECTORS = 8; // N, NE, E, SE, S, SW, W, NW
+const UFOV_Z = -1.1;    // viewing plane (1.1 m) — eccentricity computed from this
+const UFOV_R_NEAR = 0.20; // ~10 deg
+const UFOV_R_FAR = 0.78;  // ~35 deg
+const UFOV_EXP_SLOW = 380;
+const UFOV_EXP_FAST = 60;
+
+interface UfovRec { eye: "right" | "left"; sector: number; eccDeg: number; expMs: number }
+const ufovPlan: UfovRec[] = [];
+const degOf = (r: number) => Math.round((Math.atan(r / Math.abs(UFOV_Z)) * 180) / Math.PI);
 
 export const UsefulFieldOfView: DrillDefinition = {
   id: "assess-ufov",
-  name: "Useful Field of View",
+  name: "Useful Field of View (Monocular)",
   shortName: "Useful Field",
   phase: "Assess",
   description:
-    "Hold central fixation on the flashing center cue while a peripheral target flashes at one of eight positions — then strike where the peripheral target was. Exposure shrinks each time you get it, until three misses. The shortest flash you can still localize is your threshold.",
-  purpose: "Divided-attention processing speed across the field (exposure threshold).",
-  interaction: "touch",
-  responseMode: "strike",
+    "MONOCULAR field test. One eye is blacked out while the other is tested — left eye covered first (right eye tested), then swapped. Hold central fixation; a target flashes somewhere in the periphery, then point + trigger where it was. The flashes move further out and get faster as you go. 15 trials per eye; every field sector is probed.",
+  purpose: "Monocular useful field of view — how far out, and how fast, each eye can localize.",
+  interaction: "ray",
+  responseMode: "pointer",
   environment: "arena",
   mvp: true,
   assessment: true,
+  monocular: true,
   instructions: [
-    "1. Keep your eyes on the CENTER cue - it flashes each trial.",
-    "2. At the same instant, a target flashes briefly somewhere in your PERIPHERY.",
-    "3. When they vanish, STRIKE the position where the peripheral target flashed.",
-    "4. Every correct localization shortens the next flash.",
-    "5. Three misses in a row ends the test; your shortest flash is the threshold.",
+    "1. ONE EYE IS COVERED. A banner tells you which eye is being tested.",
+    "2. Keep your eyes locked on the CENTER cue - do not look around the field.",
+    "3. A target FLASHES briefly out in your periphery, then vanishes.",
+    "4. POINT at the ring where it flashed and pull the TRIGGER.",
+    "5. It moves further out and flashes faster as you go. 15 trials per eye, then eyes swap.",
   ],
-  controlsHint: "HOLD CENTER - STRIKE WHERE THE PERIPHERAL FLASH WAS",
-  levels: STANDARD({ maxTrials: 26 }),
+  controlsHint: "HOLD CENTER - POINT + TRIGGER WHERE IT FLASHED",
+  levels: STANDARD({ trialsPerEye: UFOV_TRIALS_PER_EYE }),
   buildTrials: (params, rng) => {
-    ufovState.idx = 0; ufovState.wrongRun = 0; ufovState.applied = UFOV_LADDER[0];
-    ufovState.best = null; ufovState.done = false;
-    const p = params as { maxTrials: number };
+    const p = params as { trialsPerEye: number };
+    ufovPlan.length = 0;
     const trials: TrialSpec[] = [];
-    let t = 2200;
-    for (let n = 0; n < p.maxTrials; n++) {
-      const target = UFOV_ECC[Math.floor(rng() * UFOV_ECC.length)];
-      const groupId = `ufov-${n}`;
-      // central fixation/identification cue (attention load) — flashes then clears
+    let t = 2600;
+    // LEFT eye covered first => RIGHT eye tested first
+    const blocks: { tested: "right" | "left"; blocked: "left" | "right" }[] = [
+      { tested: "right", blocked: "left" },
+      { tested: "left", blocked: "right" },
+    ];
+    let g = 0;
+    for (const blk of blocks) {
+      // balanced sector deck: 2x each of 8 sectors -> take trialsPerEye
+      const deck: number[] = [];
+      for (let rep = 0; rep < 2; rep++) for (let sct = 0; sct < UFOV_SECTORS; sct++) deck.push(sct);
+      for (let k = deck.length - 1; k > 0; k--) {
+        const j = Math.floor(rng() * (k + 1));
+        [deck[k], deck[j]] = [deck[j], deck[k]];
+      }
+      const sectors = deck.slice(0, p.trialsPerEye);
+
+      // eye-change banner
       trials.push({
-        id: `${groupId}-c`, spawnAt: t, duration: 500, kind: "distractor", decor: true,
-        zone: "center", position: [0, 1.45, Z], color: GOLD, emissive: GOLD, shape: "diamond", scale: 0.03,
-        meta: { ufovFirst: true, stepIdx: n },
+        id: `ufov-banner-${blk.tested}`, spawnAt: t, duration: 2400, kind: "distractor",
+        zone: "center", position: [0, 1.72, UFOV_Z], color: TEAL, emissive: TEAL, shape: "diamond", scale: 0.001,
+        label: `${blk.tested.toUpperCase()} EYE — ${blk.blocked.toUpperCase()} COVERED`,
+        meta: { decor: true, blockEye: blk.blocked, labelInside: true, labelSize: 0.055, labelColor: "#7FD3DE" },
       });
-      // peripheral flash — decor cue that marks WHERE, clears with the group
-      trials.push({
-        id: `${groupId}-flash`, spawnAt: t, duration: 500, kind: "distractor", decor: true,
-        zone: "center", position: [target[0], 1.45 + target[1], Z], color: WHITE, emissive: WHITE, shape: "sphere", scale: 0.04,
-        groupId, meta: { ufovFlash: true },
-      });
-      // eight strikeable response pads appear AFTER the flash — one correct
-      UFOV_ECC.forEach((pos, k) => {
-        const correct = pos[0] === target[0] && pos[1] === target[1];
+      t += 2600;
+
+      for (let n = 0; n < p.trialsPerEye; n++) {
+        const f = n / Math.max(1, p.trialsPerEye - 1); // 0 -> 1 across the block
+        const r = UFOV_R_NEAR + (UFOV_R_FAR - UFOV_R_NEAR) * f;   // central -> peripheral
+        const expMs = Math.round(UFOV_EXP_SLOW + (UFOV_EXP_FAST - UFOV_EXP_SLOW) * f); // slow -> fast
+        const sector = sectors[n];
+        const ang = (sector / UFOV_SECTORS) * Math.PI * 2 + rng() * 0.12; // slight jitter, same sector
+        const groupId = `ufov-${blk.tested}-${g++}`;
+        ufovPlan.push({ eye: blk.tested, sector, eccDeg: degOf(r), expMs });
+
+        // central fixation cue — holds through the whole trial (the attention load)
         trials.push({
-          id: `${groupId}-p${k}`, spawnAt: t + 520, duration: 2600,
-          kind: correct ? "go" : "distractor",
-          zone: "center", position: [pos[0], 1.45 + pos[1], Z],
-          color: "#38406B", emissive: PURPLE, shape: "ring", scale: 0.055, groupId,
+          id: `${groupId}-fix`, spawnAt: t, duration: expMs + 2600, kind: "distractor", decor: true,
+          zone: "center", position: [0, 1.45, UFOV_Z], color: GOLD, emissive: GOLD, shape: "sphere", scale: 0.016,
+          meta: { blockEye: blk.blocked },
         });
-      });
-      t += 3400;
+        // the peripheral FLASH — brief, then gone
+        trials.push({
+          id: `${groupId}-flash`, spawnAt: t + 260, duration: expMs, kind: "distractor", decor: true,
+          zone: "center",
+          position: [Math.cos(ang) * r, 1.45 + Math.sin(ang) * r * 0.78, UFOV_Z],
+          color: WHITE, emissive: WHITE, shape: "sphere", scale: 0.035,
+          groupId, meta: { blockEye: blk.blocked },
+        });
+        // response rings at every sector on THIS trial's eccentricity
+        for (let k = 0; k < UFOV_SECTORS; k++) {
+          const a = (k / UFOV_SECTORS) * Math.PI * 2;
+          trials.push({
+            id: `${groupId}-r${k}`, spawnAt: t + 260 + expMs + 60, duration: 2400,
+            kind: k === sector ? "go" : "distractor",
+            zone: "center",
+            position: [Math.cos(a) * r, 1.45 + Math.sin(a) * r * 0.78, UFOV_Z],
+            color: "#38406B", emissive: PURPLE, shape: "ring", scale: 0.05,
+            groupId, meta: { blockEye: blk.blocked },
+          });
+        }
+        t += 260 + expMs + 2400 + 700;
+      }
     }
     return trials;
   },
-  onSpawnAdapt: (spec, snapshot, api) => {
-    if (spec.meta?.ufovFlash) { spec.duration = ufovState.applied; return; } // flash follows exposure
-    if (!spec.meta?.ufovFirst) return;
-    if (ufovState.done) { api.finishEarly(); return; }
-    if (snapshot.hits + snapshot.errors > 0 && snapshot.lastEventCorrect !== undefined) {
-      if (snapshot.lastEventCorrect) {
-        ufovState.best = ufovState.best === null ? ufovState.applied : Math.min(ufovState.best, ufovState.applied);
-        ufovState.wrongRun = 0;
-        ufovState.idx = Math.min(UFOV_LADDER.length - 1, ufovState.idx + 1);
-      } else {
-        ufovState.wrongRun += 1;
-        ufovState.idx = Math.max(0, ufovState.idx - 1);
-        if (ufovState.wrongRun >= 3) { ufovState.done = true; api.finishEarly(); return; }
-      }
+  analyze: (events) => {
+    const notes: string[] = [];
+    for (const eye of ["right", "left"] as const) {
+      const evts = events.filter((e) => e.trialId.startsWith(`ufov-${eye}-`) && e.errorType !== "correctRejection");
+      if (!evts.length) continue;
+      const correct = evts.filter((e) => e.correct).length;
+      const acc = Math.round((correct / evts.length) * 1000) / 10;
+      // deepest eccentricity + fastest flash still localized correctly
+      const plan = ufovPlan.filter((r) => r.eye === eye);
+      let deepest = 0;
+      let fastest = 9999;
+      evts.forEach((e, i) => {
+        if (!e.correct) return;
+        const rec = plan[i];
+        if (!rec) return;
+        deepest = Math.max(deepest, rec.eccDeg);
+        fastest = Math.min(fastest, rec.expMs);
+      });
+      notes.push(
+        `${eye.toUpperCase()} eye: ${acc}% localization over ${evts.length} trials — furthest correct ${deepest} deg eccentricity, briefest correct flash ${fastest === 9999 ? "—" : fastest + "ms"}.`,
+      );
     }
-    ufovState.applied = UFOV_LADDER[ufovState.idx];
-    // apply the exposure to the central + peripheral flash of THIS trial
-    spec.duration = ufovState.applied;
+    notes.push("Monocular protocol — 15 trials per eye, all 8 field sectors probed. PROTOTYPE (design validation) — non-validating.");
+    return notes;
   },
-  analyze: () => {
-    if (ufovState.best === null) return ["No exposure reliably localized - start peripheral drills at foundation."];
-    return [
-      `Useful field of view threshold: ${ufovState.best}ms exposure (8-position, divided attention).`,
-      ufovState.best <= 90 ? "Fast processing under load - elite range." : ufovState.best <= 200 ? "Solid divided-attention speed." : "Divided-attention speed a development target.",
-      "PROTOTYPE (design validation) — non-validating threshold.",
-    ];
+  durationMs: (params) => {
+    const p = params as { trialsPerEye: number };
+    // 2 eyes x (banner + trials)
+    return 2600 + 2 * (2600 + p.trialsPerEye * (260 + UFOV_EXP_SLOW + 2400 + 700)) + 3000;
   },
-  durationMs: (params) => 2200 + (params as { maxTrials: number }).maxTrials * 3400 + 1500,
 };
 
 export const TIER_ONE_BASELINES = [

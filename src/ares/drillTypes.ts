@@ -160,6 +160,8 @@ export interface DrillDefinition {
   interTrialCountdown?: boolean;
   /** stroboscopic occlusion is offered as a pre-drill option (motion drills) */
   supportsStrobe?: boolean;
+  /** monocular protocol: one eye is fully occluded per block (per-eye layers) */
+  monocular?: boolean;
   /** gaze-stabilization drill: render fixation dot + head-speed feedback ring */
   gazeStability?: boolean;
   /** completion-paced session (Schulte): length is trial-driven, not timed —

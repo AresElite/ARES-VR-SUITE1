@@ -710,6 +710,43 @@ function StroboscopicLayer() {
   );
 }
 
+/**
+ * MonocularOccluder — TRUE per-eye block. A full-field black quad is rendered
+ * ONLY to the occluded eye's layer (layer 1 = left eye, layer 2 = right eye),
+ * so the tested eye sees the field normally and the other sees black.
+ * The active trial carries meta.blockEye.
+ */
+function MonocularOccluder() {
+  const engine = useAppStore((s) => s.engine);
+  const inSession = useXR((s) => s.session);
+  const camera = useThree((s) => s.camera);
+  const mesh = useRef<THREE.Mesh>(null);
+  const fwd = useMemo(() => new THREE.Vector3(), []);
+  const [blockEye, setBlockEye] = useState<"left" | "right" | null>(null);
+  useFrame(() => {
+    if (!engine) return;
+    let be: "left" | "right" | null = null;
+    for (const t of (engine as unknown as { active: Map<string, { spec: { meta?: { blockEye?: "left" | "right" } } }> }).active.values()) {
+      const e = t.spec.meta?.blockEye;
+      if (e) { be = e; break; }
+    }
+    if (be !== blockEye) setBlockEye(be);
+    const m = mesh.current;
+    if (!m) return;
+    fwd.set(0, 0, -1).applyQuaternion(camera.quaternion);
+    m.position.copy(camera.position).add(fwd.multiplyScalar(0.24));
+    m.quaternion.copy(camera.quaternion);
+  });
+  if (!inSession || !blockEye) return null;
+  const mask = blockEye === "left" ? 2 : 4; // layer1 -> left eye, layer2 -> right eye
+  return (
+    <mesh ref={mesh} renderOrder={9998} frustumCulled={false} layers-mask={mask}>
+      <planeGeometry args={[3, 3]} />
+      <meshBasicMaterial color="#000000" depthTest={false} depthWrite={false} toneMapped={false} />
+    </mesh>
+  );
+}
+
 /** feeds head angular velocity from the XR camera every frame */
 function HeadMotionTracker() {
   const camera = useThree((s) => s.camera);
@@ -898,6 +935,7 @@ export function DrillRunner() {
       {inSession && engine.definition.responseMode === "trigger" && <TriggerListener />}
       {!inSession && engine.definition.responseMode === "trigger" && <DesktopTriggerKeys />}
       {engine.definition.gazeStability && <GazeAids />}
+      {engine.definition.monocular && <MonocularOccluder />}
       {strobeLevel > 0 && engine.definition.supportsStrobe && <StroboscopicLayer />}
       <HeadMotionTracker />
       {engine.definition.responseMode === "joystick" && <JoystickListener cursor={demCursor} />}
