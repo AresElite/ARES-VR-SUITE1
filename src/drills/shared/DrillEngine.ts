@@ -64,6 +64,7 @@ export class DrillEngine {
   /** chainId -> pending members in order; head spawns on predecessor resolution */
   private chains = new Map<string, TrialSpec[]>();
   private orderedProgress = new Map<string, number>(); // groupId -> next seq expected
+  private orderedLastAt = new Map<string, number>();   // groupId -> when the previous item resolved
   private gridQueue = new Map<number, TrialSpec[]>(); // gridSeq -> members (spawn on prev grid completion)
   private active = new Map<string, ActiveTarget>();
   private events: RawEvent[] = [];
@@ -146,6 +147,16 @@ export class DrillEngine {
     if (this.state !== "paused") return;
     this.timing.resume();
     this.setState("running");
+  }
+
+  /**
+   * The seq the ordered group is CURRENTLY waiting on. The UI must read the
+   * cursor from here rather than counting resolved events — an orderError
+   * records an event without resolving the target, so an event-counting cursor
+   * silently desyncs and then every subsequent response fails.
+   */
+  expectedSeq(groupId: string): number {
+    return this.orderedProgress.get(groupId) ?? this.minSeqInGroup(groupId);
   }
 
   /** Adaptive protocols: drop everything unspawned; completes once the
@@ -449,7 +460,14 @@ export class DrillEngine {
     const t = this.active.get(targetId);
     if (!t || t.resolved) return;
     const now = this.timing.now;
-    const reactionMs = now - t.spawnClock;
+    // Ordered boards (DEM): every item spawns at once, so time-since-spawn is
+    // cumulative and useless. The real per-item speed is the time since the
+    // PREVIOUS item was completed.
+    let reactionMs = now - t.spawnClock;
+    if (t.spec.groupMode === "ordered" && t.spec.groupId) {
+      const prev = this.orderedLastAt.get(t.spec.groupId) ?? t.spawnClock;
+      reactionMs = now - prev;
+    }
     const pos = this.posOf(targetId);
 
     let correct = true;
@@ -476,6 +494,7 @@ export class DrillEngine {
         return;
       }
       this.orderedProgress.set(t.spec.groupId, expected + 1);
+      this.orderedLastAt.set(t.spec.groupId, now);
     }
 
     if (t.kind === "noGo") {
