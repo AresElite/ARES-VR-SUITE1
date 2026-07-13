@@ -85,88 +85,155 @@ export const CoincidenceAnticipation: DrillDefinition = {
   },
 };
 
-// ============ 2. DYNAMIC VISUAL ACUITY — target motion (staircase) ============
-// A direction optotype sweeps horizontally at increasing angular velocity.
-// Identify its pointing direction by joystick flick. Velocity climbs on a
-// correct answer, eases on a wrong one, terminates after 3 consecutive
-// misses. Threshold = the highest velocity still identified.
-const DVA_LADDER = [20, 30, 45, 65, 90, 120, 155, 195, 240, 290, 345];
-interface Stair { idx: number; wrongRun: number; applied: number; best: number | null; done: boolean }
-const dvaState: Stair = { idx: 0, wrongRun: 0, applied: DVA_LADDER[0], best: null, done: false };
+// ====== 2. DYNAMIC VISUAL ACUITY — monocular OD / OS / OU ======
+// Three blocks: RIGHT eye only (OD, left occluded), LEFT eye only (OS, right
+// occluded), then BOTH (OU). 15 trials per block. Within a block the arrow
+// sweeps FASTER and gets SMALLER each trial, with a fully random direction.
+// THREE consecutive wrong answers ends that block early and moves to the next.
+const DVA_TRIALS_PER_BLOCK = 15;
+const DVA_Z = -1.0;
+const DVA_V_SLOW = 30;   // deg/s
+const DVA_V_FAST = 260;  // deg/s
+const DVA_SCALE_BIG = 0.075;
+const DVA_SCALE_SMALL = 0.026;
+
+type DvaBlock = "od" | "os" | "ou";
+const DVA_BLOCKS: { id: DvaBlock; label: string; blockEye?: "left" | "right" }[] = [
+  { id: "od", label: "RIGHT EYE (OD) — LEFT COVERED", blockEye: "left" },
+  { id: "os", label: "LEFT EYE (OS) — RIGHT COVERED", blockEye: "right" },
+  { id: "ou", label: "BOTH EYES (OU)" },
+];
+
+interface DvaState {
+  wrongRun: Record<DvaBlock, number>;
+  done: Record<DvaBlock, boolean>;
+  lastBlock: DvaBlock | null;
+  prevEvents: number;
+}
+const dvaState: DvaState = {
+  wrongRun: { od: 0, os: 0, ou: 0 },
+  done: { od: false, os: false, ou: false },
+  lastBlock: null,
+  prevEvents: 0,
+};
+const dvaPlan: { block: DvaBlock; idx: number; degS: number }[] = [];
 
 export const DynamicVisualAcuity: DrillDefinition = {
   id: "assess-dva-motion",
-  name: "Dynamic Visual Acuity (Target Motion)",
+  name: "Dynamic Visual Acuity (OD / OS / OU)",
   shortName: "Dynamic Acuity",
   phase: "Assess",
   description:
-    "A pointing arrow sweeps across your view, faster each time you read it correctly. Flick the joystick in the direction it points. Three misses in a row ends the test — the fastest sweep you still identified is your threshold.",
-  purpose: "Dynamic visual acuity for moving targets (velocity threshold).",
+    "Monocular then binocular. RIGHT eye alone (left covered), LEFT eye alone (right covered), then BOTH. An arrow sweeps across your view — flick the joystick the way it points. Each trial it moves faster and gets smaller. Three wrong in a row ends that eye and moves to the next. 15 trials per block.",
+  purpose: "Dynamic visual acuity per eye and binocularly (velocity + size threshold).",
   interaction: "touch",
   responseMode: "joystick",
   environment: "arena",
   mvp: true,
   assessment: true,
+  monocular: true,
   instructions: [
-    "1. An arrow sweeps left-to-right or right-to-left across your view.",
-    "2. Read which way it points and FLICK the joystick that direction.",
-    "3. Every correct read makes the next sweep FASTER.",
-    "4. A miss slows it back down; three misses in a row ends the test.",
-    "5. Your threshold - the fastest sweep you resolved - is recorded in deg/s.",
+    "1. A banner tells you which eye is being tested - the other eye is BLACKED OUT.",
+    "2. An ARROW sweeps across your view. Read which way it POINTS.",
+    "3. FLICK the joystick in that exact direction (up / down / left / right).",
+    "4. Every trial the arrow moves FASTER and gets SMALLER.",
+    "5. Three wrong in a row ends that eye and moves to the next. RIGHT eye, then LEFT, then BOTH.",
   ],
-  controlsHint: "READ THE SWEEPING ARROW - FLICK THE JOYSTICK TO MATCH",
-  levels: STANDARD({ maxTrials: 26 }),
+  controlsHint: "READ THE SWEEPING ARROW - FLICK THE JOYSTICK THAT WAY",
+  levels: STANDARD({ trialsPerBlock: DVA_TRIALS_PER_BLOCK }),
   buildTrials: (params, rng) => {
-    dvaState.idx = 0; dvaState.wrongRun = 0; dvaState.applied = DVA_LADDER[0];
-    dvaState.best = null; dvaState.done = false;
-    const p = params as { maxTrials: number };
+    const p = params as { trialsPerBlock: number };
+    dvaState.wrongRun = { od: 0, os: 0, ou: 0 };
+    dvaState.done = { od: false, os: false, ou: false };
+    dvaState.lastBlock = null;
+    dvaState.prevEvents = 0;
+    dvaPlan.length = 0;
     const trials: TrialSpec[] = [];
-    let t = 2000;
-    for (let n = 0; n < p.maxTrials; n++) {
-      const dir = pick(rng, DIRS);
-      const leftToRight = rng() < 0.5;
+    let t = 2400;
+    for (const blk of DVA_BLOCKS) {
+      // eye banner
       trials.push({
-        id: `dva-${n}`, spawnAt: t, duration: 2600, kind: "go",
-        zone: "center",
-        position: [leftToRight ? -0.7 : 0.7, 1.42 + (rng() - 0.5) * 0.12, Z],
-        requiredDirection: dir,
-        color: WHITE, emissive: TEAL, shape: "arrow", scale: 0.05,
-        meta: { pointDir: dir, dvaFirst: true, leftToRight, stepIdx: n },
+        id: `dva-banner-${blk.id}`, spawnAt: t, duration: 2400, kind: "distractor",
+        zone: "center", position: [0, 1.72, DVA_Z], color: TEAL, emissive: TEAL, shape: "diamond", scale: 0.001,
+        label: blk.label,
+        meta: { decor: true, ...(blk.blockEye ? { blockEye: blk.blockEye } : {}), labelInside: true, labelSize: 0.05, labelColor: "#7FD3DE" },
       });
-      t += 2900;
+      t += 2600;
+
+      for (let n = 0; n < p.trialsPerBlock; n++) {
+        const f = n / Math.max(1, p.trialsPerBlock - 1);
+        const degS = Math.round(DVA_V_SLOW + (DVA_V_FAST - DVA_V_SLOW) * f); // faster each trial
+        const scale = DVA_SCALE_BIG + (DVA_SCALE_SMALL - DVA_SCALE_BIG) * f;  // smaller each trial
+        const dir = pick(rng, DIRS);                                          // fully random direction
+        const leftToRight = rng() < 0.5;
+        const vms = (degS * Math.PI) / 180 * Math.abs(DVA_Z);                 // deg/s -> m/s
+        const travel = 1.5;
+        dvaPlan.push({ block: blk.id, idx: n, degS });
+        trials.push({
+          id: `dva-${blk.id}-${n}`, spawnAt: t,
+          duration: (travel / vms) * 1000 + 250,
+          kind: "go",
+          zone: "center",
+          position: [leftToRight ? -0.75 : 0.75, 1.45 + (rng() - 0.5) * 0.16, DVA_Z],
+          velocity: [(leftToRight ? 1 : -1) * vms, 0, 0],
+          requiredDirection: dir,
+          color: WHITE, emissive: TEAL, shape: "arrow", scale,
+          meta: { pointDir: dir, dvaBlock: blk.id, dvaIdx: n, ...(blk.blockEye ? { blockEye: blk.blockEye } : {}) },
+        });
+        t += (travel / vms) * 1000 + 250 + 900;
+      }
+      t += 600;
     }
     return trials;
   },
-  onSpawnAdapt: (spec, snapshot, api) => {
-    if (dvaState.done) { api.finishEarly(); spec.meta = { ...spec.meta, decor: true }; spec.duration = 10; return; }
-    // fold in previous outcome, set this sweep's velocity
-    if (snapshot.hits + snapshot.errors > 0 && snapshot.lastEventCorrect !== undefined) {
-      if (snapshot.lastEventCorrect) {
-        dvaState.best = dvaState.best === null ? dvaState.applied : Math.max(dvaState.best, dvaState.applied);
-        dvaState.wrongRun = 0;
-        dvaState.idx = Math.min(DVA_LADDER.length - 1, dvaState.idx + 1);
-      } else {
-        dvaState.wrongRun += 1;
-        dvaState.idx = Math.max(0, dvaState.idx - 1);
-        if (dvaState.wrongRun >= 3) { dvaState.done = true; api.finishEarly(); spec.meta = { ...spec.meta, decor: true }; spec.duration = 10; return; }
+  onSpawnAdapt: (spec, snapshot) => {
+    const blk = spec.meta?.dvaBlock as DvaBlock | undefined;
+    if (!blk) return;
+    // fold in the previous trial's outcome (only when a new event actually landed)
+    const events = snapshot.hits + snapshot.errors;
+    if (events > dvaState.prevEvents && dvaState.lastBlock && snapshot.lastEventCorrect !== undefined) {
+      if (snapshot.lastEventCorrect) dvaState.wrongRun[dvaState.lastBlock] = 0;
+      else {
+        dvaState.wrongRun[dvaState.lastBlock] += 1;
+        if (dvaState.wrongRun[dvaState.lastBlock] >= 3) dvaState.done[dvaState.lastBlock] = true;
       }
     }
-    dvaState.applied = DVA_LADDER[dvaState.idx];
-    // deg/s -> lateral m/s at ~0.9 m viewing distance
-    const vms = (dvaState.applied * Math.PI / 180) * Math.abs(Z);
-    const sign = spec.meta?.leftToRight ? 1 : -1;
-    spec.velocity = [sign * vms, 0, 0];
-    spec.duration = (1.4 / vms) * 1000 + 200;
+    dvaState.prevEvents = events;
+    // this block is finished (3 wrong in a row) — skip its remaining trials
+    if (dvaState.done[blk]) {
+      spec.kind = "distractor";
+      spec.meta = { ...spec.meta, decor: true };
+      spec.duration = 10;
+      return;
+    }
+    dvaState.lastBlock = blk;
   },
-  analyze: () => {
-    if (dvaState.best === null) return ["No sweep resolved even at the slowest speed - retest; verify headset fit."];
-    return [
-      `Dynamic visual acuity threshold: ${dvaState.best} deg/s (target-motion).`,
-      dvaState.best >= 195 ? "Elite dynamic acuity range." : dvaState.best >= 90 ? "Solid dynamic acuity - trainable upward." : "Dynamic acuity a development target - drills prescribed.",
-      "PROTOTYPE (design validation) — non-validating threshold.",
-    ];
+  analyze: (events) => {
+    const notes: string[] = [];
+    for (const blk of DVA_BLOCKS) {
+      const evts = events.filter((e) => e.trialId.startsWith(`dva-${blk.id}-`) && e.errorType !== "correctRejection");
+      if (!evts.length) { notes.push(`${blk.id.toUpperCase()}: not reached.`); continue; }
+      const correct = evts.filter((e) => e.correct).length;
+      const acc = Math.round((correct / evts.length) * 1000) / 10;
+      let fastest = 0;
+      for (const e of evts) {
+        if (!e.correct) continue;
+        const m = e.trialId.match(/-(\d+)$/);
+        const idx = m ? Number(m[1]) : -1;
+        const rec = dvaPlan.find((r) => r.block === blk.id && r.idx === idx);
+        if (rec) fastest = Math.max(fastest, rec.degS);
+      }
+      notes.push(
+        `${blk.id.toUpperCase()}: ${acc}% over ${evts.length} trial(s) — fastest arrow correctly read ${fastest || "—"} deg/s${dvaState.done[blk.id] ? " (ended on 3 consecutive misses)" : ""}.`,
+      );
+    }
+    notes.push("Monocular OD/OS then binocular OU — 15 trials each. PROTOTYPE (design validation) — non-validating.");
+    return notes;
   },
-  durationMs: (params) => 2000 + (params as { maxTrials: number }).maxTrials * 2900 + 1500,
+  durationMs: (params) => {
+    const p = params as { trialsPerBlock: number };
+    return 2400 + 3 * (2600 + p.trialsPerBlock * 3200 + 600) + 3000;
+  },
 };
 
 // ================= 3. USEFUL FIELD OF VIEW (monocular) =================

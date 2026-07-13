@@ -7,7 +7,7 @@ export const ORG_NAME = "Ares Elite Sports Vision";
  * Version stamp — visible in the site footer and the VR arena so anyone can
  * instantly tell which build is live. Bump on every deploy.
  */
-export const APP_VERSION = "v0.36.0 — UFOV rebuilt: monocular per-eye, 15 trials/eye, central→peripheral ramp";
+export const APP_VERSION = "v0.37.0 — DVA rebuilt OD/OS/OU + CRITICAL arrow-direction fix";
 
 /** Spatial UI distances (meters) — panels live 1.5–2.5m from the athlete. */
 export const PANEL_NEAR = 1.6;

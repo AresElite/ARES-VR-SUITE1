@@ -452,7 +452,14 @@ function TargetMesh({
     : undefined;
 
   const pointDir = (spec.meta?.pointDir as SliceDirection | undefined) ?? spec.requiredDirection;
-  const rotZ = pointDir ? DIR_ANGLE[pointDir] - Math.PI / 2 : 0;
+  // ARROW_SHAPE points +X (right) at rest; coneGeometry points +Y (up).
+  // So the arrow needs NO offset, the cone needs -90deg. Getting this wrong
+  // renders every arrow 90deg off from its requiredDirection.
+  const rotZ = pointDir
+    ? spec.shape === "arrow"
+      ? DIR_ANGLE[pointDir]
+      : DIR_ANGLE[pointDir] - Math.PI / 2
+    : 0;
 
   if (spec.shape === "pad") {
     // Suite card language: pads are rounded (rounded-xl) tiles
