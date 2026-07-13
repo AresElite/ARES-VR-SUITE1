@@ -64,11 +64,32 @@ const STRIKE_ORB_RADIUS = 0.037; // trimmed per athlete feedback
 const HIT_PADDING = 0.042; // tightened: oversized hitboxes caused phantom errors
 const DIRECTION_MIN_SPEED = 0.6; // m/s of hand motion needed to read a slice direction
 
+/**
+ * A wrong-hand error requires INTENT. These thresholds separate a strike from a
+ * hand simply passing through the space on its way somewhere else.
+ */
+const WRONG_HAND_MIN_SPEED = 0.45; // m/s — below this it is travel, not a strike
+const WRONG_HAND_MIN_DOT = 0.35;   // must be moving INTO the target, not across it
+
+/** Squared distance from a point to the segment a->b (the swept hand path). */
+function segPointDist2(a: THREE.Vector3, b: THREE.Vector3, p: readonly number[]): number {
+  const abx = b.x - a.x, aby = b.y - a.y, abz = b.z - a.z;
+  const apx = p[0] - a.x, apy = p[1] - a.y, apz = p[2] - a.z;
+  const len2 = abx * abx + aby * aby + abz * abz;
+  const t = len2 > 1e-9
+    ? Math.max(0, Math.min(1, (apx * abx + apy * aby + apz * abz) / len2))
+    : 0;
+  const cx = a.x + abx * t, cy = a.y + aby * t, cz = a.z + abz * t;
+  return (p[0] - cx) ** 2 + (p[1] - cy) ** 2 + (p[2] - cz) ** 2;
+}
+
 interface HandTracker {
   hand: Hand;
   object: THREE.Object3D | null;
   pos: THREE.Vector3;
   prev: THREE.Vector3;
+  /** where the hand was at the START of this frame — the swept segment's origin */
+  prevSwept: THREE.Vector3;
   vel: THREE.Vector3;
   hasPrev: boolean;
   pulse: (() => void) | null;
@@ -94,14 +115,17 @@ function StrikeColliders() {
 
   const trackers = useMemo<HandTracker[]>(
     () => [
-      { hand: "left", object: null, pos: new THREE.Vector3(), prev: new THREE.Vector3(), vel: new THREE.Vector3(), hasPrev: false, pulse: null, touching: new Set() },
-      { hand: "right", object: null, pos: new THREE.Vector3(), prev: new THREE.Vector3(), vel: new THREE.Vector3(), hasPrev: false, pulse: null, touching: new Set() },
+      { hand: "left", object: null, pos: new THREE.Vector3(), prev: new THREE.Vector3(), prevSwept: new THREE.Vector3(), vel: new THREE.Vector3(), hasPrev: false, pulse: null, touching: new Set() },
+      { hand: "right", object: null, pos: new THREE.Vector3(), prev: new THREE.Vector3(), prevSwept: new THREE.Vector3(), vel: new THREE.Vector3(), hasPrev: false, pulse: null, touching: new Set() },
     ],
     [],
   );
 
+  const candidates = useMemo<{ slot: PoolSlot; tracker: HandTracker; d2: number }[]>(() => [], []);
+
   useFrame((_, dt) => {
     if (!engine) return;
+    candidates.length = 0;
     // Resolve current input objects (controller grip preferred, else hand)
     trackers[0].object = leftCtl?.object ?? leftHand?.object ?? null;
     trackers[1].object = rightCtl?.object ?? rightHand?.object ?? null;
@@ -128,6 +152,9 @@ function StrikeColliders() {
       if (t.hasPrev && dt > 0) {
         t.vel.copy(t.pos).sub(t.prev).divideScalar(dt);
       }
+      // the swept segment is LAST frame's position -> this frame's position, so it
+      // must be captured before prev is advanced
+      t.prevSwept.copy(t.prev);
       t.prev.copy(t.pos);
       t.hasPrev = true;
 
@@ -135,34 +162,98 @@ function StrikeColliders() {
       const stillTouching = new Set<string>();
       for (const slot of engine.pool.slots) {
         if (!slot.active || !slot.spec || slot.spec.decor || slot.spec.meta?.decor) continue;
-        const dx = slot.pos[0] - t.pos.x;
-        const dy = slot.pos[1] - t.pos.y;
-        const dz = slot.pos[2] - t.pos.z;
+
+        /**
+         * SWEPT CONTACT — test the segment the hand travelled this frame, not the
+         * point where it happened to land.
+         *
+         * At 72-90 fps a hand moving 3 m/s covers 3-4 cm between frames. Against a
+         * 2.6 cm target that means the hand can pass clean THROUGH it and never be
+         * inside it on any sampled frame. The athlete sees a dead-centre strike and
+         * the engine sees nothing — which is exactly the Focus-Frenzy report: the
+         * ball is hit, isn't counted, and rides its colour ramp to red.
+         *
+         * Testing prev->current as a segment makes a fast, accurate strike register
+         * MORE reliably than a slow one, which is the correct incentive.
+         */
         const reach = slot.spec.scale + STRIKE_ORB_RADIUS + HIT_PADDING + ((slot.spec.meta?.hitBoost as number) ?? 0);
-        if (dx * dx + dy * dy + dz * dz <= reach * reach) {
-          stillTouching.add(slot.spec.id);
-          const age = engine.timing.now - slot.spawnClock;
-          if (!t.touching.has(slot.spec.id) && age < 140) {
-            // spawn grace: resting hands don't auto-strike a target that
-            // appears around them — require a deliberate exit + re-entry
-            continue;
-          }
-          if (!t.touching.has(slot.spec.id)) {
-            let direction: SliceDirection | undefined;
-            if (slot.spec.requiredDirection) {
-              const speed = Math.hypot(t.vel.x, t.vel.y);
-              direction =
-                speed >= DIRECTION_MIN_SPEED
-                  ? sliceDirectionFromDelta(t.vel.x, t.vel.y)
-                  : slot.spec.requiredDirection;
-            }
-            const contactDist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-            engine.registerHit(slot.spec.id, t.hand, direction, contactDist, slot.spec.scale + STRIKE_TOLERANCE_M);
-            t.pulse?.();
-          }
+        const d2 = t.hasPrev
+          ? segPointDist2(t.prevSwept, t.pos, slot.pos)
+          : (slot.pos[0] - t.pos.x) ** 2 + (slot.pos[1] - t.pos.y) ** 2 + (slot.pos[2] - t.pos.z) ** 2;
+        if (d2 > reach * reach) continue;
+
+        stillTouching.add(slot.spec.id);
+        const age = engine.timing.now - slot.spawnClock;
+        if (!t.touching.has(slot.spec.id) && age < 140) {
+          // spawn grace: resting hands don't auto-strike a target that
+          // appears around them — require a deliberate exit + re-entry
+          continue;
         }
+        if (t.touching.has(slot.spec.id)) continue;
+
+        /**
+         * DELIBERATE-STRIKE GATE FOR THE WRONG HAND.
+         *
+         * The correct hand may take a target with any touch — we never want to make
+         * a legitimate strike harder to land. But the WRONG hand only commits an
+         * error if it STRIKES: moving with intent, INTO the target.
+         *
+         * An accidental graze is not a decision. When the left hand sweeps past a
+         * purple orb on its way to a teal one, that is travel, not a choice, and
+         * scoring it as a wrong-hand error measures the target layout rather than
+         * the athlete. This is the whole reason cross-hand false errors were
+         * appearing: a hand in transit was being read as a hand committing.
+         */
+        const req = slot.spec.requiredHand;
+        if (req && req !== "either" && req !== "both" && req !== t.hand) {
+          const speed = t.vel.length();
+          const tox = slot.pos[0] - t.pos.x, toy = slot.pos[1] - t.pos.y, toz = slot.pos[2] - t.pos.z;
+          const m = Math.hypot(tox, toy, toz) || 1e-6;
+          const into = speed > 1e-3
+            ? (t.vel.x * tox + t.vel.y * toy + t.vel.z * toz) / (m * speed)
+            : 0;
+          if (speed < WRONG_HAND_MIN_SPEED || into < WRONG_HAND_MIN_DOT) continue;
+        }
+
+        candidates.push({ slot, tracker: t, d2 });
       }
       t.touching = stillTouching;
+    }
+
+    /**
+     * CORRECT-HAND PREFERENCE.
+     *
+     * The tracker loop runs left-then-right, so when BOTH hands were inside a
+     * purple (right-hand) target on the same frame, the LEFT hand registered a
+     * wrong-hand error before the right hand was ever tested. The athlete struck
+     * correctly and was marked wrong — purely because of array order.
+     *
+     * Contacts are now gathered first and resolved after: if the required hand is
+     * among the hands touching a target, it wins. Ordering is not a rule.
+     */
+    candidates.sort((a, b) => {
+      const ra = a.slot.spec!.requiredHand;
+      const rb = b.slot.spec!.requiredHand;
+      const aOk = !ra || ra === "either" || ra === "both" || ra === a.tracker.hand;
+      const bOk = !rb || rb === "either" || rb === "both" || rb === b.tracker.hand;
+      if (aOk !== bOk) return aOk ? -1 : 1;   // correct hand resolves first
+      return a.d2 - b.d2;                      // then the closer contact
+    });
+    const taken = new Set<string>();
+    for (const c of candidates) {
+      const spec = c.slot.spec!;
+      if (taken.has(spec.id)) continue;
+      taken.add(spec.id);
+      const t = c.tracker;
+      let direction: SliceDirection | undefined;
+      if (spec.requiredDirection) {
+        const speed = Math.hypot(t.vel.x, t.vel.y);
+        direction = speed >= DIRECTION_MIN_SPEED
+          ? sliceDirectionFromDelta(t.vel.x, t.vel.y)
+          : spec.requiredDirection;
+      }
+      engine.registerHit(spec.id, t.hand, direction, Math.sqrt(c.d2), spec.scale + STRIKE_TOLERANCE_M);
+      t.pulse?.();
     }
   });
 

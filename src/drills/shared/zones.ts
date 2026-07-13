@@ -11,6 +11,52 @@ export const EYE_Y = 1.5;
  */
 export const STRIKE_REACH = 0.68;
 
+/**
+ * THE REACH CEILING — a hard guarantee, not a convention.
+ *
+ * Shoulders sit ~0.19 m either side of the midline at ~1.42 m. A strike inside
+ * ~0.82 m of the relevant shoulder is a reach; past that it becomes a lunge, and
+ * a planted athlete simply cannot get there without stepping.
+ *
+ * Individual drills were passing their own `reach` values — 0.92, 0.98 — and
+ * high-eccentricity peripheral zones then pushed the result further still. Six
+ * drills ended up with targets that were physically unstrikeable, and the failure
+ * was silent: the athlete swings, nothing registers, the target expires, and the
+ * drill records a miss that was never theirs. Focus-Frenzy was the extreme case.
+ *
+ * So the ceiling is enforced HERE, at the one function every strike target goes
+ * through. A drill may ask for whatever eccentricity it likes; it may not ask for
+ * an eccentricity the athlete's arm cannot satisfy.
+ */
+export const MAX_STRIKE_DIST = 0.82;
+const SHOULDER_Y = 1.42;
+const SHOULDER_X = 0.19;
+
+/**
+ * Pull a commanded position back inside the athlete's arm, preserving direction.
+ *
+ * HAND-AWARE. If a target is assigned to a specific hand, reach is measured from
+ * THAT hand's shoulder — not the nearest one. A right-hand target sitting at
+ * x = -0.74 is 0.98 m from the right shoulder: a full cross-body lunge that a
+ * planted athlete simply cannot make. It looked reachable to a naive check
+ * because it was close to the LEFT shoulder — the shoulder that is forbidden from
+ * taking it. Depth Slice and Chaos Arena were both doing this, and the athlete ate
+ * a wrong-hand error or a miss for a target no correct hand could ever have met.
+ */
+export function clampToReach(
+  p: [number, number, number],
+  hand?: "left" | "right" | "either" | "both",
+): [number, number, number] {
+  const sx = hand === "left" ? -SHOULDER_X
+    : hand === "right" ? SHOULDER_X
+    : p[0] >= 0 ? SHOULDER_X : -SHOULDER_X;
+  const dx = p[0] - sx, dy = p[1] - SHOULDER_Y, dz = p[2];
+  const d = Math.hypot(dx, dy, dz);
+  if (d <= MAX_STRIKE_DIST || d < 1e-6) return p;
+  const k = MAX_STRIKE_DIST / d;
+  return [sx + dx * k, SHOULDER_Y + dy * k, dz * k];
+}
+
 const DEG = Math.PI / 180;
 
 /** Unit offsets per zone (x = right, y = up) on the view plane. */
@@ -58,7 +104,7 @@ export function strikePosition(
   const x = Math.sin(ecc) * reach * dx + jx;
   const y = EYE_Y - 0.15 + Math.sin(ecc) * reach * 0.62 * dy + jy;
   const z = -Math.cos(ecc * 0.55) * reach;
-  return [x, Math.min(1.85, Math.max(0.95, y)), z];
+  return clampToReach([x, Math.min(1.85, Math.max(0.95, y)), z]);
 }
 
 /** Legacy far-field position (visual anchors, decorative movers). */

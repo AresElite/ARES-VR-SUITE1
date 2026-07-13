@@ -1,7 +1,7 @@
-import type { DrillDefinition, TrialSpec, SliceDirection, TargetZone } from "@/ares/drillTypes";
+import type { DrillDefinition, TrialSpec, SliceDirection, TargetZone, HandRule } from "@/ares/drillTypes";
 import { ARES_COLORS } from "@/ares/colors";
 import { pick } from "@/utils/rng";
-import { strikePosition, PERIPHERAL_ZONES } from "../shared/zones";
+import { strikePosition, PERIPHERAL_ZONES, STRIKE_REACH } from "../shared/zones";
 import { levels25, lerp25, ilerp25, levels50, lerp50, ilerp50 } from "../shared/levels";
 
 /**
@@ -148,11 +148,44 @@ export const ReactionGrid: DrillDefinition = {
 // =========================== EYE-HAND COORDINATION ===========================
 // Central/peripheral distribution, stimulus size, and color/hand modes are
 // trainer dropdowns matching the A.R.E.S. Performance Suite formats.
-const EHC_REACH = 0.98; // strike wall sits a full arm's extension out
-const EHC_SIZES: Record<string, number> = { xl: 0.115, l: 0.095, m: 0.078, s: 0.062, xs: 0.05 };
+/**
+ * The wall used to sit at 0.98 m — 44% beyond the documented 0.55-0.75 m strike
+ * shell. That is a full arm extension on every single rep, and it is why the
+ * targets had to be so large in the first place: the size was compensating for
+ * the distance. Halving the targets without pulling the wall in would have made
+ * the drill unplayable, so both move together.
+ */
+const EHC_REACH = STRIKE_REACH;
+/** Every size halved, as requested. Medium is now 3.9 cm radius (was 7.8 cm). */
+const EHC_SIZES: Record<string, number> = { xl: 0.0575, l: 0.0475, m: 0.039, s: 0.031, xs: 0.025 };
+
+/**
+ * MIDLINE GUARD — the structural half of the cross-hand fix.
+ *
+ * A PURPLE (right-hand) orb must never spawn in left-hand territory, and vice
+ * versa. Previously a purple target could land just left of centre, so the left
+ * hand had to travel THROUGH it to reach its own targets — and every pass was a
+ * chance to be scored as a wrong-hand error the athlete never intended.
+ *
+ * This does not make the drill easier. The athlete still has to see the colour,
+ * pick the hand, and cross the field to the peripheral zones. It only stops the
+ * layout from manufacturing errors that have nothing to do with their decision.
+ * "Either"-hand targets (blue) are unrestricted — there is no wrong hand for them.
+ */
+const EHC_MIDLINE = 0.10;
 const EHC_DIST: Record<string, number> = {
   "60-40": 0.6, "50-50": 0.5, "40-60": 0.4, "30-70": 0.3, "20-80": 0.2, "10-90": 0.1, "0-100": 0,
 };
+
+/** Place an EHC target, keeping hand-assigned orbs on their own side of the midline. */
+function handSafePosition(
+  zone: TargetZone, ecc: number, rng: () => number, hand?: HandRule,
+): [number, number, number] {
+  const p = strikePosition(zone, ecc, 0.12, rng, EHC_REACH);
+  if (hand === "right") p[0] = Math.max(p[0], EHC_MIDLINE);
+  else if (hand === "left") p[0] = Math.min(p[0], -EHC_MIDLINE);
+  return p;
+}
 
 export const EyeHandCoordination: DrillDefinition = {
   id: "eye-hand-coordination",
@@ -253,7 +286,7 @@ export const EyeHandCoordination: DrillDefinition = {
           duration: p.timeoutMs,
           kind: "go",
           zone,
-          position: strikePosition(zone, ecc, 0.12, rng, EHC_REACH),
+          position: handSafePosition(zone, ecc, rng, c.hand),
           requiredHand: c.hand,
           color: c.color,
           emissive: c.color,
@@ -647,9 +680,17 @@ levels: levels50((i) => ({
     // four well-separated anchors — a target wandering within `amp` of its
     // anchor can never reach a neighbouring anchor's zone (spacing > 2*amp+size)
     const ANCHORS: [number, number][] = [
-      [-0.46, 1.28], [0.46, 1.28], [-0.46, 1.70], [0.46, 1.70],
+      [-0.42, 1.30], [0.42, 1.30], [-0.42, 1.68], [0.42, 1.68],
     ];
-    const Z_FF = -0.85;
+    /**
+     * Focus-Frenzy was the ONLY drill in the suite sitting outside the strike
+     * shell: z = -0.85 against a documented reach of 0.55-0.75 m. Combined with
+     * targets as small as 2.6 cm, the total hit tolerance was ~10 cm at a point
+     * the athlete could only reach at full extension — while the target was also
+     * oscillating away from them. Hits genuinely could not land, which is exactly
+     * what was reported: strike it, nothing counts, it rides the ramp to red.
+     */
+    const Z_FF = -STRIKE_REACH;
     const trials: TrialSpec[] = [];
     for (let sIdx = 0; sIdx < p.streams; sIdx++) {
       const [ax0, ay0] = ANCHORS[sIdx];
@@ -675,9 +716,15 @@ levels: levels50((i) => ({
           },
           color: PURPLE,
           emissive: PURPLE,
+          /**
+           * A MOVING target earns a little extra tolerance, scaled to how fast it
+           * is actually travelling. A 2.6 cm ball oscillating at 3 Hz is not the
+           * same hit as a 2.6 cm ball standing still, and pretending otherwise
+           * measures the athlete's luck with frame timing rather than their aim.
+           */
           shape: "sphere",
           scale: p.scale,
-          meta: { urgency: true },
+          meta: { urgency: true, hitBoost: Math.min(0.035, ampX * p.freq * 0.05) },
         });
       }
     }

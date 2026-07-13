@@ -1,4 +1,5 @@
 import { classifyPrecision } from "@/ares/precision";
+import { clampToReach } from "./zones";
 import type {
   DrillDefinition,
   Hand,
@@ -113,6 +114,45 @@ export class DrillEngine {
       scheduled.push(arr[0]);
       this.chains.set(cid, arr.slice(1));
     }
+    /**
+     * REACH GUARANTEE — the last line of defence, applied to every drill.
+     *
+     * Most drills place targets through strikePosition(), which now clamps. But
+     * several position them with raw coordinates, and those slipped past: six
+     * drills were placing STATIC strike targets 0.92-0.99 m from the shoulder,
+     * beyond what a planted athlete can reach. The failure mode is silent and
+     * ugly — the athlete swings, nothing registers, the target expires, and the
+     * engine records a miss that was never theirs.
+     *
+     * Only STATIC strike targets are clamped. A target with velocity or a lane is
+     * SUPPOSED to start out of reach and fly in; clamping its spawn would destroy
+     * the drill. A wandering target is clamped at its anchor, and its amplitude is
+     * bounded well inside the margin.
+     */
+    if (definition.interaction === "touch" && (definition.responseMode ?? "strike") === "strike") {
+      for (const t of scheduled) {
+        if (t.decor || t.meta?.decor) continue;
+        if (t.lane) continue;
+        const rh = t.requiredHand === "left" || t.requiredHand === "right" ? t.requiredHand : undefined;
+        if (!t.velocity) { t.position = clampToReach(t.position, rh); continue; }
+
+        /**
+         * A target that flies STRAIGHT AT the athlete (pure +Z approach) is still
+         * unstrikeable if its LANE is too far out to the side. It gets close in
+         * depth and stays out of reach laterally, so the athlete watches it sail
+         * past their shoulder and eats a miss they could never have prevented.
+         *
+         * So the depth is left alone — it is supposed to start far away — but the
+         * lateral and vertical lane is clamped to the reachable envelope.
+         */
+        const pureApproach = Math.abs(t.velocity[0]) < 1e-6 && Math.abs(t.velocity[1]) < 1e-6;
+        if (pureApproach) {
+          const [cx, cy] = clampToReach([t.position[0], t.position[1], 0], rh);
+          t.position = [cx, cy, t.position[2]];
+        }
+      }
+    }
+
     this.trials = scheduled.sort((a, b) => a.spawnAt - b.spawnAt);
     this.pool = new TargetPool(poolSize);
     this.timing = new TimingEngine((parameters.bpm as number) || undefined);
@@ -231,7 +271,10 @@ export class DrillEngine {
         const a = phase + (angularSpeed * age) / 1000;
         slot.pos[0] = Math.sin(a) * radius;
         slot.pos[1] = y + Math.cos(a) * radius * 0.55;
-        slot.pos[2] = -0.9;
+        // the orbit plane sat at -0.9 m, which put a 0.42 m-radius ring roughly
+        // 0.92 m from the shoulder at its far side — beyond reach, so the far half
+        // of every orbit was unstrikeable and every pass there recorded a phantom miss
+        slot.pos[2] = -0.66;
       }
       if (t.spec.switchKindAt !== undefined && t.spec.switchKindTo && now >= t.spec.switchKindAt && t.kind !== t.spec.switchKindTo) {
         t.kind = t.spec.switchKindTo;
