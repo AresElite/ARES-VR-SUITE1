@@ -71,6 +71,10 @@ export function TrainerControlDock() {
   // A.R.E.S. Training sub-menu — the four Loop phases plus Sport
   if (group === "training" && !phase) {
     const TRAIN = [
+      // AEGIS leads the menu. It is the flagship eye-hand drill and the only one
+      // that runs the full A.R.E.S. Loop end-to-end inside a single session.
+      { id: "AEGIS", label: "AEGIS", color: "#8B5CF6", tag: "Eye-hand · 5:00 + bonus until failure",
+        onClick: () => useAppStore.setState({ arenaMode: "aegisSetup" }) },
       ...TRAINING_PHASES.map((tp) => ({ id: tp, label: tp, color: PM[tp].color, tag: PM[tp].tagline, onClick: () => selectPhase(tp) })),
       { id: "Sport", label: "Sport", color: "#2998AA", tag: "Sport-specific suites", onClick: () => selectPhase("Sport" as never) },
     ];

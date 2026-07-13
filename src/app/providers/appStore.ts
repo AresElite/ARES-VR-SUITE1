@@ -11,6 +11,7 @@ import { createDrillSession } from "@/drills/shared/DrillSession";
 import { buildSessionResult, type FinishedDrill } from "@/drills/shared/DrillResult";
 import { levelFor } from "@/drills/shared/ProgressionEngine";
 import { PERFORM_TIERS, TIER_GATE_ACCURACY, UNGATED_TIERS } from "@/perform/tiers";
+import { modeAllowed, handRuleAllowed } from "@/aegis/tiers";
 
 const TIER_KEY = "ares.perform.tierUnlocks.v1";
 function loadTierUnlocks(): Record<string, number> {
@@ -33,7 +34,7 @@ import { detectHeadset, detectBrowser } from "@/utils/questDetection";
 import { EMPTY_XR_SUPPORT, type XRSupportInfo } from "@/utils/xrSupport";
 import { PERF_MODES, defaultPerfMode, type PerfModeId } from "@/utils/performance";
 
-export type ArenaMode = "home" | "setup" | "calibration" | "drill" | "results";
+export type ArenaMode = "home" | "setup" | "calibration" | "drill" | "results" | "aegisSetup" | "aegis" | "aegisResults";
 
 interface AppState {
   // device & support
@@ -44,6 +45,9 @@ interface AppState {
   orgUnlocked: boolean;
   /** highest PERFORM tier unlocked per drill (earned, persisted) */
   tierUnlocks: Record<string, number>;
+  /** AEGIS — the flagship eye-hand drill runs on its own continuous engine */
+  aegis: import("@/aegis/types").AegisSettings;
+  aegisResult: import("@/aegis/metrics").AegisMetrics | null;
   // session setup
   athlete: Athlete;
   group: import("@/ares/phases").ArenaGroupId | null;
@@ -66,6 +70,9 @@ interface AppState {
   setStrobeLevel(level: number): void;
   unlockOrg(pin: string): boolean;
   unlockedTier(drillId: string): number;
+  setAegis(p: Partial<import("@/aegis/types").AegisSettings>): void;
+  startAegis(): void;
+  finishAegis(m: import("@/aegis/metrics").AegisMetrics): void;
   setAthlete(a: Athlete): void;
   selectGroup(id: import("@/ares/phases").ArenaGroupId | null): void;
   selectPhase(phase: ARESPhase | null): void;
@@ -110,6 +117,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   drillId: null,
   level: 1,
   tierUnlocks: loadTierUnlocks(),
+  aegis: { tier: "intermediate", mode: "block", handRule: "asymmetric", bonusEnabled: true },
+  aegisResult: null,
   drillOptions: {},
   arenaMode: "home",
   engine: null,
@@ -123,6 +132,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSeated: (seated) => set({ seated }),
   setStrobeLevel: (level) => set({ strobeLevel: Math.max(0, Math.min(5, level)) }),
   unlockedTier: (drillId) => Math.max(UNGATED_TIERS, get().tierUnlocks[drillId] ?? UNGATED_TIERS),
+
+  setAegis: (p) => {
+    const next = { ...get().aegis, ...p };
+    // Reserved combinations are guarded in the STORE as well as the engine, so a
+    // stale UI selection can never smuggle Mixed or Adaptive into a low tier.
+    if (!modeAllowed(next.tier, next.mode)) next.mode = "block";
+    if (!handRuleAllowed(next.tier, next.handRule)) next.handRule = "asymmetric";
+    set({ aegis: next });
+  },
+  startAegis: () => set({ arenaMode: "aegis", aegisResult: null }),
+  finishAegis: (m) => set({ arenaMode: "aegisResults", aegisResult: m }),
   unlockOrg: (pin) => {
     const ok = pin === ORG_PIN;
     if (ok) set({ orgUnlocked: true });

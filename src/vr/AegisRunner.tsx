@@ -1,0 +1,289 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useFrame, useThree } from "@react-three/fiber";
+import { useXRInputSourceState } from "@react-three/xr";
+import * as THREE from "three";
+import { Text } from "@react-three/drei";
+import { AegisEngine, type AegisSnapshot, type HandState, type HandId } from "@/aegis/ContinuousEngine";
+import { CATEGORY_VISUAL, type AegisObject, type AegisSettings } from "@/aegis/types";
+import { computeAegisMetrics, type AegisMetrics } from "@/aegis/metrics";
+import { tuningFor } from "@/aegis/tiers";
+
+/**
+ * AEGIS RUNNER.
+ *
+ * Three rules from the brief are enforced here, at the render layer, and they
+ * are the reason this could not simply reuse DrillRunner:
+ *
+ *   NO FIXATION POINT (§29). There is no crosshair, no centre dot, nothing to
+ *   anchor the gaze. Peripheral demand has to EMERGE from where the objects are,
+ *   not be manufactured by forcing the eyes to a mark. Visual search is the task.
+ *
+ *   NO AUDIO IDENTITY CUES (§28). Nothing about an object's category, hand, or
+ *   action is ever carried by sound. If the athlete could hear a bomb coming,
+ *   we would be measuring hearing. System audio (countdown, round end) only.
+ *
+ *   FEEDBACK MUST NEVER PRE-REVEAL (§26, §27). Both visual and haptic feedback
+ *   fire strictly ON or AFTER contact — never on approach — and both attenuate
+ *   as tier rises, so a GOAT athlete is not being coached by the game.
+ */
+
+const HIT_FLASH_MS = 260;
+
+/** Geometry per category. Silhouette carries as much identity as colour (§7). */
+function geometryFor(shape: string, scale: number): THREE.BufferGeometry {
+  switch (shape) {
+    case "box": return new THREE.BoxGeometry(scale * 1.7, scale * 1.7, scale * 1.7);
+    case "diamond": return new THREE.OctahedronGeometry(scale * 1.15, 0);
+    case "sphere": return new THREE.SphereGeometry(scale, 20, 16);
+    case "cone": return new THREE.ConeGeometry(scale * 1.05, scale * 2.1, 5); // spiked = danger
+    case "pyramid": return new THREE.TetrahedronGeometry(scale * 1.35, 0);
+    case "ring": return new THREE.TorusGeometry(scale * 0.95, scale * 0.22, 10, 22);
+    default: return new THREE.SphereGeometry(scale, 16, 12);
+  }
+}
+
+function AegisObjectMesh({ obj, pos, feedback }: { obj: AegisObject; pos: [number, number, number]; feedback: number }) {
+  const v = CATEGORY_VISUAL[obj.cat];
+  const mesh = useRef<THREE.Mesh>(null);
+  const geo = useMemo(() => geometryFor(v.shape, obj.scale), [v.shape, obj.scale]);
+
+  useFrame((_, dt) => {
+    const m = mesh.current;
+    if (!m) return;
+    m.position.set(pos[0], pos[1], pos[2]);
+    // A slow, constant tumble. It is deliberately IDENTICAL for every category:
+    // if bombs spun faster, rotation would become a free identity cue and the
+    // shape-and-colour system we just built would be doing no work.
+    m.rotation.x += dt * 0.8;
+    m.rotation.y += dt * 1.1;
+  });
+
+  const isThreat = obj.cat === "bomb" || obj.cat === "nogo";
+  return (
+    <mesh ref={mesh} geometry={geo}>
+      <meshStandardMaterial
+        color={v.color}
+        emissive={v.color}
+        emissiveIntensity={isThreat ? 0.25 : 0.55 + feedback * 0.25}
+        metalness={0.35}
+        roughness={obj.cat === "bomb" ? 0.85 : 0.28}
+        // The no-go is deliberately SALIENT but hollow — it must attract the hand
+        // in order to test the athlete's ability to refuse it (§6).
+        wireframe={obj.cat === "nogo"}
+      />
+    </mesh>
+  );
+}
+
+/** The release zone for delivery catches — shown only while something is held. */
+function ReleaseZone({ at }: { at: [number, number, number] }) {
+  const ring = useRef<THREE.Mesh>(null);
+  useFrame(({ clock }) => {
+    if (ring.current) {
+      const p = 1 + Math.sin(clock.elapsedTime * 4) * 0.06;
+      ring.current.scale.setScalar(p);
+    }
+  });
+  return (
+    <mesh ref={ring} position={at} rotation={[0, 0, 0]}>
+      <torusGeometry args={[0.2, 0.018, 8, 32]} />
+      <meshBasicMaterial color="#C9A6FF" toneMapped={false} transparent opacity={0.75} />
+    </mesh>
+  );
+}
+
+export function AegisRunner({
+  settings, seed, onComplete,
+}: {
+  settings: AegisSettings;
+  seed: number;
+  onComplete: (m: AegisMetrics, engine: AegisEngine) => void;
+}) {
+  const { camera } = useThree();
+  const engine = useMemo(() => new AegisEngine(settings, seed), [settings, seed]);
+  const tune = useMemo(() => tuningFor(settings.tier, settings.custom), [settings]);
+  const [snap, setSnap] = useState<AegisSnapshot>(() => engine.snapshot());
+  const done = useRef(false);
+
+  const leftCtl = useXRInputSourceState("controller", "left");
+  const rightCtl = useXRInputSourceState("controller", "right");
+  const leftHandSrc = useXRInputSourceState("hand", "left");
+  const rightHandSrc = useXRInputSourceState("hand", "right");
+
+  const prev = useRef<Record<HandId, THREE.Vector3 | null>>({ left: null, right: null });
+  const hands = useRef<Record<HandId, HandState>>({
+    left: { pos: [-0.3, 1.3, -0.25], vel: [0, 0, 0], gripping: false },
+    right: { pos: [0.3, 1.3, -0.25], vel: [0, 0, 0], gripping: false },
+  });
+  const flash = useRef<{ t: number; good: boolean; critical: boolean }>({ t: -9999, good: true, critical: false });
+  const lastEventCount = useRef(0);
+
+  useEffect(() => {
+    engine.start(performance.now());
+    return engine.subscribe(setSnap);
+  }, [engine]);
+
+  useFrame((_, dt) => {
+    if (done.current) return;
+    const now = performance.now();
+
+    // ---- read controllers (grip preferred; tracked hands fall back to pinch)
+    const srcs: Record<HandId, { obj?: THREE.Object3D; gripping: boolean; haptic?: (i: number, d: number) => void }> = {
+      left: {
+        obj: leftCtl?.object ?? leftHandSrc?.object,
+        gripping:
+          (leftCtl?.gamepad?.["xr-standard-squeeze"]?.state === "pressed") ||
+          (leftCtl?.gamepad?.["xr-standard-trigger"]?.state === "pressed"),
+        haptic: leftCtl?.inputSource?.gamepad?.hapticActuators?.[0]
+          ? (i: number, d: number) => leftCtl.inputSource.gamepad!.hapticActuators![0].pulse(i, d)
+          : undefined,
+      },
+      right: {
+        obj: rightCtl?.object ?? rightHandSrc?.object,
+        gripping:
+          (rightCtl?.gamepad?.["xr-standard-squeeze"]?.state === "pressed") ||
+          (rightCtl?.gamepad?.["xr-standard-trigger"]?.state === "pressed"),
+        haptic: rightCtl?.inputSource?.gamepad?.hapticActuators?.[0]
+          ? (i: number, d: number) => rightCtl.inputSource.gamepad!.hapticActuators![0].pulse(i, d)
+          : undefined,
+      },
+    };
+
+    const tmp = new THREE.Vector3();
+    for (const h of ["left", "right"] as HandId[]) {
+      const s = srcs[h];
+      if (s.obj) {
+        s.obj.getWorldPosition(tmp);
+        const p = prev.current[h];
+        if (p && dt > 0) {
+          hands.current[h].vel = [(tmp.x - p.x) / dt, (tmp.y - p.y) / dt, (tmp.z - p.z) / dt];
+        }
+        hands.current[h].pos = [tmp.x, tmp.y, tmp.z];
+        prev.current[h] = tmp.clone();
+      }
+      hands.current[h].gripping = s.gripping;
+    }
+
+    const head: [number, number, number] = [camera.position.x, camera.position.y, camera.position.z];
+    engine.tick(now, hands.current, head);
+
+    // ---- TIERED FEEDBACK (§26, §27). Fires strictly on resolution, never on
+    // approach, and attenuates as tier rises so elite athletes are not coached.
+    const evs = engine.events;
+    if (evs.length > lastEventCount.current) {
+      const e = evs[evs.length - 1];
+      lastEventCount.current = evs.length;
+      flash.current = { t: now, good: e.correct, critical: e.critical };
+      const hh = e.responseHand ? srcs[e.responseHand].haptic : undefined;
+      if (hh && tune.hapticIntensity > 0) {
+        // critical errors always cut through, even at GOAT — that is a safety
+        // signal, not a coaching one.
+        if (e.critical) hh(Math.max(0.7, tune.hapticIntensity), 140);
+        else if (e.correct) hh(tune.hapticIntensity * 0.7, 28);
+      }
+    }
+
+    if (engine.isFinished() && !done.current) {
+      done.current = true;
+      onComplete(computeAegisMetrics(engine, settings), engine);
+    }
+  });
+
+  const held = snap.objects.find((o) => o.heldBy);
+  const flashAge = performance.now() - flash.current.t;
+  const flashOn = flashAge < HIT_FLASH_MS * (flash.current.critical ? 2.2 : 1);
+  const fb = tune.feedbackIntensity;
+
+  /**
+   * STREAK ENVIRONMENT ESCALATION (§31). The arena gets more alive as the streak
+   * grows — but ONLY through light and depth, never through anything that touches
+   * the objects themselves. Target contrast, size, and legibility are held exactly
+   * constant, because the moment the environment starts obscuring the task, the
+   * reaction times we are recording stop meaning anything.
+   */
+  const streakEnergy = Math.min(1, snap.streak / 40);
+
+  return (
+    <group>
+      {/* ambient escalation — light only, never clutter */}
+      <ambientLight intensity={0.35 + streakEnergy * 0.15} />
+      <pointLight position={[0, 3.2, -2]} intensity={1.6 + streakEnergy * 1.4} color="#8B5CF6" distance={14} />
+      <pointLight position={[-2.4, 1.6, -1]} intensity={0.5 + streakEnergy * 0.6} color="#2998AA" distance={9} />
+      <pointLight position={[2.4, 1.6, -1]} intensity={0.5 + streakEnergy * 0.6} color="#8B5CF6" distance={9} />
+
+      {snap.objects.map((o) => {
+        const p = o.heldBy ? hands.current[o.heldBy].pos : (snap.positions[o.id] ?? o.p0);
+        return <AegisObjectMesh key={o.id} obj={o} pos={p} feedback={streakEnergy} />;
+      })}
+
+      {held?.releaseZone && <ReleaseZone at={held.releaseZone} />}
+
+      {/* CONTACT FEEDBACK — a brief, restrained wash. No explosions, ever. */}
+      {flashOn && fb > 0.05 && (
+        <mesh position={[0, 1.5, -1.4]} renderOrder={-1}>
+          <planeGeometry args={[7, 4]} />
+          <meshBasicMaterial
+            color={flash.current.critical ? "#FF4D6D" : flash.current.good ? "#8B5CF6" : "#6A7086"}
+            transparent
+            opacity={(1 - flashAge / (HIT_FLASH_MS * 2)) * 0.16 * fb * (flash.current.critical ? 2.4 : 1)}
+            depthWrite={false}
+            toneMapped={false}
+          />
+        </mesh>
+      )}
+
+      {/* RULE-SWITCH WARNING — every rule change is announced (§5). There are no
+          unannounced switches in the launch build; a rule you were never told
+          about measures surprise, not cognitive flexibility. */}
+      {snap.ruleWarningMs > 0 && (
+        <Text position={[0, 2.15, -1.5]} fontSize={0.13} color="#C9A6FF" anchorX="center" outlineWidth={0.006} outlineColor="#14161F">
+          {`HANDS SWAP IN ${Math.ceil(snap.ruleWarningMs / 1000)}`}
+        </Text>
+      )}
+
+      <AegisHUD snap={snap} tier={settings.tier} />
+    </group>
+  );
+}
+
+/** Minimal HUD. No fixation point, nothing near the centre of the field. */
+function AegisHUD({ snap, tier }: { snap: AegisSnapshot; tier: string }) {
+  const mm = Math.floor(snap.mainRemainingMs / 60000);
+  const ss = Math.floor((snap.mainRemainingMs % 60000) / 1000);
+  const inBonus = snap.phase === "bonus";
+
+  return (
+    <group>
+      {/* Upper periphery only — the centre of the visual field is left completely
+          clear, because that is where the athlete has to be searching. */}
+      <Text position={[-1.15, 2.28, -1.9]} fontSize={0.1} color="#E8E9F0" anchorX="left">
+        {inBonus ? `BONUS · STAGE ${snap.bonusStage}` : `${mm}:${String(ss).padStart(2, "0")}`}
+      </Text>
+      <Text position={[-1.15, 2.14, -1.9]} fontSize={0.055} color="#6A7086" anchorX="left">
+        {tier.toUpperCase()}
+      </Text>
+
+      <Text position={[1.15, 2.28, -1.9]} fontSize={0.1} color="#E8E9F0" anchorX="right">
+        {snap.score.toLocaleString()}
+      </Text>
+      <Text position={[1.15, 2.14, -1.9]} fontSize={0.055}
+        color={snap.streak >= 10 ? "#C9A6FF" : "#6A7086"} anchorX="right">
+        {snap.streak > 0 ? `STREAK ${snap.streak}` : "—"}
+      </Text>
+
+      {/* The slowdown is FELT, not labelled. The only thing shown is that the
+          athlete is in a recovery state and how to leave it — never a "rest" cue. */}
+      {snap.pace !== "normal" && (
+        <Text position={[0, 0.78, -1.6]} fontSize={0.07} color="#2998AA" anchorX="center">
+          {snap.pace === "slowdown" ? "RESET" : `RECOVER  ${snap.recoveryStreak}/3`}
+        </Text>
+      )}
+
+      {inBonus && snap.bonusMisses > 0 && (
+        <Text position={[0, 0.78, -1.6]} fontSize={0.07} color="#FF4D6D" anchorX="center">
+          {`${3 - snap.bonusMisses} MISSES LEFT`}
+        </Text>
+      )}
+    </group>
+  );
+}
