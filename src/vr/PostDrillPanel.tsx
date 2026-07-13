@@ -23,7 +23,7 @@ export function PostDrillPanel() {
   const rows: string[] = [
     `Trials ${m.trials}    Correct ${m.correct}    Accuracy ${m.accuracyPct}%`,
     m.avgReactionMs !== undefined
-      ? `Reaction avg ${m.avgReactionMs}ms   median ${m.medianReactionMs}ms   best ${m.fastestReactionMs}ms`
+      ? `Reaction avg ${m.avgReactionMs}ms   fastest ${m.fastestReactionMs}ms   slowest ${m.slowestReactionMs}ms`
       : "Reaction —",
     `False starts ${m.falseStarts ?? 0}    No-go failures ${m.noGoFailures ?? 0}    Wrong hand ${m.wrongHandErrors ?? 0}`,
     `Peripheral misses ${m.peripheralMisses ?? 0}    L/R asym ${m.leftRightAsymmetryPct ?? 0}%    Drift ${m.fatigueDriftPct ?? 0}%`,

@@ -26,7 +26,7 @@ const NO_POS: [number, number, number] = [-0.42, 1.12, Z];
 function buildSternberg(
   items: string[],
   colorItems: boolean,
-  p: { trials: number; setSize: number; memorizeMs: number; retentionMs: number; probeMs: number },
+  p: { trials: number; setSize?: number; setMin?: number; setMax?: number; memorizeMs: number; retentionMs: number; probeMs: number },
   rng: () => number,
   idp: string,
 ): TrialSpec[] {
@@ -40,18 +40,25 @@ function buildSternberg(
   }
   for (let i = 0; i < p.trials; i++) {
     const groupId = `${idp}-g${i}`;
+    // set size: fixed, or randomized in [setMin..setMax] to probe span
+    const size = p.setMin !== undefined && p.setMax !== undefined
+      ? p.setMin + Math.floor(rng() * (p.setMax - p.setMin + 1))
+      : (p.setSize ?? 3);
     const shuffled = [...items].sort(() => rng() - 0.5);
-    const set = shuffled.slice(0, p.setSize);
+    const set = shuffled.slice(0, size);
     const inSet = deck[i];
-    const probe = inSet ? pick(rng, set) : shuffled[p.setSize];
-    // memorize display (row of items)
+    const probe = inSet ? pick(rng, set) : shuffled[size];
+    // memorize display — digits/letters are PURE TEXT (no shape behind them)
     set.forEach((item, k) => {
       trials.push({
         id: `${groupId}-m${k}`, spawnAt: t, duration: p.memorizeMs, kind: "distractor", decor: true,
-        zone: "center", position: [(k - (set.length - 1) / 2) * 0.16, 1.55, Z - 0.08],
-        color: colorItems ? item : WHITE, emissive: colorItems ? item : undefined,
-        shape: colorItems ? "sphere" : "diamond", scale: colorItems ? 0.05 : 0.028,
-        label: colorItems ? undefined : item,
+        zone: "center", position: [(k - (set.length - 1) / 2) * 0.18, 1.55, Z - 0.08],
+        ...(colorItems
+          ? { color: item, emissive: item, shape: "sphere" as const, scale: 0.05 }
+          : {
+              color: WHITE, shape: "diamond" as const, scale: 0.001, label: item,
+              meta: { labelInside: true, labelSize: 0.09, labelColor: WHITE },
+            }),
       });
     });
     // probe IS the response target — RIGHT trigger = YES (in set), LEFT = NO
@@ -60,9 +67,12 @@ function buildSternberg(
       id: `${groupId}-probe`, spawnAt: probeAt, duration: p.probeMs, kind: "go",
       requiredHand: inSet ? "right" : "left",
       zone: "center", position: [0, 1.55, Z - 0.08],
-      color: colorItems ? probe : WHITE, emissive: colorItems ? probe : undefined,
-      shape: colorItems ? "sphere" : "diamond", scale: colorItems ? 0.065 : 0.04,
-      label: colorItems ? undefined : probe,
+      ...(colorItems
+        ? { color: probe, emissive: probe, shape: "sphere" as const, scale: 0.065 }
+        : {
+            color: WHITE, shape: "diamond" as const, scale: 0.001, label: probe,
+            meta: { labelInside: true, labelSize: 0.13, labelColor: "#7FD3DE" },
+          }),
     });
     t = probeAt + p.probeMs + 800;
   }
@@ -121,10 +131,32 @@ export const SternbergDigits: DrillDefinition = {
   id: "sternberg-digits",
   name: "Sternberg-Digits",
   shortName: "Sternberg-Digits",
-  description: "Memorize a set of digits. After retention, a probe digit appears: RIGHT trigger = YES in set, LEFT trigger = NO.",
-  purpose: "Working-memory scanning (digits).",
-  instructions: STERNBERG_INSTRUCTIONS("digits"),
+  description: "20 trials. Between 2 and 6 digits appear (randomized every trial, so it probes how much you can actually hold). After a retention gap a probe digit appears: RIGHT trigger = YES it was in the set, LEFT trigger = NO. Reports average / fastest / slowest reaction time, accuracy, and post-error slowing.",
+  purpose: "Working-memory span and scanning speed (digits).",
+  instructions: [
+    "1. Between 2 and 6 DIGITS appear - the count changes every trial.",
+    "2. Memorize them, then hold them through the blank retention gap.",
+    "3. A single PROBE digit appears.",
+    "4. RIGHT-hand TRIGGER = YES (it WAS in the set). LEFT-hand TRIGGER = NO.",
+    "5. 20 trials. Speed AND accuracy both count.",
+  ],
+  // 20 trials; span randomized 2-6 every trial; levels tighten the timing
+  levels: levels50((i) => ({
+    label: `2-6 digits, ${ilerp50(2800, 1000, i)}ms study`,
+    parameters: {
+      trials: 20,
+      setMin: 2,
+      setMax: 6,
+      memorizeMs: ilerp50(2800, 1000, i),
+      retentionMs: ilerp50(800, 3200, i),
+      probeMs: ilerp50(2600, 1300, i),
+    },
+  })),
   buildTrials: (params, rng) => buildSternberg("0123456789".split(""), false, params as never, rng, "std"),
+  durationMs: (params) => {
+    const p = params as { trials: number; memorizeMs: number; retentionMs: number; probeMs: number };
+    return 1500 + p.trials * (p.memorizeMs + p.retentionMs + p.probeMs + 800) + 1500;
+  },
 };
 
 export const SternbergLetters: DrillDefinition = {
