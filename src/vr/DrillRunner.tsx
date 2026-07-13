@@ -722,7 +722,7 @@ function StroboscopicLayer() {
     m.visible = phase < cfg.occludeMs; // opaque during the occlusion window
   });
   return (
-    <mesh ref={mesh} renderOrder={9999} frustumCulled={false}>
+    <mesh ref={mesh} renderOrder={9999} frustumCulled={false} raycast={() => null}>
       <planeGeometry args={[3, 3]} />
       <meshBasicMaterial color="#000000" depthTest={false} depthWrite={false} toneMapped={false} />
     </mesh>
@@ -759,7 +759,7 @@ function MonocularOccluder() {
   if (!inSession || !blockEye) return null;
   const mask = blockEye === "left" ? 2 : 4; // layer1 -> left eye, layer2 -> right eye
   return (
-    <mesh ref={mesh} renderOrder={9998} frustumCulled={false} layers-mask={mask}>
+    <mesh ref={mesh} renderOrder={9998} frustumCulled={false} layers-mask={mask} raycast={() => null}>
       <planeGeometry args={[3, 3]} />
       <meshBasicMaterial color="#000000" depthTest={false} depthWrite={false} toneMapped={false} />
     </mesh>
