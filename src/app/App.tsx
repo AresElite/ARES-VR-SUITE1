@@ -1,4 +1,5 @@
 import { XRRoot } from "@/vr/XRRoot";
+import { ErrorBoundary } from "./ErrorBoundary";
 import { ScreenRouter } from "./routes/ScreenRouter";
 
 /**
@@ -9,9 +10,11 @@ import { ScreenRouter } from "./routes/ScreenRouter";
  */
 export default function App() {
   return (
-    <>
+    // A render error must never present as a silent black void to someone wearing
+    // a headset. It now shows what broke, and a way back to the arena.
+    <ErrorBoundary>
       <XRRoot />
       <ScreenRouter />
-    </>
+    </ErrorBoundary>
   );
 }

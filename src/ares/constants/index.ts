@@ -7,7 +7,7 @@ export const ORG_NAME = "Ares Elite Sports Vision";
  * Version stamp — visible in the site footer and the VR arena so anyone can
  * instantly tell which build is live. Bump on every deploy.
  */
-export const APP_VERSION = "v0.47.0 — KEYSTONE: whole-body visual-motor integration (4th Perform portal)";
+export const APP_VERSION = "v0.47.1 — FIX: conditional hook in the trainer dock blanked the canvas mid-drill";
 
 /** Spatial UI distances (meters) — panels live 1.5–2.5m from the athlete. */
 export const PANEL_NEAR = 1.6;

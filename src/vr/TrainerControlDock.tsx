@@ -66,6 +66,19 @@ export function TrainerControlDock() {
   const group = useAppStore((s) => s.group);
   const { selectSport, selectGroup, selectPhase } = useAppStore.getState();
   const [offset, setOffset] = useState(0);
+  /**
+   * HOOKS MUST ALL RUN, EVERY RENDER, BEFORE ANY EARLY RETURN.
+   *
+   * This one was originally declared down beside the level stepper that uses it —
+   * which reads naturally, and was a serious bug. The Training and Perform
+   * sub-menus RETURN before that line, so on those renders React saw N hooks, and
+   * on the drill-list render it saw N+1. React responds to a changing hook count
+   * by tearing down the component tree, which in an R3F app means the entire
+   * canvas unmounts and the athlete is left staring at a black void mid-session.
+   *
+   * Rules of Hooks are not a style preference. Put every hook at the top.
+   */
+  const unlockedTier = useAppStore((s) => s.unlockedTier);
   useEffect(() => setOffset(0), [phase, sport]);
 
   /**
@@ -207,7 +220,6 @@ export function TrainerControlDock() {
   const def = drillId ? drillById(drillId) : undefined;
   // PERFORM tiers are EARNED — the ladder only extends as far as the athlete
   // has held 85%. Every other phase keeps its full level range.
-  const unlockedTier = useAppStore((s) => s.unlockedTier);
   const isPerform = def?.phase === "Perform";
   const ceiling = def ? def.levels.length : 1;
   const maxLevel = def && isPerform ? Math.min(ceiling, unlockedTier(def.id)) : ceiling;
