@@ -153,7 +153,7 @@ export function makeRDSTexture(seed: number): THREE.CanvasTexture {
   const key = `rds-${seed}`;
   const hit = cache.get(key);
   if (hit) return hit;
-  const S = 256;
+  const S = 512;
   const cv = document.createElement("canvas");
   cv.width = S;
   cv.height = S;
@@ -161,16 +161,41 @@ export function makeRDSTexture(seed: number): THREE.CanvasTexture {
   g.fillStyle = "#0B0F2A";
   g.fillRect(0, 0, S, S);
   const r = rng(seed);
-  for (let i = 0; i < 2600; i++) {
-    const v = r();
-    g.fillStyle = v < 0.5 ? "#EAF0FF" : v < 0.75 ? "#9AA3C7" : "#2D234F";
+  // SOFT dots. Stereopsis is a HYPERACUITY — the visual system resolves
+  // disparities far below one pixel by reading intensity gradients. Hard-edged
+  // dots alias sub-pixel shifts away and hard-cap the test at ~1 pixel
+  // (~144 arcsec on Quest 3). Smooth, band-limited dots let a sub-pixel shift
+  // register as a real luminance change, which is what makes fine disparity
+  // measurable at all on a fixed-resolution display.
+  for (let i = 0; i < 1500; i++) {
     const x = r() * S;
     const y = r() * S;
-    const d = 1.5 + r() * 2.5;
-    g.fillRect(x, y, d, d);
+    const rad = 5 + r() * 5;
+    const bright = r() < 0.55;
+    const grd = g.createRadialGradient(x, y, 0, x, y, rad);
+    if (bright) {
+      grd.addColorStop(0, "rgba(234,240,255,0.95)");
+      grd.addColorStop(0.55, "rgba(200,210,235,0.55)");
+      grd.addColorStop(1, "rgba(234,240,255,0)");
+    } else {
+      grd.addColorStop(0, "rgba(45,35,79,0.95)");
+      grd.addColorStop(0.55, "rgba(35,30,60,0.55)");
+      grd.addColorStop(1, "rgba(45,35,79,0)");
+    }
+    g.fillStyle = grd;
+    g.beginPath();
+    g.arc(x, y, rad, 0, Math.PI * 2);
+    g.fill();
   }
   const tex = new THREE.CanvasTexture(cv);
   tex.colorSpace = THREE.SRGBColorSpace;
+  // sub-pixel-accurate sampling: linear filtering, no mipmaps, wrap so a UV
+  // shift never exposes an edge
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearFilter;
+  tex.generateMipmaps = false;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
   cache.set(key, tex);
   return tex;
 }

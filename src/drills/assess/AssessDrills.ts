@@ -355,10 +355,13 @@ export const ColorVisionAssessment: DrillDefinition = {
 // Starts blatantly obvious (800") and steps finer after every correct pick.
 // A wrong pick steps back up; THREE consecutive wrong answers terminate the
 // staircase. The finest disparity answered correctly is the threshold.
-const STEREO_LADDER = [800, 600, 450, 340, 260, 200, 150, 110, 80, 60, 45, 35, 25, 20, 15];
+// Clinical range: Randot near stereo runs 400" down to 20". Fine rungs where
+// it matters. The headset's ~144"/pixel floor is beaten by hyperacuity (soft
+// dots + sub-pixel UV disparity) — see makeRDSTexture / StereoEyeMaterial.
+const STEREO_LADDER = [600, 400, 300, 200, 140, 100, 80, 60, 50, 40, 30, 25, 20, 16];
 
-interface StairState { idx: number; wrongRun: number; applied: number; best: number | null; done: boolean }
-const stereoState: StairState = { idx: 0, wrongRun: 0, applied: STEREO_LADDER[0], best: null, done: false };
+interface StairState { idx: number; wrongRun: number; applied: number; best: number | null; done: boolean; fine?: boolean }
+const stereoState: StairState = { idx: 0, wrongRun: 0, applied: STEREO_LADDER[0], best: null, done: false, fine: false };
 
 export const StereopsisAssessment: DrillDefinition = {
   id: "assess-stereopsis",
@@ -380,7 +383,8 @@ export const StereopsisAssessment: DrillDefinition = {
     "5. Headset required: the depth physically cannot appear on a flat screen.",
   ],
   controlsHint: "POINT + TRIGGER THE FLOATING DISC - IT GETS SUBTLER",
-  levels: STANDARD({ maxTrials: 24, exposureMs: 6500 }),
+  trialPaced: true,
+  levels: STANDARD({ maxTrials: 30, exposureMs: 8000 }),
   buildTrials: (params, rng) => {
     // reset the staircase for this session
     stereoState.idx = 0;
@@ -388,6 +392,7 @@ export const StereopsisAssessment: DrillDefinition = {
     stereoState.applied = STEREO_LADDER[0];
     stereoState.best = null;
     stereoState.done = false;
+    stereoState.fine = false;
     const p = params as { maxTrials: number; exposureMs: number };
     const trials: TrialSpec[] = [];
     let t = 2000;
@@ -396,7 +401,7 @@ export const StereopsisAssessment: DrillDefinition = {
       const targetIdx = Math.floor(rng() * 4);
       for (let k = 0; k < 4; k++) {
         trials.push({
-          id: `${groupId}-d${k}`, spawnAt: t, duration: p.exposureMs,
+          id: `${groupId}-d${k}`, spawnAt: n === 0 ? t : -1, gridSeq: n, duration: p.exposureMs,
           kind: k === targetIdx ? "go" : "distractor",
           zone: "center", position: [-0.45 + k * 0.3, 1.45, -1.0],
           color: WHITE, shape: "stereo", scale: 0.105,
@@ -422,8 +427,11 @@ export const StereopsisAssessment: DrillDefinition = {
         if (snapshot.lastEventCorrect) {
           stereoState.best = stereoState.best === null ? stereoState.applied : Math.min(stereoState.best, stereoState.applied);
           stereoState.wrongRun = 0;
-          stereoState.idx = Math.min(STEREO_LADDER.length - 1, stereoState.idx + 1);
+          // coarse phase: drop 2 rungs per correct until the first miss, then
+          // switch to fine 1-rung steps. Converges on threshold far faster.
+          stereoState.idx = Math.min(STEREO_LADDER.length - 1, stereoState.idx + (stereoState.fine ? 1 : 2));
         } else {
+          stereoState.fine = true;
           stereoState.wrongRun += 1;
           stereoState.idx = Math.max(0, stereoState.idx - 1);
           if (stereoState.wrongRun >= 3) {
@@ -458,7 +466,7 @@ export const StereopsisAssessment: DrillDefinition = {
   },
   durationMs: (params) => {
     const p = params as { maxTrials: number; exposureMs: number };
-    return 2000 + p.maxTrials * (p.exposureMs + 700) + 1500;
+    return 2000 + p.maxTrials * (p.exposureMs + 700) + 1500; // ceiling; trial-paced
   },
 };
 
@@ -489,7 +497,8 @@ export const ContrastSensitivityAssessment: DrillDefinition = {
     "4. Three misses in a row ends the test. Your contrast threshold (logCS) is recorded.",
   ],
   controlsHint: "POINT + TRIGGER THE STRIPED DISC - IT FADES EVERY ROUND",
-  levels: STANDARD({ maxTrials: 22, exposureMs: 6500 }),
+  trialPaced: true,
+  levels: STANDARD({ maxTrials: 26, exposureMs: 8000 }),
   buildTrials: (params, rng) => {
     csState.idx = 0;
     csState.wrongRun = 0;
@@ -505,7 +514,7 @@ export const ContrastSensitivityAssessment: DrillDefinition = {
       const angle = pick(rng, [0, 45, 90, 135]);
       for (let k = 0; k < 4; k++) {
         trials.push({
-          id: `${groupId}-d${k}`, spawnAt: t, duration: p.exposureMs,
+          id: `${groupId}-d${k}`, spawnAt: n === 0 ? t : -1, gridSeq: n, duration: p.exposureMs,
           kind: k === targetIdx ? "go" : "distractor",
           zone: "center", position: [-0.45 + k * 0.3, 1.5, -0.95],
           color: WHITE, shape: "grating", scale: 0.1,
@@ -516,7 +525,7 @@ export const ContrastSensitivityAssessment: DrillDefinition = {
       }
       // honest escape hatch
       trials.push({
-        id: `${groupId}-q`, spawnAt: t, duration: p.exposureMs, kind: "distractor",
+        id: `${groupId}-q`, spawnAt: n === 0 ? t : -1, gridSeq: n, duration: p.exposureMs, kind: "distractor",
         zone: "center", position: [0, 1.12, -0.62],
         color: GRAY, emissive: GOLD, shape: "pad", scale: 0.055, label: "?", groupId,
       });

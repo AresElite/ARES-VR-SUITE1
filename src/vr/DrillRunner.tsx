@@ -412,20 +412,29 @@ function TargetMesh({
     );
   }
 
-  // Dichoptic RDS disc: identical dot fields per eye, horizontally offset —
-  // true retinal disparity (layer 1 = left eye, layer 2 = right eye)
+  // Dichoptic RDS disc. The disc itself stays PUT in both eyes; the disparity
+  // is applied as a horizontal shift of the DOT FIELD via a texture UV offset.
+  // Two reasons this beats moving the mesh:
+  //   1. UV offsets are continuous, so sub-pixel disparity survives (with
+  //      linear filtering the GPU interpolates) — moving a mesh by a fraction
+  //      of a pixel against a hard-edged texture just aliases away, which hard-
+  //      capped the old test at ~1 pixel (~144 arcsec on Quest 3).
+  //   2. The disc outline is identical in both eyes, so there is no monocular
+  //      edge cue — only the dot field carries the depth. This is the classic
+  //      random-dot stereogram construction.
   if (spec.shape === "stereo") {
-    const shift = (spec.stereoShiftM ?? 0) / 2;
     const rds = makeRDSTexture((spec.meta?.rdsSeed as number) ?? 7);
+    // disparity in UV units: metres of shift / disc width in metres
+    const uv = (spec.stereoShiftM ?? 0) / (2 * spec.scale);
     return (
       <group ref={group} position={spec.position} key={version}>
-        <mesh position={[shift, 0, 0]} layers-mask={2}>
-          <circleGeometry args={[spec.scale, 32]} />
-          <meshBasicMaterial map={rds} />
+        <mesh layers-mask={2}>
+          <circleGeometry args={[spec.scale, 48]} />
+          <StereoEyeMaterial tex={rds} offsetU={uv / 2} />
         </mesh>
-        <mesh position={[-shift, 0, 0]} layers-mask={4}>
-          <circleGeometry args={[spec.scale, 32]} />
-          <meshBasicMaterial map={rds} />
+        <mesh layers-mask={4}>
+          <circleGeometry args={[spec.scale, 48]} />
+          <StereoEyeMaterial tex={rds} offsetU={-uv / 2} />
         </mesh>
         {/* invisible strike/click proxy on the shared layer */}
         <mesh onClick={onHitProxy(spec, engine, desktopClicks)} visible={true}>
@@ -755,6 +764,23 @@ function MonocularOccluder() {
       <meshBasicMaterial color="#000000" depthTest={false} depthWrite={false} toneMapped={false} />
     </mesh>
   );
+}
+
+/**
+ * StereoEyeMaterial — one eye's view of the dot field, shifted by a sub-pixel
+ * UV offset. The texture image is shared; only the offset differs per eye, so
+ * the two retinal images are identical apart from the disparity.
+ */
+function StereoEyeMaterial({ tex, offsetU }: { tex: THREE.Texture; offsetU: number }) {
+  const eyeTex = useMemo(() => {
+    const t = tex.clone();
+    t.needsUpdate = true;
+    return t;
+  }, [tex]);
+  useEffect(() => {
+    eyeTex.offset.set(offsetU, 0);
+  }, [eyeTex, offsetU]);
+  return <meshBasicMaterial map={eyeTex} toneMapped={false} />;
 }
 
 /** feeds head angular velocity from the XR camera every frame */

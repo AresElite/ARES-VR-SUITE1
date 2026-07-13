@@ -164,6 +164,9 @@ export class DrillEngine {
   finishEarly(): void {
     this.nextTrialIdx = this.trials.length;
     this.chains.clear();
+    // staircases terminate mid-protocol — the queued grids must go too, or the
+    // completion gate (which waits on an empty grid queue) can never be met.
+    this.gridQueue.clear();
   }
 
   /** Trainer stop — ends immediately and still produces a result. */
