@@ -506,6 +506,7 @@ export class DrillEngine {
       actualAction: direction ?? `hit:${hand}`,
       correct,
       reactionMs,
+      arriveMs: t.spec.meta?.arriveMs as number | undefined,
       hand,
       errorType,
       zone: t.spec.zone,

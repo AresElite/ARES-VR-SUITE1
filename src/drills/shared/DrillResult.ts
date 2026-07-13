@@ -67,20 +67,25 @@ export function buildSessionResult(
     }
   }
 
-  // coincidence-anticipation timing: signed error vs the fixed arrival
+  // coincidence-anticipation: signed error against each trial's OWN arrival.
+  // + = LATE (crossed the line before they fired), - = EARLY. Reaction time is
+  // deliberately NOT the metric here — synchronization to the line is.
   if (def.anticipation) {
     const errs = events
-      .filter((e) => e.reactionMs !== undefined && e.errorType !== "correctRejection")
-      .map((e) => e.reactionMs! - def.anticipation!.arriveMs);
+      .filter((e) => e.reactionMs !== undefined && e.errorType !== "correctRejection" && e.errorType !== "miss")
+      .map((e) => e.reactionMs! - (e.arriveMs ?? def.anticipation!.arriveMs));
     if (errs.length) {
       const mean = errs.reduce((a, b) => a + b, 0) / errs.length;
       const absMean = errs.reduce((a, b) => a + Math.abs(b), 0) / errs.length;
       const sd = Math.sqrt(errs.reduce((a, b) => a + (b - mean) ** 2, 0) / errs.length);
+      const early = errs.filter((e) => e < 0).length;
+      const late = errs.filter((e) => e > 0).length;
       metrics.catBiasMs = Math.round(mean);
       metrics.catAbsErrorMs = Math.round(absMean);
       metrics.catVariabilityMs = Math.round(sd);
       notes.push(
-        `Coincidence-anticipation: ${mean >= 0 ? "+" : ""}${Math.round(mean)}ms bias (${mean > 25 ? "late" : mean < -25 ? "early" : "on-time"}), ±${Math.round(sd)}ms variability over ${errs.length} contacts.`,
+        `Timing vs the contact line over ${errs.length} trial(s): average ${mean >= 0 ? "+" : ""}${Math.round(mean)}ms (${mean > 20 ? "LATE" : mean < -20 ? "EARLY" : "on the line"}).`,
+        `Absolute error ${Math.round(absMean)}ms · consistency ±${Math.round(sd)}ms · ${early} early / ${late} late.`,
         "PROTOTYPE (design validation) — non-validating timing.",
       );
     }

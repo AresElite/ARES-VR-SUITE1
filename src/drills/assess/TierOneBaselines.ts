@@ -23,12 +23,23 @@ const STANDARD = (parameters: Record<string, unknown> = {}) => [
 ];
 
 // ================= 1. COINCIDENCE-ANTICIPATION TIMING (CAT) =================
-// A marker travels a fixed path toward a contact line at constant speed and
-// arrives at a KNOWN time. The athlete clicks the trigger at the exact moment
-// of arrival. Score = signed timing error (early/late bias) and its SD. The
-// single most sport-transferable construct, and robust to timing jitter
-// because the athlete is scored against a known arrival, not absolute latency.
-const CAT_ARRIVE_MS = 1600; // fixed flight time to the contact line
+// A marker travels toward a thin CONTACT LINE. The athlete fires the trigger at
+// the exact instant the marker's centre crosses the line. We are NOT measuring
+// reaction time — we are measuring how tightly their motor output is
+// synchronized to what their visual system sees.
+//
+//   score per trial = press_time - exact_crossing_time
+//        + = LATE (it already crossed)      - = EARLY (fired before it got there)
+//   perfect = 0
+//
+// The marker ACCELERATES across the 20 trials, and every trial is jittered in
+// speed, direction and delay so no rhythm can be learned.
+const CAT_TRIALS = 20;
+const CAT_Z = -1.0;
+const CAT_LINE_X = 0.34;      // the contact line
+const CAT_FLIGHT_SLOW = 1900; // trial 1 — easy read
+const CAT_FLIGHT_FAST = 700;  // trial 20 — fast
+const CAT_JITTER = 0.18;      // +/-18% unpredictability on every trial
 
 export const CoincidenceAnticipation: DrillDefinition = {
   id: "assess-cat",
@@ -36,52 +47,63 @@ export const CoincidenceAnticipation: DrillDefinition = {
   shortName: "Anticipation Timing",
   phase: "Assess",
   description:
-    "A marker slides toward the gold contact line and arrives at a fixed, predictable time. Click either trigger the INSTANT it reaches the line — not before, not after. Scored on early/late bias and consistency, not raw speed.",
-  purpose: "Coincidence-anticipation timing — perception-action synchronization.",
+    "A marker travels toward a thin CONTACT LINE — pull the trigger at the exact instant it crosses. Not a reaction test: it measures how precisely your motor output is synchronized to what you see. Early fires score negative, late fires positive, perfect is zero. The marker speeds up and its timing is randomized every trial so no rhythm can be learned. 20 trials.",
+  purpose: "Visuomotor synchronization — signed timing error against the contact line.",
   interaction: "touch",
   responseMode: "trigger",
   environment: "arena",
   mvp: true,
   assessment: true,
-  anticipation: { arriveMs: CAT_ARRIVE_MS },
+  anticipation: { arriveMs: 0 }, // per-trial arrival is carried on each stimulus
   instructions: [
-    "1. A glowing marker slides steadily toward the GOLD contact line.",
-    "2. Its speed is constant and predictable - read the approach.",
-    "3. Click EITHER top trigger at the exact moment the marker meets the line.",
-    "4. Early clicks score negative, late clicks positive - aim for zero.",
-    "5. 20 contacts. Your timing bias and consistency are the score.",
+    "1. A thin TEAL CONTACT LINE stands in front of you.",
+    "2. A marker travels toward it. Watch it approach.",
+    "3. Pull EITHER trigger at the EXACT moment the marker crosses the line.",
+    "4. Fire early = negative score. Fire late = positive. DEAD ON THE LINE = zero.",
+    "5. It gets faster and the timing is randomized - do not try to find a rhythm. 20 trials.",
   ],
-  controlsHint: "CLICK THE TRIGGER AS THE MARKER MEETS THE GOLD LINE",
-  levels: STANDARD({ trials: 20 }),
+  controlsHint: "FIRE THE INSTANT IT CROSSES THE LINE - 0ms IS PERFECT",
+  levels: STANDARD({ trials: CAT_TRIALS }),
   buildTrials: (params, rng) => {
     const p = params as { trials: number };
     const trials: TrialSpec[] = [];
-    let t = 1500;
-    const startX = -0.62;
-    const lineX = 0.42;
-    const speed = (lineX - startX) / (CAT_ARRIVE_MS / 1000); // constant, m/s
+    let t = 1800;
     for (let i = 0; i < p.trials; i++) {
-      const y = 1.3 + rng() * 0.32;
-      // fixed gold contact line
+      // accelerating base + per-trial jitter => speeds up, stays unpredictable
+      const f = i / Math.max(1, p.trials - 1);
+      const base = CAT_FLIGHT_SLOW + (CAT_FLIGHT_FAST - CAT_FLIGHT_SLOW) * f;
+      const flightMs = Math.round(base * (1 - CAT_JITTER + rng() * CAT_JITTER * 2));
+      const leftToRight = rng() < 0.5; // direction randomized too
+      const y = 1.34 + (rng() - 0.5) * 0.28; // crosses the line at a random height
+      const startX = leftToRight ? -0.72 : 0.72 + (CAT_LINE_X * 2);
+      const lineX = leftToRight ? CAT_LINE_X : -CAT_LINE_X;
+      const dist = Math.abs(lineX - startX);
+      const speed = dist / (flightMs / 1000); // m/s
+      const overshoot = 0.45; // keeps travelling past the line
+
+      // the contact LINE (thin vertical bar, decor)
       trials.push({
-        id: `cat-${i}-line`, spawnAt: t, duration: CAT_ARRIVE_MS + 900, kind: "distractor", decor: true,
-        zone: "center", position: [lineX, y, Z], color: GOLD, emissive: GOLD, shape: "pad", scale: 0.05,
+        id: `cat-${i}-line`, spawnAt: t, duration: flightMs + 1100, kind: "distractor", decor: true,
+        zone: "center", position: [lineX, 1.34, CAT_Z],
+        color: TEAL, emissive: "#7FD3DE", shape: "line", scale: 0.19,
       });
-      // the traveling marker — a GO target, live from spawn through a window
-      // past arrival so both early and late clicks register and are scored
+      // the marker — GO from spawn so BOTH early and late presses are scored.
+      // meta.arriveMs = the exact ms its centre crosses the line's centre.
       trials.push({
-        id: `cat-${i}`, spawnAt: t, duration: CAT_ARRIVE_MS + 700, kind: "go",
-        zone: "center", position: [startX, y, Z], velocity: [speed, 0, 0],
-        color: TEAL, emissive: TEAL, shape: "sphere", scale: 0.05,
-        meta: { arriveMs: CAT_ARRIVE_MS },
+        id: `cat-${i}`, spawnAt: t, duration: flightMs + 900, kind: "go",
+        zone: "center", position: [startX, y, CAT_Z],
+        velocity: [(leftToRight ? 1 : -1) * speed, 0, 0],
+        color: PURPLE, emissive: PURPLE, shape: "sphere", scale: 0.035,
+        meta: { arriveMs: flightMs },
       });
-      t += CAT_ARRIVE_MS + 1200 + rng() * 400;
+      // random inter-trial delay — no learnable cadence
+      t += flightMs + 900 + 700 + Math.round(rng() * 900) + (overshoot * 0);
     }
     return trials;
   },
   durationMs: (params) => {
     const p = params as { trials: number };
-    return 1500 + p.trials * (CAT_ARRIVE_MS + 1500) + 1500;
+    return 1800 + p.trials * (CAT_FLIGHT_SLOW + 900 + 700 + 900) + 2500;
   },
 };
 

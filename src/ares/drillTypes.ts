@@ -15,7 +15,7 @@ export type TargetZone =
 export type TargetKind = "go" | "noGo" | "distractor";
 export type HandRule = "left" | "right" | "either" | "both";
 export type Hand = "left" | "right" | "both" | "unknown";
-export type TargetShape = "sphere" | "box" | "diamond" | "ring" | "cone" | "pyramid" | "arc" | "pad" | "plate" | "stereo" | "grating" | "arrow";
+export type TargetShape = "sphere" | "box" | "diamond" | "ring" | "cone" | "pyramid" | "arc" | "pad" | "plate" | "stereo" | "grating" | "arrow" | "line";
 
 export type SliceDirection =
   | "up"
@@ -193,4 +193,7 @@ export type RawEvent = {
   zone?: TargetZone;
   /** hand-to-target-center distance at contact (meters) */
   precisionM?: number;
+  /** anticipation protocols: the exact ms (from spawn) the stimulus reaches the
+      contact line — signed error = reactionMs - arriveMs (+late / -early) */
+  arriveMs?: number;
 };
