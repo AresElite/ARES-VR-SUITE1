@@ -10,6 +10,24 @@ import { ORG_PIN } from "@/ares/constants";
 import { createDrillSession } from "@/drills/shared/DrillSession";
 import { buildSessionResult, type FinishedDrill } from "@/drills/shared/DrillResult";
 import { levelFor } from "@/drills/shared/ProgressionEngine";
+import { PERFORM_TIERS, TIER_GATE_ACCURACY, UNGATED_TIERS } from "@/perform/tiers";
+
+const TIER_KEY = "ares.perform.tierUnlocks.v1";
+function loadTierUnlocks(): Record<string, number> {
+  try {
+    const raw = localStorage.getItem(TIER_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, number>) : {};
+  } catch {
+    return {};
+  }
+}
+function saveTierUnlocks(t: Record<string, number>): void {
+  try {
+    localStorage.setItem(TIER_KEY, JSON.stringify(t));
+  } catch {
+    /* storage unavailable — unlocks stay session-local */
+  }
+}
 import type { DrillEngine, DrillSnapshot } from "@/drills/shared/DrillEngine";
 import { detectHeadset, detectBrowser } from "@/utils/questDetection";
 import { EMPTY_XR_SUPPORT, type XRSupportInfo } from "@/utils/xrSupport";
@@ -24,6 +42,8 @@ interface AppState {
   seated: boolean;
   strobeLevel: number;
   orgUnlocked: boolean;
+  /** highest PERFORM tier unlocked per drill (earned, persisted) */
+  tierUnlocks: Record<string, number>;
   // session setup
   athlete: Athlete;
   group: import("@/ares/phases").ArenaGroupId | null;
@@ -45,6 +65,7 @@ interface AppState {
   setSeated(seated: boolean): void;
   setStrobeLevel(level: number): void;
   unlockOrg(pin: string): boolean;
+  unlockedTier(drillId: string): number;
   setAthlete(a: Athlete): void;
   selectGroup(id: import("@/ares/phases").ArenaGroupId | null): void;
   selectPhase(phase: ARESPhase | null): void;
@@ -88,6 +109,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   sport: null,
   drillId: null,
   level: 1,
+  tierUnlocks: loadTierUnlocks(),
   drillOptions: {},
   arenaMode: "home",
   engine: null,
@@ -100,6 +122,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setPerfMode: (id) => set({ perfModeId: id }),
   setSeated: (seated) => set({ seated }),
   setStrobeLevel: (level) => set({ strobeLevel: Math.max(0, Math.min(5, level)) }),
+  unlockedTier: (drillId) => Math.max(UNGATED_TIERS, get().tierUnlocks[drillId] ?? UNGATED_TIERS),
   unlockOrg: (pin) => {
     const ok = pin === ORG_PIN;
     if (ok) set({ orgUnlocked: true });
@@ -194,7 +217,19 @@ export const useAppStore = create<AppState>((set, get) => ({
       ...finished.result.progression.parameters,
       strobeLevel: get().strobeLevel,
     };
-    set({ lastFinished: finished, arenaMode: "results", engine: null, snapshot: null });
+
+    // PERFORM TIER GATE — clearing a tier at >=85% accuracy unlocks the next
+    // rung. Survival is not enough; the mechanic has to have been absorbed.
+    let tierUnlocks = get().tierUnlocks;
+    if (def.phase === "Perform" && finished.result.metrics.accuracyPct >= TIER_GATE_ACCURACY) {
+      const earned = Math.min(PERFORM_TIERS, level + 1);
+      const held = Math.max(UNGATED_TIERS, tierUnlocks[def.id] ?? UNGATED_TIERS);
+      if (earned > held) {
+        tierUnlocks = { ...tierUnlocks, [def.id]: earned };
+        saveTierUnlocks(tierUnlocks);
+      }
+    }
+    set({ lastFinished: finished, arenaMode: "results", engine: null, snapshot: null, tierUnlocks });
   },
 
   saveLastSession: async () => {

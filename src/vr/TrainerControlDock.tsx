@@ -133,8 +133,14 @@ export function TrainerControlDock() {
   const scroll = (d: number) => setOffset((o) => Math.max(0, Math.min(maxOffset, o + d)));
   const pageDrills = drills.slice(offset, offset + PAGE_SIZE);
   const def = drillId ? drillById(drillId) : undefined;
-  const maxLevel = def ? def.levels.length : 1;
+  // PERFORM tiers are EARNED — the ladder only extends as far as the athlete
+  // has held 85%. Every other phase keeps its full level range.
+  const unlockedTier = useAppStore((s) => s.unlockedTier);
+  const isPerform = def?.phase === "Perform";
+  const ceiling = def ? def.levels.length : 1;
+  const maxLevel = def && isPerform ? Math.min(ceiling, unlockedTier(def.id)) : ceiling;
   const levelLabel = def?.levels.find((l) => l.level === level)?.label ?? "";
+  const gated = isPerform && maxLevel < ceiling;
   const opts = def?.options ?? [];
 
   const cycleAthlete = () => {
@@ -340,7 +346,7 @@ export function TrainerControlDock() {
           disabled={!def || level <= 1} onClick={() => step(-1)} />
         <PanelButton position={[-0.22, 0.62, 0]} width={0.2} height={0.08} label="−10" fontSize={0.03}
           disabled={!def || level <= 1} onClick={() => step(-10)} />
-        <PanelText position={[0.08, 0.62, 0]} text={def ? `LV ${level}/${maxLevel}` : "—"} size={0.045}
+        <PanelText position={[0.08, 0.62, 0]} text={def ? (isPerform ? `TIER ${level}/${ceiling}${gated ? ` · ${maxLevel} UNLOCKED` : ""}` : `LV ${level}/${maxLevel}`) : "—"} size={0.045}
           color={ARES_ACCENTS.tealBright} anchorX="center" align="center" mono />
         <PanelButton position={[0.38, 0.62, 0]} width={0.2} height={0.08} label="+10" fontSize={0.03}
           disabled={!def || level >= maxLevel} onClick={() => step(10)} />

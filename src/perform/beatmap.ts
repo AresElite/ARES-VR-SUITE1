@@ -1,4 +1,5 @@
 import { makeRng } from "@/utils/rng";
+import { tierAt } from "./tiers";
 
 /**
  * PERFORM — the beat-mapped choreography system.
@@ -71,8 +72,16 @@ export function generateMap(r: TrackRecipe): BeatMap {
     const col = cross ? awayCol : wide ? homeCol : rng() < 0.5 ? 1 : homeCol;
     return { col, row: rng() < 0.45 ? 0 : 1 };
   };
+  // MAX-GAP GUARANTEE — a fill probability alone can string together a long
+  // run of empty beats, and dead air on the strike plane breaks the beat lock
+  // and lets attention drift. Never let the athlete wait more than ~3.5s.
+  const secPerBeatGen = 60 / r.bpm;
+  const maxGapBeats = Math.max(2, Math.floor(3.5 / secPerBeatGen));
+  let lastBeat = -1;
+
   for (let b = 0; b < lengthBeats; b++) {
-    if (rng() < r.fill) {
+    const forced = lastBeat >= 0 && b - lastBeat >= maxGapBeats;
+    if (forced || rng() < r.fill) {
       if (rng() < r.doubles) {
         notes.push({ beat: b, col: 0, row: rng() < 0.5 ? 0 : 1, hand: "left" });
         notes.push({ beat: b, col: 2, row: rng() < 0.5 ? 0 : 1, hand: "right" });
@@ -84,11 +93,13 @@ export function generateMap(r: TrackRecipe): BeatMap {
         notes.push({ beat: b, ...laneFor(hand), hand });
         lastHand = hand;
       }
+      lastBeat = b;
     }
     if (rng() < r.offbeat) {
       const hand: NoteHand = lastHand === "left" ? "right" : "left";
       notes.push({ beat: b + 0.5, ...laneFor(hand), hand });
       lastHand = hand;
+      lastBeat = b;
     }
   }
   return {
@@ -163,26 +174,46 @@ export const BASE_RECIPES: TrackRecipe[] = [
 ];
 
 /**
- * LEVEL SCALING — every track becomes a 12-rung ladder. Low levels are
- * slower, sparser, and CENTRAL (targets hug the midline); high levels are
- * denser, faster, syncopated, and PERIPHERAL (full-width field, crossovers,
- * doubles). The Goldilocks Zone lives somewhere on this ladder for every
- * athlete — the prescription engine finds it and holds them there.
+ * TIER SCALING — the track recipe is re-derived for each of the ten tiers.
+ * Motor axes (density, pace, spread, size) scale smoothly; cognitive axes
+ * (voids, decoys, mirrors, bursts) are carried on the TierSpec and applied at
+ * trial-build time, so the beat grid stays musical no matter how hard it gets.
  */
-export function levelRecipe(base: TrackRecipe, level: number): TrackRecipe {
-  const L = Math.max(1, Math.min(12, level));
-  const t = (L - 1) / 11; // 0..1 across the ladder
+export function tierRecipe(base: TrackRecipe, level: number): TrackRecipe {
+  const t = tierAt(level);
   return {
     ...base,
-    id: `${base.id}-l${L}`,
-    fill: Math.min(0.95, base.fill * (0.72 + t * 0.42)),
-    offbeat: Math.min(0.5, base.offbeat * 0.4 + t * (base.offbeat + 0.08)),
-    doubles: Math.min(0.3, base.doubles * 0.3 + t * (base.doubles + 0.05)),
-    crossover: Math.min(0.45, base.crossover * 0.3 + t * (base.crossover + 0.06)),
-    spread: Math.min(1, 0.15 + t * (0.35 + base.spread)), // central -> peripheral
-    approachSec: base.approachSec * (1.18 - t * 0.3), // slower read -> faster read
-    seed: base.seed * 1000 + L,
+    id: `${base.id}-t${t.tier}`,
+    // floor the density: even Orientation must keep a live pulse — long dead
+    // air breaks the beat lock and lets attention drift off the strike plane.
+    fill: Math.min(0.95, Math.max(0.4, base.fill * t.fillMul)),
+    offbeat: Math.min(0.5, t.offbeat),
+    doubles: Math.min(0.3, t.doubles),
+    crossover: Math.min(0.45, t.crossover),
+    spread: t.spread,
+    approachSec: base.approachSec * t.approachMul,
+    seed: base.seed * 1000 + t.tier,
   };
+}
+
+/**
+ * COGNITIVE LOAD (0–10) — the second difficulty dimension. computeDifficulty()
+ * measures how hard the chart is on the BODY; this measures how hard it is on
+ * the BRAIN. The pair is what makes the ladder honest: tier 9 is only ~20%
+ * faster than tier 5, but carries roughly five times the decision load.
+ */
+export function cognitiveLoad(level: number): number {
+  const t = tierAt(level);
+  const raw =
+    t.suppress * 9 +
+    t.decoy * 8 +
+    t.lateVoid * 12 +
+    t.mirror * 11 +
+    t.unstable * 6 +
+    t.burst * 10 +
+    t.clutter * 2.5 +
+    (t.adaptive ? 1.2 : 0);
+  return Math.round(Math.min(10, raw) * 10) / 10;
 }
 
 export interface Track {
