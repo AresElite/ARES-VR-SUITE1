@@ -21,6 +21,7 @@ const LIMIT = 0.90;
 const STRIKE_ORB = 0.037, PAD = 0.042;
 
 const issues: string[] = [];
+const crossTotals: [string, number, number][] = [];
 const flag = (s: string) => { if (!issues.includes(s)) issues.push(s); };
 
 function shoulderDist(p: readonly number[], hand?: string): number {
@@ -81,10 +82,40 @@ for (const d of ALL_DRILLS) {
   const dists: number[] = [];
   let smallest = Infinity;
   let minTol = Infinity;
-  let midlineViolations = 0;
+  let crossBody = 0;
+  let handTargets = 0;
 
-  for (const lvl of [1, Math.ceil(d.levels.length / 2), d.levels.length]) {
-    const specs = d.buildTrials(levelFor(d, lvl).parameters, makeRng(lvl * 7 + 1));
+  /**
+   * SWEEP THE OPTIONS, not just the defaults.
+   *
+   * Eye-Hand defaults to "purple-only", which assigns NO hand at all — so an audit
+   * that only ran the defaults never once exercised the hand rules, and reported
+   * the drill as having no cross-body reaching because it had no hand-assigned
+   * targets to cross with. The interesting behaviour was hiding behind a dropdown.
+   */
+  let combos: Record<string, string>[] = [{}];
+  for (const opt of d.options ?? []) {
+    const next: Record<string, string>[] = [];
+    for (const base of combos) for (const v of opt.values) next.push({ ...base, [opt.id]: v.id });
+    combos = next;
+  }
+  /**
+   * Sample the option space with a STRIDE, never off the front.
+   *
+   * Truncating with slice(0, N) after each expansion silently kept only the first
+   * value of the first option — so Eye-Hand's sweep ran "purple-only" (which
+   * assigns no hand at all) twelve times over and never once exercised the
+   * purple=RIGHT / teal=LEFT rules the whole bug report was about. The audit
+   * reported the drill as clean because it had tested nothing.
+   */
+  const CAP = 16;
+  const optionSets = combos.length <= CAP
+    ? combos
+    : Array.from({ length: CAP }, (_, i) => combos[Math.floor((i * combos.length) / CAP)]);
+
+  for (const lvl of [1, Math.ceil(d.levels.length / 2), d.levels.length])
+  for (const opts of optionSets) {
+    const specs = d.buildTrials({ ...levelFor(d, lvl).parameters, ...opts }, makeRng(lvl * 7 + 1));
     // mirror the engine's reach clamp: it applies to STATIC strike targets only,
     // because a target with velocity is SUPPOSED to start out of reach and fly in
     const strikeDrill = d.interaction === "touch" && (d.responseMode ?? "strike") === "strike";
@@ -102,19 +133,23 @@ for (const d of ALL_DRILLS) {
     }
     for (const s of specs) {
       if (s.decor) continue;
+      if (s.requiredHand === "left" || s.requiredHand === "right") handTargets++;
       const dd = closestApproach(s);
       dists.push(dd);
       smallest = Math.min(smallest, s.scale);
       const tol = s.scale + STRIKE_ORB + PAD + ((s.meta?.hitBoost as number) ?? 0);
       minTol = Math.min(minTol, tol);
 
-      // a hand-assigned target must sit on its own side of the midline, or the
-      // opposite hand has to travel THROUGH it and can be scored for a decision
-      // it never made
-      if (d.id === "eye-hand-coordination") {
-        if (s.requiredHand === "right" && s.position[0] < 0.05) midlineViolations++;
-        if (s.requiredHand === "left" && s.position[0] > -0.05) midlineViolations++;
-      }
+      /**
+       * CROSS-BODY IS REQUIRED, NOT FORBIDDEN.
+       *
+       * A purple (right-hand) orb SHOULD appear left of the midline sometimes —
+       * reaching across the body loads trunk rotation and contralateral control,
+       * and a drill that never asks for it has a hole in it. What must be true is
+       * only that the assigned hand can physically GET there.
+       */
+      if (s.requiredHand === "right" && s.position[0] < -0.03) crossBody++;
+      if (s.requiredHand === "left" && s.position[0] > 0.03) crossBody++;
     }
   }
   if (!dists.length) continue;
@@ -132,8 +167,12 @@ for (const d of ALL_DRILLS) {
     (minTol * 100).toFixed(1).padStart(7) + "cm",
     "  " + (bad ? "OUT OF REACH" : warn ? "at the limit" : "ok"),
   );
-  if (bad) flag(`REACH: ${d.shortName} places targets ${max.toFixed(2)}m from the shoulder (shell is ${STRIKE_REACH}m)`);
-  if (midlineViolations) flag(`MIDLINE: ${d.shortName} has ${midlineViolations} hand-assigned targets in the opposite hand's territory`);
+  if (bad) flag(`REACH: ${d.shortName} places targets ${max.toFixed(2)}m from the shoulder — the assigned hand cannot get there`);
+  // A hand-rule drill that NEVER crosses the midline has quietly lost a demand.
+  if (handTargets > 50 && crossBody === 0) {
+    flag(`CROSS-BODY: ${d.shortName} assigns hands but never places a target across the midline — contralateral reaching has been lost`);
+  }
+  if (crossBody) crossTotals.push([d.shortName, crossBody, handTargets]);
 }
 
 // ---- Eye-Hand sizes must be exactly half of what they were
@@ -146,6 +185,12 @@ console.log("");
 console.log("Eye-Hand sizes (radius):", Object.entries(NEW).map(([k, v]) => `${k} ${(v * 100).toFixed(2)}cm`).join("  "));
 
 console.log("");
+console.log("CROSS-BODY REACHES (purple taken left of centre / teal right of centre):");
+for (const [name, n, tot] of crossTotals) {
+  console.log(`  ${name.padEnd(28)} ${n} of ${tot} hand-assigned targets  (${((n / tot) * 100).toFixed(0)}%)`);
+}
+
+console.log("");
 console.log(issues.length ? "ISSUES:\n" + issues.map((i) => "  " + i).join("\n")
-  : "0 ISSUES — every strike target is inside a human arm's reach, and no hand-assigned target sits in the other hand's territory");
+  : "0 ISSUES — every strike target is reachable BY THE HAND REQUIRED TO TAKE IT, and cross-body reaching is preserved");
 if (issues.length) process.exit(1);

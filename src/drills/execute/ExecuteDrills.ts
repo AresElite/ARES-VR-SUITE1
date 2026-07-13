@@ -160,32 +160,32 @@ const EHC_REACH = STRIKE_REACH;
 const EHC_SIZES: Record<string, number> = { xl: 0.0575, l: 0.0475, m: 0.039, s: 0.031, xs: 0.025 };
 
 /**
- * MIDLINE GUARD — the structural half of the cross-hand fix.
+ * NO MIDLINE EXCLUSION. Cross-body reaching is a FEATURE.
  *
- * A PURPLE (right-hand) orb must never spawn in left-hand territory, and vice
- * versa. Previously a purple target could land just left of centre, so the left
- * hand had to travel THROUGH it to reach its own targets — and every pass was a
- * chance to be scored as a wrong-hand error the athlete never intended.
+ * An earlier fix banned purple from the left half and teal from the right, to stop
+ * the idle hand brushing through an orb it wasn't allowed to take. It worked — and
+ * it was the wrong trade. It deleted cross-body reaching from the drill entirely,
+ * which is one of the most valuable demands in it: reaching a right-hand target
+ * across the midline loads trunk rotation, shoulder mobility, and contralateral
+ * motor control, and an athlete who can only work their own side of the body has a
+ * hole in exactly the place sport exposes.
  *
- * This does not make the drill easier. The athlete still has to see the colour,
- * pick the hand, and cross the field to the peripheral zones. It only stops the
- * layout from manufacturing errors that have nothing to do with their decision.
- * "Either"-hand targets (blue) are unrestricted — there is no wrong hand for them.
+ * The false wrong-hand errors are fixed properly instead, in the collider, by two
+ * rules that cost the athlete nothing:
+ *
+ *   CORRECT-HAND PREFERENCE  when both hands are in contact, the required hand
+ *                            resolves it. Array order is not a rule.
+ *   INTENT GATE              the wrong hand only errs if it STRIKES — moving with
+ *                            speed, INTO the target. A hand in transit is not a
+ *                            hand committing.
+ *
+ * The only remaining constraint is physical: a hand-assigned target must be
+ * REACHABLE BY THAT HAND (clampToReach is hand-aware). Purple can sit well past
+ * the midline — it just cannot sit somewhere the right arm cannot get to.
  */
-const EHC_MIDLINE = 0.10;
 const EHC_DIST: Record<string, number> = {
   "60-40": 0.6, "50-50": 0.5, "40-60": 0.4, "30-70": 0.3, "20-80": 0.2, "10-90": 0.1, "0-100": 0,
 };
-
-/** Place an EHC target, keeping hand-assigned orbs on their own side of the midline. */
-function handSafePosition(
-  zone: TargetZone, ecc: number, rng: () => number, hand?: HandRule,
-): [number, number, number] {
-  const p = strikePosition(zone, ecc, 0.12, rng, EHC_REACH);
-  if (hand === "right") p[0] = Math.max(p[0], EHC_MIDLINE);
-  else if (hand === "left") p[0] = Math.min(p[0], -EHC_MIDLINE);
-  return p;
-}
 
 export const EyeHandCoordination: DrillDefinition = {
   id: "eye-hand-coordination",
@@ -286,7 +286,7 @@ export const EyeHandCoordination: DrillDefinition = {
           duration: p.timeoutMs,
           kind: "go",
           zone,
-          position: handSafePosition(zone, ecc, rng, c.hand),
+          position: strikePosition(zone, ecc, 0.12, rng, EHC_REACH),
           requiredHand: c.hand,
           color: c.color,
           emissive: c.color,
