@@ -7,7 +7,7 @@ export const ORG_NAME = "Ares Elite Sports Vision";
  * Version stamp — visible in the site footer and the VR arena so anyone can
  * instantly tell which build is live. Bump on every deploy.
  */
-export const APP_VERSION = "v0.44.0 — AEGIS: flagship eye-hand drill (5:00 + bonus-until-fail, block/catch/mixed, continuous engine)";
+export const APP_VERSION = "v0.45.0 — SEQUENCE COMMAND: peripheral intake, central decision, bilateral sequencing (Training + Assessment)";
 
 /** Spatial UI distances (meters) — panels live 1.5–2.5m from the athlete. */
 export const PANEL_NEAR = 1.6;

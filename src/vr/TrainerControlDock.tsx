@@ -75,6 +75,8 @@ export function TrainerControlDock() {
       // that runs the full A.R.E.S. Loop end-to-end inside a single session.
       { id: "AEGIS", label: "AEGIS", color: "#8B5CF6", tag: "Eye-hand · 5:00 + bonus until failure",
         onClick: () => useAppStore.setState({ arenaMode: "aegisSetup" }) },
+      { id: "SEQUENCE", label: "Sequence Command", color: "#2998AA", tag: "Peripheral intake · central decision · sequencing",
+        onClick: () => useAppStore.setState({ arenaMode: "seqSetup" }) },
       ...TRAINING_PHASES.map((tp) => ({ id: tp, label: tp, color: PM[tp].color, tag: PM[tp].tagline, onClick: () => selectPhase(tp) })),
       { id: "Sport", label: "Sport", color: "#2998AA", tag: "Sport-specific suites", onClick: () => selectPhase("Sport" as never) },
     ];

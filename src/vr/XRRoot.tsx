@@ -4,6 +4,7 @@ import { OrbitControls } from "@react-three/drei";
 import { XR, XROrigin, createXRStore, useXR } from "@react-three/xr";
 import { useAppStore } from "@/app/providers/appStore";
 import { AegisSession, AegisSetup, AegisResultsPanel } from "@/vr/AegisSession";
+import { SequenceSession, SequenceSetup, SequenceResultsPanel } from "@/vr/SequenceSession";
 import { drillById } from "@/drills/registry";
 import { PERF_MODES, defaultPerfMode } from "@/utils/performance";
 import { pointerStoreOptions } from "./InteractionRay";
@@ -72,6 +73,9 @@ function SceneContent() {
           <AthleteHUD />
         </>
       )}
+      {arenaMode === "seqSetup" && <SequenceSetup />}
+      {arenaMode === "sequence" && <SequenceSession />}
+      {arenaMode === "seqResults" && <SequenceResultsPanel />}
       {arenaMode === "aegisSetup" && <AegisSetup />}
       {arenaMode === "aegis" && <AegisSession />}
       {arenaMode === "aegisResults" && <AegisResultsPanel />}
