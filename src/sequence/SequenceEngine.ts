@@ -7,6 +7,7 @@ import {
 } from "./types";
 import { tuningFor } from "./tiers";
 import { generateCues, chooseCommand, resolvePlan } from "./generator";
+import { classifyPrecision } from "@/ares/precision";
 
 /**
  * THE SEQUENCE ENGINE.
@@ -86,6 +87,14 @@ export class SequenceEngine {
   private acc = 0;
   private lastReal = 0;
   private finished = false;
+  /**
+   * PAUSE. The engine advances on accumulated real time, so a pause cannot
+   * simply stop calling tick() — the next tick would see the whole paused gap as
+   * elapsed and fast-forward the session through it. Re-anchoring lastReal on
+   * every paused frame is what makes the pause actually stop the clock.
+   */
+  paused = false;
+  setPaused(p: boolean): void { this.paused = p; }
 
   sessionPhase: SessionPhase = "main";
   phase: SeqPhase = "encode";
@@ -120,6 +129,8 @@ export class SequenceEngine {
    * So the trigger is the hand crossing INTO a target volume from outside one.
    */
   private handInside: Record<"left" | "right", boolean> = { left: false, right: false };
+  /** hand position at the instant of the contact currently being resolved */
+  private contactPos: [number, number, number] | null = null;
 
   events: SeqEvent[] = [];
   score = 0; mainScore = 0; bonusScore = 0;
@@ -172,6 +183,12 @@ export class SequenceEngine {
 
   tick(now: number, hands: Record<Hand, HandInput>): void {
     if (this.finished) return;
+    if (this.paused) {
+      this.lastReal = now;
+      const s0 = this.snapshot();
+      for (const f of this.listeners) f(s0);
+      return;
+    }
     this.acc += Math.min(100, now - this.lastReal);
     this.lastReal = now;
     while (this.acc >= STEP_MS) { this.acc -= STEP_MS; this.step(hands); }
@@ -288,6 +305,7 @@ export class SequenceEngine {
       const wasInside = this.handInside[h];
       this.handInside[h] = !!hit;
       if (!hit || wasInside) continue;   // rising edge only
+      this.contactPos = [...hands[h].pos] as [number, number, number];
       this.record(hit, as, h, hit.action, hit.band);
     }
   }
@@ -486,10 +504,31 @@ export class SequenceEngine {
     const iai = this.t - this.lastActionAt[stream];
     this.lastActionAt[stream] = this.t;
 
+    /**
+     * HAND LOCALIZATION. Recorded on every pad contact, normalized by the pad's
+     * own contact radius. Sequence Command has FIXED pads, which makes it the
+     * cleanest localization measure in the suite: the target never moves, so any
+     * offset is entirely the athlete's internal model of where their hand is —
+     * there is no interception error mixed in to confound it.
+     */
+    const PAD_R = 0.13;
+    let precisionM: number | undefined;
+    let precisionZone: import("@/ares/precision").PrecisionZone | undefined;
+    let offX: number | undefined, offY: number | undefined, offZ: number | undefined;
+    if (this.contactPos && hand) {
+      const c = this.targetPos(step);
+      offX = this.contactPos[0] - c[0];
+      offY = this.contactPos[1] - c[1];
+      offZ = this.contactPos[2] - c[2];
+      precisionM = Math.hypot(offX, offY, offZ);
+      precisionZone = classifyPrecision(precisionM, PAD_R);
+    }
+    this.contactPos = null;
+
     const breakdown = this.attribute(outcome);
     if (breakdown) this.breakdowns[breakdown]++;
 
-    const delta = this.scoreFor(outcome, timingErr, step);
+    const delta = this.scoreFor(outcome, timingErr, step, precisionZone);
     this.score += delta;
     if (this.sessionPhase === "bonus") this.bonusScore += delta; else this.mainScore += delta;
 
@@ -506,6 +545,7 @@ export class SequenceEngine {
       encodingMs: this.live.cueDisplayMs,
       execMs, iaiMs: iai > 0 && iai < 8000 ? iai : undefined,
       timingErrorMs: timingErr,
+      precisionM, radiusM: 0.13, offX, offY, offZ, precisionZone,
       stream,
       scoreDelta: delta,
       bonusStage: this.sessionPhase === "bonus" ? this.bonusStage : undefined,
@@ -549,7 +589,10 @@ export class SequenceEngine {
    * never reach by volume. And every speed term is gated by a correctness term,
    * so reckless speed cannot outscore order and rule control (§36).
    */
-  private scoreFor(o: SeqOutcome, timingErr: number | undefined, step: PlanStep): number {
+  private scoreFor(
+    o: SeqOutcome, timingErr: number | undefined, step: PlanStep,
+    zone?: import("@/ares/precision").PrecisionZone,
+  ): number {
     switch (o) {
       case "wrongHand": return -140;
       case "forbidden": return -160;
@@ -573,6 +616,8 @@ export class SequenceEngine {
       const q = Math.max(0, 1 - Math.abs(timingErr) / this.live.timingWindowMs);
       s += 45 * q; // timing PRECISION, not timing speed
     }
+    // SPATIAL LOCALIZATION — stepped, so finding the centre is worth chasing
+    if (zone) s += zone === "perfect" ? 45 : zone === "good" ? 18 : 3;
     if (this.transformed) s += 30;        // a transformed plan is worth more
     if (step.inferred) s += 25;           // an inferred element even more
     if (step.moving) s += 15;

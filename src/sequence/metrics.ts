@@ -2,6 +2,7 @@ import type { SeqEvent, SeqSettings, BreakdownSource } from "./types";
 import { TRANSFORM_COMMANDS } from "./types";
 import { TIER_COEFF, MODE_RANKED } from "./tiers";
 import type { SequenceEngine } from "./SequenceEngine";
+import { profilePrecision, precisionGate, type PrecisionProfile } from "@/ares/precision";
 
 /**
  * METRIC DICTIONARY (§39) + COMPOSITE INDICES (§40).
@@ -57,6 +58,10 @@ export interface SeqMetrics {
   temporalPrecision: number;
   recoveryResilience: number;
   eliteBreakdownPoint: number | null;
+
+  precision: PrecisionProfile;
+  advanceReady: boolean;
+  advanceReason: string;
 
   compositeRating: number;
   ranked: boolean;
@@ -247,6 +252,13 @@ export function computeSeqMetrics(e: SequenceEngine, s: SeqSettings): SeqMetrics
    * fixed protocol and a self-tuned one are not comparable to a standardized
    * adaptive run, and pretending otherwise would corrupt the board.
    */
+  const precision = profilePrecision(
+    acts.filter((x) => x.precisionM !== undefined && x.radiusM !== undefined && x.correct)
+      .map((x) => ({ distM: x.precisionM!, radiusM: x.radiusM!, dx: x.offX, dy: x.offY, dz: x.offZ })),
+  );
+  const gate = precisionGate(sequenceAccuracyPct, precision.localizationIndex);
+  const localizationFactor = 0.7 + 0.3 * (precision.localizationIndex / 100);
+
   const latQ = avgDecisionToActionMs > 0 ? Math.min(1, 450 / avgDecisionToActionMs) : 0;
   const quality =
     0.30 * (sequenceAccuracyPct / 100) +
@@ -264,7 +276,7 @@ export function computeSeqMetrics(e: SequenceEngine, s: SeqSettings): SeqMetrics
 
   const compositeRating = ranked
     ? Math.max(0, Math.round(
-      1000 * Math.pow(Math.max(0, quality), 1.5) *
+      1000 * Math.pow(Math.max(0, quality), 1.5) * localizationFactor *
       TIER_COEFF[s.tier] * complexityCoeff * bonusDepth,
     ))
     : 0;
@@ -303,6 +315,7 @@ export function computeSeqMetrics(e: SequenceEngine, s: SeqSettings): SeqMetrics
     bilateralSequencing, inhibitionControl, cognitiveFlexibility,
     temporalPrecision, recoveryResilience, eliteBreakdownPoint,
 
+    precision, advanceReady: gate.ready, advanceReason: gate.reason,
     compositeRating, ranked,
   };
 }

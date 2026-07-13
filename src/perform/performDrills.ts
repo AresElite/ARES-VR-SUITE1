@@ -13,7 +13,11 @@ import { tierAt, PERFORM_TIERS, STROBE_ELIGIBLE_TIER } from "./tiers";
 import { makeRng } from "@/utils/rng";
 
 /**
- * PERFORM — flow-state training on a TEN-TIER ladder.
+ * SYNCH — beat-locked flow training on a TEN-TIER ladder.
+ *
+ * One of the three Perform products (Synch / AEGIS / Sequence Command). Synch is
+ * the rhythm suite: ten tracks, each a ten-tier ladder, where notes arrive at the
+ * strike plane exactly ON the beat.
  *
  * Each of the ten tracks now carries the same ten tiers. The tiers do not
  * merely speed the track up; they progressively load the athlete's decision
@@ -68,11 +72,11 @@ function trackToDrill(track: Track, index: number): DrillDefinition {
 
   return {
     id: `perform-${map.id}`,
-    name: `${String(index + 1).padStart(2, "0")} · ${map.title}`,
+    name: `SYNCH ${String(index + 1).padStart(2, "0")} · ${map.title}`,
     shortName: map.title,
     phase: "Perform",
-    description: `Track ${index + 1}/10 — ${map.bpm} BPM on the ten-tier ladder. Tiers 1-3 are pure motor. From T4 the track starts making decisions for you to refuse: voids, decoys, late rule-flips, mirrored hands, ordered bursts. T10 is a live staircase. Strike PURPLE DIAMONDS with the RIGHT, TEAL BOXES with the LEFT, exactly as they arrive.`,
-    purpose: "Beat-locked visuomotor flow under escalating decision load (10-tier ladder).",
+    description: `SYNCH ${index + 1}/10 — ${map.bpm} BPM on the ten-tier ladder. Tiers 1-3 are pure motor. From T4 the track starts making decisions for you to refuse: voids, decoys, late rule-flips, mirrored hands, ordered bursts. T10 is a live staircase. Strike PURPLE DIAMONDS with the RIGHT, TEAL BOXES with the LEFT, exactly as they arrive.`,
+    purpose: "SYNCH — beat-locked visuomotor flow under escalating decision load (10-tier ladder).",
     interaction: "touch",
     responseMode: "strike",
     environment: "arena",

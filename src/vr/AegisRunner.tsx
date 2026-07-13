@@ -7,6 +7,7 @@ import { AegisEngine, type AegisSnapshot, type HandState, type HandId } from "@/
 import { CATEGORY_VISUAL, type AegisObject, type AegisSettings } from "@/aegis/types";
 import { computeAegisMetrics, type AegisMetrics } from "@/aegis/metrics";
 import { tuningFor } from "@/aegis/tiers";
+import { SessionControlDock } from "@/vr/SessionControlDock";
 
 /**
  * AEGIS RUNNER.
@@ -93,12 +94,14 @@ function ReleaseZone({ at }: { at: [number, number, number] }) {
 }
 
 export function AegisRunner({
-  settings, seed, onComplete,
+  settings, seed, onComplete, onExit,
 }: {
   settings: AegisSettings;
   seed: number;
   onComplete: (m: AegisMetrics, engine: AegisEngine) => void;
+  onExit: () => void;
 }) {
+  const [paused, setPaused] = useState(false);
   const { camera } = useThree();
   const engine = useMemo(() => new AegisEngine(settings, seed), [settings, seed]);
   const tune = useMemo(() => tuningFor(settings.tier, settings.custom), [settings]);
@@ -116,6 +119,7 @@ export function AegisRunner({
     right: { pos: [0.3, 1.3, -0.25], vel: [0, 0, 0], gripping: false },
   });
   const flash = useRef<{ t: number; good: boolean; critical: boolean }>({ t: -9999, good: true, critical: false });
+  const [hitTag, setHitTag] = useState<{ t: number; zone: string; at: [number, number, number] } | null>(null);
   const lastEventCount = useRef(0);
 
   useEffect(() => {
@@ -174,6 +178,12 @@ export function AegisRunner({
       const e = evs[evs.length - 1];
       lastEventCount.current = evs.length;
       flash.current = { t: now, good: e.correct, critical: e.critical };
+      // Localization feedback, at the point of contact, immediately. This is the
+      // only way an athlete can actually CORRECT a spatial bias — telling them at
+      // the end of a five-minute round is a report, not coaching.
+      if (e.correct && e.precisionZone && e.responseHand) {
+        setHitTag({ t: now, zone: e.precisionZone, at: [...hands.current[e.responseHand].pos] });
+      }
       const hh = e.responseHand ? srcs[e.responseHand].haptic : undefined;
       if (hh && tune.hapticIntensity > 0) {
         // critical errors always cut through, even at GOAT — that is a safety
@@ -218,6 +228,23 @@ export function AegisRunner({
 
       {held?.releaseZone && <ReleaseZone at={held.releaseZone} />}
 
+      {/* HAND LOCALIZATION — PERFECT / GOOD / POOR, at the contact point. It is
+          tiered like everything else: at GOAT it is a whisper, because an elite
+          athlete should not be coached through every rep. */}
+      {hitTag && performance.now() - hitTag.t < 620 && fb > 0.05 && (
+        <Text
+          position={[hitTag.at[0], hitTag.at[1] + 0.14, hitTag.at[2]]}
+          fontSize={hitTag.zone === "perfect" ? 0.05 : 0.04}
+          color={hitTag.zone === "perfect" ? "#2998AA" : hitTag.zone === "good" ? "#E8E9F0" : "#FF9F1C"}
+          anchorX="center"
+          fillOpacity={Math.max(0, 1 - (performance.now() - hitTag.t) / 620) * Math.min(1, fb * 1.6)}
+          outlineWidth={0.004}
+          outlineColor="#14161F"
+        >
+          {hitTag.zone.toUpperCase()}
+        </Text>
+      )}
+
       {/* CONTACT FEEDBACK — a brief, restrained wash. No explosions, ever. */}
       {flashOn && fb > 0.05 && (
         <mesh position={[0, 1.5, -1.4]} renderOrder={-1}>
@@ -242,6 +269,14 @@ export function AegisRunner({
       )}
 
       <AegisHUD snap={snap} tier={settings.tier} />
+
+      <SessionControlDock
+        label={`AEGIS · ${settings.tier.toUpperCase()}`}
+        paused={paused}
+        onPause={() => { engine.setPaused(true); setPaused(true); }}
+        onResume={() => { engine.setPaused(false); setPaused(false); }}
+        onExit={() => { engine.stop(); onExit(); }}
+      />
     </group>
   );
 }
@@ -256,20 +291,26 @@ function AegisHUD({ snap, tier }: { snap: AegisSnapshot; tier: string }) {
     <group>
       {/* Upper periphery only — the centre of the visual field is left completely
           clear, because that is where the athlete has to be searching. */}
-      <Text position={[-1.15, 2.28, -1.9]} fontSize={0.1} color="#E8E9F0" anchorX="left">
-        {inBonus ? `BONUS · STAGE ${snap.bonusStage}` : `${mm}:${String(ss).padStart(2, "0")}`}
-      </Text>
-      <Text position={[-1.15, 2.14, -1.9]} fontSize={0.055} color="#6A7086" anchorX="left">
-        {tier.toUpperCase()}
-      </Text>
+      {/* The HUD is pushed to the far SIDES and angled inward. Nothing sits in
+          the central field, because the central field is the measurement. */}
+      <group position={[-1.72, 1.62, -1.5]} rotation={[0, 0.5, 0]}>
+        <Text position={[0, 0.12, 0]} fontSize={0.095} color="#E8E9F0" anchorX="center">
+          {inBonus ? `STAGE ${snap.bonusStage}` : `${mm}:${String(ss).padStart(2, "0")}`}
+        </Text>
+        <Text position={[0, 0, 0]} fontSize={0.042} color="#6A7086" anchorX="center">
+          {inBonus ? "BONUS" : tier.toUpperCase()}
+        </Text>
+      </group>
 
-      <Text position={[1.15, 2.28, -1.9]} fontSize={0.1} color="#E8E9F0" anchorX="right">
-        {snap.score.toLocaleString()}
-      </Text>
-      <Text position={[1.15, 2.14, -1.9]} fontSize={0.055}
-        color={snap.streak >= 10 ? "#C9A6FF" : "#6A7086"} anchorX="right">
-        {snap.streak > 0 ? `STREAK ${snap.streak}` : "—"}
-      </Text>
+      <group position={[1.72, 1.62, -1.5]} rotation={[0, -0.5, 0]}>
+        <Text position={[0, 0.12, 0]} fontSize={0.095} color="#E8E9F0" anchorX="center">
+          {snap.score.toLocaleString()}
+        </Text>
+        <Text position={[0, 0, 0]} fontSize={0.042}
+          color={snap.streak >= 10 ? "#C9A6FF" : "#6A7086"} anchorX="center">
+          {snap.streak > 0 ? `STREAK ${snap.streak}` : "—"}
+        </Text>
+      </group>
 
       {/* The slowdown is FELT, not labelled. The only thing shown is that the
           athlete is in a recovery state and how to leave it — never a "rest" cue. */}

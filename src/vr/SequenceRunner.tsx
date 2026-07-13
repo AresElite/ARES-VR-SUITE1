@@ -7,6 +7,7 @@ import { SequenceEngine, type SeqSnapshot, type HandInput, type Hand } from "@/s
 import { computeSeqMetrics, type SeqMetrics } from "@/sequence/metrics";
 import type { Cue, CueZone, PlanStep, SeqSettings, CentralCommand, SeqAction } from "@/sequence/types";
 import { tuningFor } from "@/sequence/tiers";
+import { SessionControlDock } from "@/vr/SessionControlDock";
 
 /**
  * THE SEQUENCING CHAMBER (§41).
@@ -180,12 +181,14 @@ function Pad({ step, pos, active, pending }: { step: PlanStep; pos: [number, num
 }
 
 export function SequenceRunner({
-  settings, seed, onComplete,
+  settings, seed, onComplete, onExit,
 }: {
   settings: SeqSettings;
   seed: number;
   onComplete: (m: SeqMetrics) => void;
+  onExit: () => void;
 }) {
+  const [paused, setPaused] = useState(false);
   const engine = useMemo(() => new SequenceEngine(settings, seed), [settings, seed]);
   const tune = useMemo(() => tuningFor(settings.tier, settings.mode, settings.custom), [settings]);
   const [snap, setSnap] = useState<SeqSnapshot>(() => engine.snapshot());
@@ -327,12 +330,24 @@ export function SequenceRunner({
       )}
 
       <SequenceHUD snap={snap} tier={settings.tier} mode={settings.mode} />
+
+      <SessionControlDock
+        label={`SEQUENCE COMMAND · ${settings.tier.toUpperCase()}`}
+        paused={paused}
+        onPause={() => { engine.setPaused(true); setPaused(true); }}
+        onResume={() => { engine.setPaused(false); setPaused(false); }}
+        onExit={() => { engine.stop(); onExit(); }}
+      />
     </group>
   );
 }
 
 /** HUD lives in the far upper periphery. The centre stays clear — no fixation point. */
 function SequenceHUD({ snap, tier, mode }: { snap: SeqSnapshot; tier: string; mode: string }) {
+  const contacts = snap.events.filter((e) => e.precisionZone);
+  const centrePct = contacts.length
+    ? Math.round((contacts.filter((e) => e.precisionZone === "perfect").length / contacts.length) * 100)
+    : 0;
   const mm = Math.floor(snap.mainRemainingMs / 60000);
   const ss = Math.floor((snap.mainRemainingMs % 60000) / 1000);
   const bonus = snap.sessionPhase === "bonus";
@@ -344,20 +359,33 @@ function SequenceHUD({ snap, tier, mode }: { snap: SeqSnapshot; tier: string; mo
 
   return (
     <group>
-      <Text position={[-1.62, 2.42, -2.0]} fontSize={0.09} color={WHITE} anchorX="left">
-        {bonus ? `BONUS · STAGE ${snap.bonusStage}` : `${mm}:${String(ss).padStart(2, "0")}`}
-      </Text>
-      <Text position={[-1.62, 2.30, -2.0]} fontSize={0.05} color={GRAY} anchorX="left">
-        {`${tier.toUpperCase()}${mode === "assessment" ? " · ASSESSMENT" : ""}`}
-      </Text>
+      {/* The HUD sits OUTSIDE the cue ring, angled inward. It must never compete
+          with a peripheral cue for attention — that would corrupt the very thing
+          this drill measures. */}
+      <group position={[-2.05, 1.62, -1.35]} rotation={[0, 0.62, 0]}>
+        <Text position={[0, 0.12, 0]} fontSize={0.09} color={WHITE} anchorX="center">
+          {bonus ? `STAGE ${snap.bonusStage}` : `${mm}:${String(ss).padStart(2, "0")}`}
+        </Text>
+        <Text position={[0, 0.005, 0]} fontSize={0.04} color={GRAY} anchorX="center">
+          {bonus ? "BONUS" : `${tier.toUpperCase()}${mode === "assessment" ? " · ASSESS" : ""}`}
+        </Text>
+      </group>
 
-      <Text position={[1.62, 2.42, -2.0]} fontSize={0.09} color={WHITE} anchorX="right">
-        {snap.score.toLocaleString()}
-      </Text>
-      <Text position={[1.62, 2.30, -2.0]} fontSize={0.05}
-        color={snap.streak >= 5 ? TEAL : GRAY} anchorX="right">
-        {snap.streak > 0 ? `${snap.streak} PERFECT` : "—"}
-      </Text>
+      <group position={[2.05, 1.62, -1.35]} rotation={[0, -0.62, 0]}>
+        <Text position={[0, 0.12, 0]} fontSize={0.09} color={WHITE} anchorX="center">
+          {snap.score.toLocaleString()}
+        </Text>
+        <Text position={[0, 0.005, 0]} fontSize={0.04}
+          color={snap.streak >= 5 ? TEAL : GRAY} anchorX="center">
+          {snap.streak > 0 ? `${snap.streak} PERFECT` : "—"}
+        </Text>
+        {/* Running localization. The pads here are FIXED, so a live tally is more
+            useful than a per-hit tag — and far less clutter in a drill whose whole
+            demand is peripheral attention. */}
+        <Text position={[0, -0.09, 0]} fontSize={0.032} color={GRAY} anchorX="center">
+          {`CENTRE ${centrePct}%`}
+        </Text>
+      </group>
 
       {/* The phase word is the ONLY central text, and it disappears during GO so
           it can never sit between the athlete and the pads. */}

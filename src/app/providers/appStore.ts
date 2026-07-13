@@ -171,7 +171,9 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   selectGroup: (id) => {
     if (id === "assess") set({ group: id, phase: "Assess", sport: null, drillId: null, level: 1, arenaMode: "setup" });
-    else if (id === "perform") set({ group: id, phase: "Perform", sport: null, drillId: null, level: 1, arenaMode: "setup" });
+    // Perform is now a THREE-portal suite (Synch / AEGIS / Sequence Command),
+    // so selecting it opens a sub-menu rather than jumping straight to a drill.
+    else if (id === "perform") set({ group: id, phase: null, sport: null, drillId: null, level: 1, arenaMode: "setup" });
     else if (id === "training") set({ group: id, phase: null, sport: null, drillId: null, level: 1, arenaMode: "setup" });
     else set({ group: null, phase: null, sport: null, drillId: null, arenaMode: "home" });
   },

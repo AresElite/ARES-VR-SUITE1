@@ -14,6 +14,8 @@ export interface DeviceInfo {
 }
 
 export interface SessionMetrics {
+  /** hand localization: perfect (centre 10%) / good / poor (outer 30%) */
+  precision: import("@/ares/precision").PrecisionProfile;
   trials: number;
   correct: number;
   incorrect: number;

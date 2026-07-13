@@ -133,6 +133,12 @@ export interface AegisEvent {
   moveInitMs?: number;
   /** contact-point distance from object centre (m) — spatial accuracy */
   precisionM?: number;
+  /** the object's contact radius at that moment — precisionM is normalized by it */
+  radiusM?: number;
+  /** signed hand-minus-centre offset (m) — separates systematic bias from noise */
+  offX?: number; offY?: number; offZ?: number;
+  /** perfect (centre 10%) / good / poor (outer 30%) */
+  precisionZone?: import("@/ares/precision").PrecisionZone;
   /** controller speed at contact (m/s) — separates a controlled block from a flail */
   contactSpeed?: number;
   /** dot(approach vector, controller velocity) — was the block driven INTO the object */

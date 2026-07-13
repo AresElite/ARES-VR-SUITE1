@@ -7,6 +7,7 @@ import {
 } from "./types";
 import { tuningFor, modeAllowed, handRuleAllowed } from "./tiers";
 import { makeTrajectory, bezier, arcLength, pairSafe, type Vec3 } from "./trajectory";
+import { classifyPrecision } from "@/ares/precision";
 
 /**
  * THE CONTINUOUS ENGINE.
@@ -125,6 +126,14 @@ export class AegisEngine {
 
   private listeners: ((s: AegisSnapshot) => void)[] = [];
   private finished = false;
+  /**
+   * PAUSE. The engine advances on accumulated real time, so a pause cannot
+   * simply stop calling tick() — the next tick would see the whole paused gap as
+   * elapsed and fast-forward the session through it. Re-anchoring lastReal on
+   * every paused frame is what makes the pause actually stop the clock.
+   */
+  paused = false;
+  setPaused(p: boolean): void { this.paused = p; }
 
   constructor(settings: AegisSettings, seed = 1) {
     // Guard the reserved combinations rather than trusting the UI (§4, §5).
@@ -158,6 +167,7 @@ export class AegisEngine {
   // ---------------------------------------------------------------- tick
   tick(now: number, hands: Record<HandId, HandState>, headPos: Vec3): void {
     if (this.finished) return;
+    if (this.paused) { this.lastReal = now; this.emit(); return; }
     this.acc += Math.min(100, now - this.lastReal);
     this.lastReal = now;
     while (this.acc >= STEP_MS) {
@@ -481,6 +491,13 @@ export class AegisEngine {
     const speed = hs ? Math.hypot(hs.vel[0], hs.vel[1], hs.vel[2]) : undefined;
     const objPos = at ?? this.posOf(o);
     const precisionM = hs ? Math.hypot(objPos[0] - hs.pos[0], objPos[1] - hs.pos[1], objPos[2] - hs.pos[2]) : undefined;
+    // The contact radius is the object's own scale plus the hand's tolerance —
+    // the same figure the contact test used, so the zones are honest.
+    const radiusM = o.scale + 0.09;
+    const offX = hs ? hs.pos[0] - objPos[0] : undefined;
+    const offY = hs ? hs.pos[1] - objPos[1] : undefined;
+    const offZ = hs ? hs.pos[2] - objPos[2] : undefined;
+    const precisionZone = precisionM !== undefined ? classifyPrecision(precisionM, radiusM) : undefined;
 
     let dirQ: number | undefined;
     if (hs && speed && speed > 0.01) {
@@ -489,7 +506,7 @@ export class AegisEngine {
       dirQ = (hs.vel[0] * to[0] + hs.vel[1] * to[1] + hs.vel[2] * to[2]) / (mag * speed);
     }
 
-    const delta = this.scoreFor(o, outcome, reactionMs, precisionM, speed, dirQ);
+    const delta = this.scoreFor(o, outcome, reactionMs, precisionM, speed, dirQ, radiusM);
 
     // ---- streak, counters
     if (good) {
@@ -535,7 +552,8 @@ export class AegisEngine {
       reactionMs,
       spawnToResponseMs: good ? this.t - o.spawnT : undefined,
       moveInitMs: o.moveInitAt !== undefined ? o.moveInitAt - o.actionableT : undefined,
-      precisionM, contactSpeed: speed, directionQuality: dirQ,
+      precisionM, radiusM, offX, offY, offZ, precisionZone,
+      contactSpeed: speed, directionQuality: dirQ,
       pathM: hand ? this.handPath[hand] : undefined,
       scoreDelta: delta,
       bonusStage: this.phase === "bonus" ? this.bonusStage : undefined,
@@ -554,7 +572,7 @@ export class AegisEngine {
    */
   private scoreFor(
     o: AegisObject, outcome: AegisOutcome,
-    rt?: number, precisionM?: number, speed?: number, dirQ?: number,
+    rt?: number, precisionM?: number, speed?: number, dirQ?: number, radiusM?: number,
   ): number {
     const T = this.settings.tier;
     const speedW = T === "beginner" ? 0.15 : T === "intermediate" ? 0.3 : T === "advanced" ? 0.55 : T === "pro" ? 0.8 : 1.0;
@@ -582,10 +600,16 @@ export class AegisEngine {
       const q = Math.max(0, 1 - rt / (this.tune.timingWindowMs * 2.6));
       s += 70 * q * speedW;
     }
-    // SPATIAL ACCURACY — did you meet it at its centre
+    /**
+     * SPATIAL LOCALIZATION — did you meet it at its CENTRE, or merely touch it?
+     * The reward is STEPPED, not linear, because the difference between a centre
+     * strike and an edge graze is a real difference in proprioceptive control and
+     * a linear ramp lets an athlete who never finds the centre still bank most of
+     * the points. PERFECT is worth more than twice GOOD.
+     */
     if (precisionM !== undefined) {
-      const q = Math.max(0, 1 - precisionM / (o.scale + 0.09));
-      s += 40 * q;
+      const zone = classifyPrecision(precisionM, radiusM ?? o.scale + 0.09);
+      s += zone === "perfect" ? 55 : zone === "good" ? 22 : 4;
     }
     // DIRECTIONAL QUALITY — did you drive INTO it (advanced+)
     if (dirQ !== undefined && this.tune.requireDirection) s += 35 * Math.max(0, dirQ);

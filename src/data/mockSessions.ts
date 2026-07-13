@@ -20,7 +20,8 @@ export const MOCK_SESSIONS: ARESDrillSessionResult[] = [
     },
     progression: { level: 2, label: "Level 2 — Wider field", parameters: {} },
     metrics: {
-      trials: 24,
+      precision: { perfectPct: 0, goodPct: 0, poorPct: 0, meanRadial: 0, localizationIndex: 0, biasX: 0, biasY: 0, biasZ: 0, spreadM: 0, contacts: 0 },
+    trials: 24,
       correct: 20,
       incorrect: 4,
       accuracyPct: 83.3,

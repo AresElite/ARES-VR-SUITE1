@@ -68,15 +68,78 @@ export function TrainerControlDock() {
   const [offset, setOffset] = useState(0);
   useEffect(() => setOffset(0), [phase, sport]);
 
+  /**
+   * PERFORM sub-menu — three portals, three distinct products.
+   *
+   *   SYNCH             the beat-locked rhythm suite. Ten tracks, ten tiers.
+   *   AEGIS             continuous eye-hand. 5:00 + bonus until failure.
+   *   SEQUENCE COMMAND  peripheral intake -> central decision -> bilateral plan.
+   *
+   * They share the Perform identity — sustained, measured, high-tempo work — but
+   * nothing else. AEGIS and Sequence Command sat under Training while they were
+   * being built; that was always wrong. Training is the four-phase Loop library.
+   * These are standardized performance products, and they belong here.
+   */
+  if (group === "perform" && !phase) {
+    const PERF = [
+      { id: "Synch", label: "Synch", color: "#1A6B78",
+        tag: "Beat-locked flow · 10 tracks x 10 tiers",
+        onClick: () => selectPhase("Perform") },
+      { id: "AEGIS", label: "AEGIS", color: "#8B5CF6",
+        tag: "Eye-hand · 5:00 + bonus until failure",
+        onClick: () => useAppStore.setState({ arenaMode: "aegisSetup" }) },
+      { id: "Sequence", label: "Sequence Command", color: "#2998AA",
+        tag: "Peripheral intake · central decision · sequencing",
+        onClick: () => useAppStore.setState({ arenaMode: "seqSetup" }) },
+    ];
+    return (
+      <group>
+        <SpatialPanel
+          position={[0, 1.6, -1.75]}
+          width={1.5}
+          height={1.18}
+          title="Perform"
+          accent="#1A6B78"
+        >
+          {PERF.map((p, i) => (
+            <group key={p.id}>
+              <PanelButton
+                position={[0, 0.4 - i * 0.26, 0]}
+                width={1.3}
+                height={0.14}
+                fontSize={0.05}
+                label={p.label.toUpperCase()}
+                color={p.color}
+                onClick={p.onClick}
+              />
+              <PanelText
+                position={[0, 0.29 - i * 0.26, 0]}
+                text={p.tag}
+                size={0.028}
+                color={ARES_COLORS.softGray}
+                anchorX="center"
+                align="center"
+                maxWidth={1.3}
+              />
+            </group>
+          ))}
+          <PanelButton
+            position={[0, -0.44, 0]}
+            width={0.6}
+            height={0.11}
+            fontSize={0.034}
+            label="< EXIT TO ARENA"
+            color={ARES_COLORS.graphite}
+            onClick={goHome}
+          />
+        </SpatialPanel>
+      </group>
+    );
+  }
+
   // A.R.E.S. Training sub-menu — the four Loop phases plus Sport
   if (group === "training" && !phase) {
     const TRAIN = [
-      // AEGIS leads the menu. It is the flagship eye-hand drill and the only one
-      // that runs the full A.R.E.S. Loop end-to-end inside a single session.
-      { id: "AEGIS", label: "AEGIS", color: "#8B5CF6", tag: "Eye-hand · 5:00 + bonus until failure",
-        onClick: () => useAppStore.setState({ arenaMode: "aegisSetup" }) },
-      { id: "SEQUENCE", label: "Sequence Command", color: "#2998AA", tag: "Peripheral intake · central decision · sequencing",
-        onClick: () => useAppStore.setState({ arenaMode: "seqSetup" }) },
       ...TRAINING_PHASES.map((tp) => ({ id: tp, label: tp, color: PM[tp].color, tag: PM[tp].tagline, onClick: () => selectPhase(tp) })),
       { id: "Sport", label: "Sport", color: "#2998AA", tag: "Sport-specific suites", onClick: () => selectPhase("Sport" as never) },
     ];
@@ -271,6 +334,16 @@ export function TrainerControlDock() {
             label="< TRAINING"
             color={ARES_COLORS.graphite}
             onClick={() => selectGroup("training")}
+          />
+        ) : group === "perform" ? (
+          <PanelButton
+            position={[0.4, 0.68, 0]}
+            width={0.44}
+            height={0.085}
+            fontSize={0.028}
+            label="< PERFORM"
+            color={ARES_COLORS.graphite}
+            onClick={() => selectGroup("perform")}
           />
         ) : null}
         {drills.length > PAGE_SIZE && <StickScroll onStep={scroll} />}

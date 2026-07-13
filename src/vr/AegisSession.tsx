@@ -15,6 +15,7 @@ export function AegisSession() {
         settings={settings}
         seed={Date.now() % 2147483647}
         onComplete={(m) => finishAegis(m)}
+        onExit={() => useAppStore.setState({ arenaMode: "aegisSetup" })}
       />
     </group>
   );
@@ -148,6 +149,12 @@ export function AegisResultsPanel() {
         : "not reached")}
       {row(-0.28, "BREAKDOWN POINT", m.eliteBreakdownPoint ? `bonus stage ${m.eliteBreakdownPoint}` : "never broke")}
 
+      {/* HAND LOCALIZATION — where on the target the hand actually landed. */}
+      {row(-0.36, "LOCALIZATION",
+        `PERFECT ${m.precision.perfectPct}%  ·  GOOD ${m.precision.goodPct}%  ·  POOR ${m.precision.poorPct}%`,
+        m.precision.localizationIndex >= 70 ? ARES_COLORS.electricTeal
+          : m.precision.localizationIndex >= 50 ? ARES_COLORS.white : "#FF9F1C")}
+
       {/* Derived indices — stated plainly, never as clinical claims. */}
       {idx(-0.78, -0.46, "DECISION", m.decisionEfficiency)}
       {idx(-0.44, -0.46, "BILATERAL", m.bilateralCoordination)}
@@ -155,8 +162,11 @@ export function AegisResultsPanel() {
       {idx(0.24, -0.46, "RECOVERY", m.recoveryResilience)}
       {idx(0.58, -0.46, "PRESSURE", m.pressureStability)}
       {idx(0.88, -0.46, "ECONOMY", m.movementEconomy)}
+      {idx(1.14, -0.46, "LOCALIZE", m.precision.localizationIndex)}
 
-      <PanelText position={[-0.86, -0.62, 0]}
+      <PanelText position={[-0.86, -0.6, 0]} text={m.advanceReason} size={0.024}
+        color={m.advanceReady ? ARES_COLORS.electricTeal : "#FF9F1C"} maxWidth={1.85} />
+      <PanelText position={[-0.86, -0.66, 0]}
         text="Performance descriptors from this session only. Not diagnostic."
         size={0.022} color={ARES_COLORS.softGray} />
 

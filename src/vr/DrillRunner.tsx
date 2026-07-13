@@ -8,6 +8,7 @@ import { PHASE_META } from "@/ares/phases";
 import { HUD_REFRESH_HZ } from "@/ares/constants";
 import type { Hand, SliceDirection } from "@/ares/drillTypes";
 import { useAppStore } from "@/app/providers/appStore";
+import { STRIKE_TOLERANCE_M } from "@/drills/shared/DrillEngine";
 import { handFromPointerEvent, sliceDirectionFromDelta } from "@/drills/shared/InputMapper";
 import type { PoolSlot } from "@/drills/shared/TargetSpawner";
 import { PERF_MODES } from "@/utils/performance";
@@ -156,7 +157,7 @@ function StrikeColliders() {
                   : slot.spec.requiredDirection;
             }
             const contactDist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-            engine.registerHit(slot.spec.id, t.hand, direction, contactDist);
+            engine.registerHit(slot.spec.id, t.hand, direction, contactDist, slot.spec.scale + STRIKE_TOLERANCE_M);
             t.pulse?.();
           }
         }

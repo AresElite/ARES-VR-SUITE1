@@ -198,6 +198,11 @@ export interface SeqEvent {
   iaiMs?: number;
   /** signed timing error against the required beat: + late, - early */
   timingErrorMs?: number;
+  /** hand-to-pad-centre distance at contact (m), and the pad's contact radius */
+  precisionM?: number;
+  radiusM?: number;
+  offX?: number; offY?: number; offZ?: number;
+  precisionZone?: import("@/ares/precision").PrecisionZone;
   stream: "L" | "R";
   scoreDelta: number;
   bonusStage?: number;

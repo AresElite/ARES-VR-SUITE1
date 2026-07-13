@@ -1,6 +1,7 @@
 import type { AegisEvent, AegisSettings } from "./types";
 import { TIER_COEFF, MODE_COEFF, HANDRULE_COEFF } from "./tiers";
 import type { AegisEngine } from "./ContinuousEngine";
+import { profilePrecision, precisionGate, type PrecisionProfile } from "@/ares/precision";
 
 /**
  * THE METRIC DICTIONARY (§23) and the derived indices (§24).
@@ -71,6 +72,11 @@ export interface AegisMetrics {
   pressureStability: number;       // 0-100
   movementEconomy: number;         // 0-100
   eliteBreakdownPoint: number | null; // bonus stage where performance materially fell
+
+  // ---- hand localization
+  precision: PrecisionProfile;
+  advanceReady: boolean;
+  advanceReason: string;
 
   // ---- leaderboard
   compositeRating: number;
@@ -261,6 +267,12 @@ export function computeAegisMetrics(engine: AegisEngine, settings: AegisSettings
    *
    * Custom Mode sessions are scored in-session but never ranked (§18).
    */
+  const precision = profilePrecision(
+    ev.filter((e) => e.precisionM !== undefined && e.radiusM !== undefined && e.correct)
+      .map((e) => ({ distM: e.precisionM!, radiusM: e.radiusM!, dx: e.offX, dy: e.offY, dz: e.offZ })),
+  );
+  const gate = precisionGate(accuracyPct, precision.localizationIndex);
+
   const rtQuality = avgRT > 0 ? Math.min(1, 350 / avgRT) : 0;
   const quality =
     0.34 * (accuracyPct / 100) +
@@ -269,6 +281,11 @@ export function computeAegisMetrics(engine: AegisEngine, settings: AegisSettings
     0.14 * rtQuality +
     0.10 * (movementEconomy / 100) +
     0.08 * (pressureStability / 100);
+  // Localization is folded in as a MULTIPLIER, not another additive term. An
+  // athlete who only ever grazes the edge of the target is not 92% as good as one
+  // who finds the centre — they have a materially worse spatial model, and the
+  // board should say so. The floor of 0.7 keeps it from being punitive.
+  const localizationFactor = 0.7 + 0.3 * (precision.localizationIndex / 100);
 
   // Bonus depth is weighted BY TIER: surviving eight bonus stages at Beginner
   // and eight at GOAT are not the same achievement, and the board must not
@@ -278,12 +295,13 @@ export function computeAegisMetrics(engine: AegisEngine, settings: AegisSettings
   const compositeRating = settings.custom
     ? 0
     : Math.max(0, Math.round(
-      1000 * Math.pow(Math.max(0, quality), 1.5) *
+      1000 * Math.pow(Math.max(0, quality), 1.5) * localizationFactor *
       TIER_COEFF[settings.tier] * MODE_COEFF[settings.mode] * HANDRULE_COEFF[settings.handRule] *
       bonusDepth,
     ));
 
   return {
+    precision, advanceReady: gate.ready, advanceReason: gate.reason,
     valid, blocked, caught, released, missed, wrongHand, wrongAction,
     retentionFails, zoneFails, accuracyPct,
     avgRT, medianRT: Math.round(median(rts)),

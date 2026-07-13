@@ -193,6 +193,11 @@ export type RawEvent = {
   zone?: TargetZone;
   /** hand-to-target-center distance at contact (meters) */
   precisionM?: number;
+  /** the target's contact radius (m). precisionM is meaningless without it — a
+      7cm miss on a big pad and a 7cm miss on a small one are not the same error. */
+  radiusM?: number;
+  /** perfect (centre 10%) / good / poor (outer 30%) */
+  precisionZone?: import("./precision").PrecisionZone;
   /** anticipation protocols: the exact ms (from spawn) the stimulus reaches the
       contact line — signed error = reactionMs - arriveMs (+late / -early) */
   arriveMs?: number;

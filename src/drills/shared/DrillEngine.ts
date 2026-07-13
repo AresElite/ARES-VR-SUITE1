@@ -1,3 +1,4 @@
+import { classifyPrecision } from "@/ares/precision";
 import type {
   DrillDefinition,
   Hand,
@@ -51,6 +52,9 @@ const DEBUG = (import.meta as { env?: Record<string, string> }).env?.VITE_DEBUG_
  * HUD; it never owns per-frame drill state. Every drill in the suite —
  * including Sport-Transfer Reality Labs — runs on this one engine.
  */
+/** the hand tolerance the strike test allows beyond the target surface */
+export const STRIKE_TOLERANCE_M = 0.055;
+
 export class DrillEngine {
   readonly definition: DrillDefinition;
   readonly parameters: Record<string, unknown>;
@@ -458,7 +462,7 @@ export class DrillEngine {
    * Register a hit on a target (ray trigger, touch, or desktop click).
    * Evaluates go/no-go, hand rules, direction rules, and group resolution.
    */
-  registerHit(targetId: string, hand: Hand, direction?: SliceDirection, precisionM?: number): void {
+  registerHit(targetId: string, hand: Hand, direction?: SliceDirection, precisionM?: number, radiusM?: number): void {
     if (this.state !== "running") return;
     const t = this.active.get(targetId);
     if (!t || t.resolved) return;
@@ -532,6 +536,18 @@ export class DrillEngine {
       hand,
       errorType,
       zone: t.spec.zone,
+      /**
+       * HAND LOCALIZATION. The contact distance was already being passed into
+       * this engine and then silently DISCARDED — it never reached the event, so
+       * no drill in the suite has ever scored where on the target the athlete
+       * actually landed. It does now, normalized by the target's own contact
+       * radius so the zones mean the same thing on a big pad and a small one.
+       */
+      precisionM,
+      radiusM: precisionM !== undefined ? t.spec.scale + STRIKE_TOLERANCE_M : undefined,
+      precisionZone: precisionM !== undefined
+        ? classifyPrecision(precisionM, t.spec.scale + STRIKE_TOLERANCE_M)
+        : undefined,
     });
 
     const mode = t.spec.groupMode ?? "single";

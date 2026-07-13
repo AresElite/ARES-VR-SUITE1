@@ -1,4 +1,5 @@
 import type { RawEvent, TargetZone } from "./drillTypes";
+import { profilePrecision } from "./precision";
 import type { SessionMetrics } from "@/data/schemas";
 
 const median = (xs: number[]) => {
@@ -141,6 +142,12 @@ export function computeMetrics(events: RawEvent[]): SessionMetrics {
   const precisions = events.filter((e) => e.precisionM !== undefined).map((e) => e.precisionM! * 100);
   const avgPrecisionCm = precisions.length ? Math.round(mean(precisions)! * 10) / 10 : undefined;
 
+  // HAND LOCALIZATION — perfect (centre 10%) / good / poor (outer 30%).
+  const precision = profilePrecision(
+    events.filter((e) => e.precisionM !== undefined && e.radiusM !== undefined && e.correct)
+      .map((e) => ({ distM: e.precisionM!, radiusM: e.radiusM! })),
+  );
+
   // Post-error slowing (true PES): mean REACTION TIME on the trial immediately
   // after an error, minus mean reaction time on trials after a correct.
   // Positive = they slowed down after a mistake (adaptive control).
@@ -178,6 +185,7 @@ export function computeMetrics(events: RawEvent[]): SessionMetrics {
     correct,
     incorrect,
     accuracyPct,
+    precision,
     avgReactionMs: avg !== undefined ? Math.round(avg) : undefined,
     medianReactionMs: median(rts) !== undefined ? Math.round(median(rts)!) : undefined,
     fastestReactionMs: rts.length ? Math.round(Math.min(...rts)) : undefined,

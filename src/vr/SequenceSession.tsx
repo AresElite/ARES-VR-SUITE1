@@ -8,7 +8,14 @@ import { ARES_COLORS } from "@/ares/colors";
 export function SequenceSession() {
   const s = useAppStore((x) => x.sequence);
   const finish = useAppStore((x) => x.finishSequence);
-  return <SequenceRunner settings={s} seed={Date.now() % 2147483647} onComplete={finish} />;
+  return (
+    <SequenceRunner
+      settings={s}
+      seed={Date.now() % 2147483647}
+      onComplete={finish}
+      onExit={() => useAppStore.setState({ arenaMode: "seqSetup" })}
+    />
+  );
 }
 
 export function SequenceSetup() {
@@ -123,6 +130,10 @@ export function SequenceResultsPanel() {
       {row(-0.17, "CRITICAL ERRORS", String(m.criticalErrors))}
       {row(-0.25, "BREAKDOWN POINT", m.eliteBreakdownPoint
         ? `bonus stage ${m.eliteBreakdownPoint}` : "never broke")}
+      {row(-0.33, "LOCALIZATION",
+        `PERFECT ${m.precision.perfectPct}%  ·  GOOD ${m.precision.goodPct}%  ·  POOR ${m.precision.poorPct}%`,
+        m.precision.localizationIndex >= 70 ? ARES_COLORS.electricTeal
+          : m.precision.localizationIndex >= 50 ? ARES_COLORS.white : "#FF9F1C")}
 
       {/* THE EIGHT INDICES (§40) */}
       {idx(-0.86, -0.44, "INTEGRATION", m.sequenceIntegration)}
@@ -133,8 +144,11 @@ export function SequenceResultsPanel() {
       {idx(0.44, -0.44, "FLEXIBILITY", m.cognitiveFlexibility)}
       {idx(0.70, -0.44, "TEMPORAL", m.temporalPrecision)}
       {idx(0.94, -0.44, "RECOVERY", m.recoveryResilience)}
+      {idx(1.18, -0.44, "LOCALIZE", m.precision.localizationIndex)}
 
-      <PanelText position={[-0.9, -0.6, 0]}
+      <PanelText position={[-0.9, -0.58, 0]} text={m.advanceReason} size={0.024}
+        color={m.advanceReady ? ARES_COLORS.electricTeal : "#FF9F1C"} maxWidth={1.85} />
+      <PanelText position={[-0.9, -0.65, 0]}
         text="Performance descriptors from this session only. Not diagnostic."
         size={0.022} color={ARES_COLORS.softGray} />
 
