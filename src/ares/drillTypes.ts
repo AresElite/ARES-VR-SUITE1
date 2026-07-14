@@ -227,6 +227,16 @@ export interface DrillDefinition {
    */
   triggerSecondary?: boolean;
   /**
+   * SURVIVAL. A scoreable target that expires unhit ends the session immediately — the drill
+   * is over the moment one gets away (Focus Frenzy: a target reaching its final colour stage).
+   */
+  endOnExpiry?: boolean;
+  /**
+   * LIVES. A scoreable wrong answer costs a life and the run ends when they run out; a streak
+   * of streakForLife correct answers earns one back (Rapid Recognition).
+   */
+  lives?: { max: number; streakForLife: number };
+  /**
    * The level ORDER is authored by the drill's own difficulty formula (a direct port of
    * the touchscreen suite's calcDiff), not by a monotone parameter ramp. A generic
    * ease-index estimator will disagree with it in places, and when it does, the estimator

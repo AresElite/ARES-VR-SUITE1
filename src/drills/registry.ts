@@ -1,14 +1,18 @@
 import type { ARESPhase } from "@/ares/phases";
 import type { DrillDefinition } from "@/ares/drillTypes";
 // ---- Direct ports of the A.R.E.S. Performance Suite (exact names) ----
-import { SpeedSearch, SchulteTable, ContrastAssessment, RapidRecognition } from "./acquire/AcquireDrills";
+import { SpeedSearch, SchulteTable, ContrastAssessment } from "./acquire/AcquireDrills";
+import { RapidRecognition } from "./acquire/RapidRecognitionVR";
 import { Sternberg, SternbergDigits, SternbergLetters, PatternMemory } from "./route/RouteDrills";
 import { MotDual } from "./route/MotDualVR";
 import { FlankerCompatibility } from "./route/FlankerVR";
 import { Stroop } from "./route/StroopVR";
-import { ReactionGrid, EyeHandCoordination, RawReaction, ChoiceRT, StopSignal, FocusFrenzy, SaccadeSwipe } from "./execute/ExecuteDrills";
+import { ReactionGrid, EyeHandCoordination, RawReaction, ChoiceRT, StopSignal } from "./execute/ExecuteDrills";
+import { FocusFrenzy } from "./execute/FocusFrenzyVR";
+import { SaccadeSwipe } from "./execute/SaccadeSwipeVR";
 import { GoNoGo } from "./execute/GoNoGoVR";
-import { NeuralPhaseLock, DualStreamNeuralCollider, PursuitPulse, Occlusion } from "./synchronize/SynchronizeDrills";
+import { NeuralPhaseLock, DualStreamNeuralCollider, Occlusion } from "./synchronize/SynchronizeDrills";
+import { PursuitPulse } from "./synchronize/PursuitPulseVR";
 import { CognitiveCrossfire } from "./synchronize/CognitiveCrossfireVR";
 // ---- VR-native originals (immersive extensions of the suite) ----
 import { PeripheralFieldVR } from "./acquire/PeripheralFieldVR";

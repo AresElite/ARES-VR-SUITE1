@@ -137,56 +137,8 @@ export const DualStreamNeuralCollider: DrillDefinition = {
 // in the arrow's direction. Arrows appear only briefly.
 const PP_DIRS: SliceDirection[] = ["up", "down", "left", "right"];
 
-export const PursuitPulse: DrillDefinition = {
-  id: "pursuit-pulse",
-  name: "Pursuit-Pulse",
-  shortName: "Pursuit-Pulse",
-  phase: "Synchronize",
-  description: "Track the moving orb with smooth pursuit. When it pulses gold with an arrow, strike through it in that direction — the window is brief.",
-  purpose: "Smooth pursuit with embedded reactive direction decisions.",
-  interaction: "touch", environment: "arena", mvp: true,
-  instructions: [
-    "1. Follow the moving orb with your EYES - smooth pursuit, no jumping ahead.",
-    "2. At random moments it pulses GOLD and shows an arrow.",
-    "3. Strike THROUGH the orb in the arrow's direction before the pulse ends.",
-    "4. Striking outside a pulse counts against you.",
-  ],
-  controlsHint: "TRACK THE ORB - STRIKE ON THE GOLD PULSE, MATCH THE ARROW",
-  levels: levels50((i) => ({
-    label: `${lerp50(0.28, 1.0, i).toFixed(2)} rad/s, ${ilerp50(1200, 480, i)}ms pulse`,
-    parameters: { pulses: i < 30 ? 18 : 20, speed: lerp50(0.28, 1.0, i), pulseMs: ilerp50(1200, 480, i), betweenMs: ilerp50(1800, 1100, i) },
-  })),
-  buildTrials: (params, rng) => {
-    const p = params as { pulses: number; speed: number; pulseMs: number; betweenMs: number };
-    const trials: TrialSpec[] = [];
-    let t = 1500;
-    let phase = rng() * Math.PI * 2;
-    for (let i = 0; i < p.pulses; i++) {
-      const dir = pick(rng, PP_DIRS);
-      const segMs = p.betweenMs + p.pulseMs;
-      trials.push({
-        id: `pp-${i}`, spawnAt: t, duration: segMs,
-        kind: "distractor",
-        switchKindAt: t + p.betweenMs, switchKindTo: "go",
-        zone: "center",
-        position: [Math.sin(phase) * 0.4, 1.42, Z],
-        lane: { radius: 0.4, angularSpeed: (i % 2 === 0 ? 1 : -1) * p.speed, phase, y: 1.3 + rng() * 0.35 },
-        requiredDirection: dir,
-        color: TEAL, emissive: TEAL, switchColor: GOLD,
-        shape: "sphere", scale: 0.07,
-        label: dir,
-        meta: { labelAfterMs: p.betweenMs }, // direction reveals ONLY at the gold pulse
-      });
-      phase += (i % 2 === 0 ? 1 : -1) * p.speed * (segMs / 1000);
-      t += segMs + 300;
-    }
-    return trials;
-  },
-  durationMs: (params) => {
-    const p = params as { pulses: number; pulseMs: number; betweenMs: number };
-    return 1500 + p.pulses * (p.betweenMs + p.pulseMs + 300) + 1500;
-  },
-};
+/* PursuitPulse retired — replaced by the full 100-level 60s port in synchronize/PursuitPulseVR.ts */
+
 
 // ================================= OCCLUSION =================================
 // A ball crosses the field, disappears behind the occlusion zone — strike the

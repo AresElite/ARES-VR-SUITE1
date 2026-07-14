@@ -75,6 +75,9 @@ export class DrillEngine {
   private orderedLastAt = new Map<string, number>();   // groupId -> when the previous item resolved
   private gridQueue = new Map<number, TrialSpec[]>(); // gridSeq -> members (spawn on prev grid completion)
   private physVel = new Map<string, { vx: number; vy: number }>(); // live MOT ball velocity
+  private livesLost = 0;   // survival-with-lives (Rapid Recognition)
+  private livesRegen = 0;  // a streak of streakForLife correct answers earns one back
+  private pendingFinish = false;  // lives ran out mid-resolution; end at the next safe point
   private selectN = new Map<string, number>(); // groupId -> selections spent (selectBudget mode)
   private active = new Map<string, ActiveTarget>();
   private events: RawEvent[] = [];
@@ -301,6 +304,16 @@ export class DrillEngine {
       if (age >= t.spec.duration) this.expire(id, now);
     }
 
+    // Survival-with-lives: the last life was lost this frame — end now, cleanly, outside the
+    // resolution that spent it.
+    if (this.pendingFinish && this.state === "running") {
+      this.pendingFinish = false;
+      this.chains.clear();
+      this.expireAllActive();
+      this.endedAtISO = new Date().toISOString();
+      this.setState("complete");
+      return;
+    }
     // Hard-stop formats (fixed 60s drills) end exactly on the clock.
     if (this.definition.hardStop && now >= this.totalDurationMs - 1500) {
       this.chains.clear();
@@ -335,6 +348,18 @@ export class DrillEngine {
         errorType: "miss",
         zone: t.spec.zone,
       });
+      /**
+       * SURVIVAL FORMATS (Focus Frenzy). Letting a scoreable target expire IS the failure
+       * condition — the run ends the instant one gets away. Decor targets never trigger this.
+       */
+      if (this.definition.endOnExpiry && !t.spec.decor && !t.spec.meta?.decor) {
+        this.despawn(targetId);
+        this.chains.clear();
+        this.expireAllActive();
+        this.endedAtISO = new Date().toISOString();
+        this.setState("complete");
+        return;
+      }
     } else if (t.kind === "noGo") {
       // Withholding on a no-go is a success
       this.recordEvent({
@@ -583,9 +608,14 @@ export class DrillEngine {
     const t = this.active.get(targetId);
     if (!t || t.resolved) return;
     const now = this.timing.now;
-    // MOT: a ball cannot be selected while it is still moving. Selection is the identify
-    // phase, which begins only once motion has frozen (age >= physics.endMs).
-    if (t.spec.physics && now - t.spawnClock < t.spec.physics.endMs) return;
+    // Rapid Recognition: a target cannot be answered until its token has flashed and HIDDEN
+    // (age >= clickableAfterMs). Answering while the token is still on screen would make it a
+    // reading test, not a recognition-from-memory one. An early tap is simply ignored.
+    if (t.spec.meta?.clickableAfterMs !== undefined && now - t.spawnClock < (t.spec.meta.clickableAfterMs as number)) return;
+    // MOT (selectN only): a ball cannot be SELECTED while it is still moving — selection is
+    // the identify phase, which begins once motion freezes. This must NOT gate survival drills
+    // like Focus Frenzy, whose whole task is striking targets WHILE they drift.
+    if (t.spec.groupMode === "selectN" && t.spec.physics && now - t.spawnClock < t.spec.physics.endMs) return;
     // openSearch decoys survive a wrong click, so the same decoy can be clicked again.
     // 500ms of dead time stops a held trigger from logging fifty errors on one object.
     if (t.lastErrorAt !== undefined && now - t.lastErrorAt < 500) return;
@@ -809,12 +839,31 @@ export class DrillEngine {
       this.hits += 1;
       this.streak += 1;
       this.lastReactionMs = e.reactionMs;
+      const lv = this.definition.lives;
+      if (lv && this.streak > 0 && this.streak % lv.streakForLife === 0) this.livesRegen += 1;
     } else {
       this.errors += 1;
       this.streak = 0;
+      /**
+       * LIVES (Rapid Recognition). A wrong answer costs a life; a run ends when they are gone.
+       * A streak of streakForLife correct answers earns one back. Only real scoreable errors
+       * count — a false start or a wrong-order tap does not drain a life.
+       */
+      const lv = this.definition.lives;
+      const drains = e.errorType === "miss" || e.errorType === "distractorHit" || e.errorType === "wrongHand" || e.errorType === "wrongDirection" || e.errorType === "noGoFailure";
+      if (lv && drains) {
+        this.livesLost += 1;
+        if (this.livesLost - this.livesRegen >= lv.max) this.pendingFinish = true;
+      }
     }
     this.lastEventCorrect = e.correct;
     this.emit({ type: "resolved", event: e });
+  }
+
+  /** lives remaining, for HUD/analysis */
+  livesRemaining(): number {
+    const lv = this.definition.lives;
+    return lv ? Math.max(0, lv.max - (this.livesLost - this.livesRegen)) : 0;
   }
 
   getEvents(): RawEvent[] {

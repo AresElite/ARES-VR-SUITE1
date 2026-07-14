@@ -510,6 +510,12 @@ function TargetMesh({
     if (labelAfter !== undefined && labelRef.current) {
       labelRef.current.visible = age >= labelAfter;
     }
+    // Rapid Recognition: the token flashes, then HIDES — the body stays as a blank, still-
+    // clickable circle the athlete must recognise from memory and pick.
+    const hideLabelAfter = spec.meta?.hideLabelAfterMs as number | undefined;
+    if (hideLabelAfter !== undefined && labelRef.current) {
+      labelRef.current.visible = age < hideLabelAfter;
+    }
     // Neural Phase Lock: expanding/contracting pulse
     const pulseMs = spec.meta?.pulsePeriodMs as number | undefined;
     if (pulseMs && group.current) {
@@ -715,6 +721,7 @@ function TargetMesh({
           anchorY="middle"
           font={FONT_MONO}
           visible={spec.meta?.labelAfterMs === undefined}
+          renderOrder={2}
         >
           {spec.label.toUpperCase()}
         </Text>
@@ -791,6 +798,9 @@ function JoystickListener({ cursor }: { cursor: { seq: number } }) {
     };
     const asCard = (): SliceDirection =>
       Math.abs(x) > Math.abs(y) ? (x > 0 ? "right" : "left") : y > 0 ? "down" : "up";
+    // TWO-WAY: horizontal only (Saccade Swipe Fundamentals). A vertical wobble on a
+    // left/right-only answer must collapse to the nearer horizontal, never read as up/down.
+    const asBi = (): SliceDirection => (x > 0 ? "right" : "left");
     // DEM: resolve the CURRENT arrow in the ordered sequence.
     // Gaze Stabilization / DVA: no ordered group — fall back to the earliest
     // live go target so up/down/left/right flicks always register.
@@ -829,7 +839,7 @@ function JoystickListener({ cursor }: { cursor: { seq: number } }) {
       const spec = engine.pool.slots.find((s) => s.active && s.spec?.id === target!.id)?.spec;
       const axes = (spec?.meta?.axes as number | undefined)
         ?? (engine.definition.eightWay === true ? 8 : 4);
-      engine.registerHit(target.id, dominant as Hand, axes === 8 ? asOct() : asCard());
+      engine.registerHit(target.id, dominant as Hand, axes === 8 ? asOct() : axes === 2 ? asBi() : asCard());
     }
   });
   return null;

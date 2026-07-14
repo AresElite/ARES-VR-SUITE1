@@ -71,7 +71,7 @@ for (const id of triggerDrills) {
 const livesDrills = ["rapid-recognition", "pattern-memory"];
 for (const id of livesDrills) {
   const d = byId(id);
-  (d?.onSpawnAdapt && d?.trialPaced ? ok : fail)(`${id} is lives-based/trial-paced (adaptive termination)`);
+  (((d?.onSpawnAdapt || d?.lives) && d?.trialPaced) ? ok : fail)(`${id} is lives-based/trial-paced (adaptive termination)`);
 }
 for (const id of ["gaze-stab-vorx1", "gaze-stab-vorx2"]) {
   const d = byId(id);
