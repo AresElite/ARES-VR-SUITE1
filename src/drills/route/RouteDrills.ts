@@ -173,58 +173,8 @@ export const SternbergLetters: DrillDefinition = {
 // ========================== FLANKER COMPATIBILITY ==========================
 // Identify the CENTRAL arrow in a row of 5; ignore the flankers.
 // Strike the pad on the side the CENTER arrow points to.
-export const FlankerCompatibility: DrillDefinition = {
-  id: "flanker",
-  name: "Flanker Compatibility",
-  shortName: "Flanker",
-  phase: "Route",
-  responseMode: "trigger",
-  description: "20 trials. A row of five arrows appears — respond ONLY to the CENTER arrow: RIGHT trigger if it points right, LEFT trigger if it points left. The flankers lie. Reports average / fastest / slowest reaction time, accuracy, d-prime sensitivity, and post-error slowing.",
-  purpose: "Selective attention and conflict resolution.",
-  interaction: "touch", environment: "arena", mvp: true,
-  instructions: [
-    "1. A row of five arrows appears (for example  < < > < < ).",
-    "2. Only the CENTER arrow matters. Ignore the flankers.",
-    "3. Center points RIGHT - pull the RIGHT-hand TRIGGER. Points LEFT - LEFT-hand TRIGGER.",
-    "4. Incompatible rows (flankers pointing the other way) are the test. Stay on the center.",
-    "5. 20 trials. Speed AND accuracy both count.",
-  ],
-  controlsHint: "CENTER ARROW: RIGHT TRIGGER = >  /  LEFT TRIGGER = <",
-  levels: levels50((i) => ({
-    label: `${ilerp50(50, 95, i)}% incompatible, ${ilerp50(2200, 950, i)}ms`,
-    parameters: { trials: 20, incompatibleRatio: lerp50(0.5, 0.95, i), windowMs: ilerp50(2200, 950, i) },
-  })),
-  buildTrials: (params, rng) => {
-    const p = params as { trials: number; incompatibleRatio: number; windowMs: number };
-    const trials: TrialSpec[] = [];
-    let t = 1500;
-    const rdeck = Array.from({ length: p.trials }, (_, k) => k % 2 === 0);
-    for (let k = rdeck.length - 1; k > 0; k--) {
-      const j = Math.floor(rng() * (k + 1));
-      [rdeck[k], rdeck[j]] = [rdeck[j], rdeck[k]];
-    }
-    for (let i = 0; i < p.trials; i++) {
-      const groupId = `flk-g${i}`;
-      const centerRight = rdeck[i];
-      const incompatible = rng() < p.incompatibleRatio;
-      const c = centerRight ? ">" : "<";
-      const f = incompatible ? (centerRight ? "<" : ">") : c;
-      // the arrow row IS the response target — RIGHT trigger = >, LEFT = <
-      trials.push({
-        id: `${groupId}-row`, spawnAt: t, duration: p.windowMs, kind: "go",
-        requiredHand: centerRight ? "right" : "left",
-        zone: "center", position: [0, 1.55, Z - 0.08], color: WHITE, shape: "diamond", scale: 0.001,
-        label: `${f} ${f} ${c} ${f} ${f}`,
-      });
-      t += p.windowMs + 700;
-    }
-    return trials;
-  },
-  durationMs: (params) => {
-    const p = params as { trials: number; windowMs: number };
-    return 1500 + p.trials * (p.windowMs + 700) + 1500;
-  },
-};
+/* FlankerCompatibility moved to its own module — see route/FlankerVR.ts (full 100/60-level port). */
+
 
 // ================================== STROOP ==================================
 // A color word is shown in colored ink. RIGHT trigger = word meaning matches
@@ -236,58 +186,8 @@ const STROOP_COLORS: { name: string; hex: string }[] = [
   { name: "TEAL", hex: TEAL },
 ];
 
-export const Stroop: DrillDefinition = {
-  id: "stroop",
-  responseMode: "trigger",
-  name: "Stroop",
-  shortName: "Stroop",
-  phase: "Route",
-  description: "A color word appears in colored ink. Judge whether the word MEANING matches the INK color: RIGHT trigger = YES (they match), LEFT trigger = NO (mismatch).",
-  purpose: "Interference control — physical property over semantic meaning.",
-  interaction: "touch", environment: "arena", mvp: true,
-  instructions: [
-    "1. A color word appears in colored ink - e.g. the word GREEN written in TEAL ink.",
-    "2. Does the WORD'S MEANING match its INK color?",
-    "3. MATCH (e.g. GREEN in green ink) - pull the RIGHT-hand TRIGGER (YES).",
-    "4. MISMATCH (e.g. GREEN in teal ink) - pull the LEFT-hand TRIGGER (NO).",
-    "5. Respond fast - resist reading the word instead of judging the ink.",
-  ],
-  controlsHint: "MATCH? RIGHT TRIGGER = YES  /  LEFT TRIGGER = NO",
-  levels: levels50((i) => ({
-    label: `${ilerp50(2300, 1000, i)}ms window`,
-    parameters: { trials: i < 30 ? 16 : 20, windowMs: ilerp50(2300, 1000, i), congruentRatio: 0.5 },
-  })),
-  buildTrials: (params, rng) => {
-    const p = params as { trials: number; windowMs: number; congruentRatio: number };
-    const trials: TrialSpec[] = [];
-    let t = 1500;
-    const cdeck = Array.from({ length: p.trials }, (_, k) => k % 2 === 0);
-    for (let k = cdeck.length - 1; k > 0; k--) {
-      const j = Math.floor(rng() * (k + 1));
-      [cdeck[k], cdeck[j]] = [cdeck[j], cdeck[k]];
-    }
-    for (let i = 0; i < p.trials; i++) {
-      const groupId = `str-g${i}`;
-      const ink = STROOP_COLORS[Math.floor(rng() * STROOP_COLORS.length)];
-      const congruent = cdeck[i];
-      const word = congruent ? ink : STROOP_COLORS[(STROOP_COLORS.indexOf(ink) + 1 + Math.floor(rng() * 2)) % STROOP_COLORS.length];
-      // the WORD (in its ink color) IS the response target: does the word's
-      // meaning MATCH its ink? RIGHT trigger = YES (congruent), LEFT = NO
-      trials.push({
-        id: `${groupId}-w`, spawnAt: t, duration: p.windowMs, kind: "go",
-        requiredHand: congruent ? "right" : "left",
-        zone: "center", position: [0, 1.58, Z - 0.08], color: ink.hex, shape: "diamond", scale: 0.001, label: word.name,
-        meta: { labelColor: ink.hex, labelSize: 0.075 },
-      });
-      t += p.windowMs + 700;
-    }
-    return trials;
-  },
-  durationMs: (params) => {
-    const p = params as { trials: number; windowMs: number };
-    return 1500 + p.trials * (p.windowMs + 700) + 1500;
-  },
-};
+/* Stroop moved to its own module — see route/StroopVR.ts (full 100/60-level port). */
+
 
 // ============================== PATTERN-MEMORY ==============================
 // Show a pattern, hide it, show the full grid, and the athlete POINTS + clicks

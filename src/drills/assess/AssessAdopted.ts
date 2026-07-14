@@ -1,6 +1,7 @@
 import type { DrillDefinition } from "@/ares/drillTypes";
 import { GoNoGo } from "../execute/ExecuteDrills";
-import { SternbergDigits, FlankerCompatibility } from "../route/RouteDrills";
+import { SternbergDigits } from "../route/RouteDrills";
+import { FlankerCompatibility } from "../route/FlankerVR";
 
 /**
  * ASSESS — adopted baseline protocols.

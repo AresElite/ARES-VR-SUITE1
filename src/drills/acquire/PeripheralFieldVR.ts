@@ -74,6 +74,8 @@ const RECALL_SLOTS: { dir: SliceDirection; dx: number; dy: number }[] = [
 interface PFParams {
   trials: number;
   eccDeg: number;
+  /** the fixation beat BEFORE the flash — the athlete parks their eyes and knows it is coming */
+  readyMs: number;
   flashMs: number;
   maskMs: number;
   span: number;          // how many central symbols must be held
@@ -104,6 +106,27 @@ function buildDualTaskTrials(p: PFParams, rng: () => number, idp = "pf"): TrialS
 
   for (let i = 0; i < p.trials; i++) {
     const gid = `${idp}-g${i}`;
+
+    /**
+     * THE READY BEAT.
+     *
+     * The flash HAS to be short — shorter than a saccade — or the drill measures nothing.
+     * But a 180ms flash with no warning is an ambush, not a test: the athlete spends the
+     * trial reacting to the fact that a trial happened. The scientific constraint is on
+     * the FLASH, not on the pacing around it.
+     *
+     * So a fixation dot appears first and holds for readyMs. The athlete parks their eyes,
+     * knows exactly when the flash is coming, and the only thing being measured is what
+     * they could see when it did. This is the difference between "hard" and "unfair" — and
+     * it is why level 1 felt fast even though its flash was already the gentlest it can be.
+     */
+    trials.push({
+      id: `${gid}-fix`, spawnAt: t, duration: p.readyMs,
+      kind: "distractor", decor: true, zone: "center",
+      position: [0, 1.45, Z],
+      color: TEAL, emissive: TEAL, shape: "ring", scale: 0.016,
+    });
+    t += p.readyMs;
     const oct = OCTANTS[Math.floor(rng() * OCTANTS.length)];
     // jitter the eccentricity a little so the athlete cannot learn one fixed ring
     const ecc = p.eccDeg * (0.85 + rng() * 0.3);
@@ -186,8 +209,9 @@ function buildDualTaskTrials(p: PFParams, rng: () => number, idp = "pf"): TrialS
       requiredDirection: oct.dir,
       groupId: gid, groupMode: "ordered", seq: 0,
       color: TEAL, emissive: TEAL, shape: "ring", scale: 0.05,
-      label: "WHERE?",
-      meta: { pointDir: oct.dir, labelInside: false, octant: oct.dir, eccDeg: ecc },
+      label: "WHERE WAS IT?",
+      // WHERE: eight real answers, diagonals included
+      meta: { pointDir: oct.dir, axes: 8, octant: oct.dir, eccDeg: ecc },
     });
 
     // ---------- 4. WHAT? (seq 1..span) — recall the held symbols, in order
@@ -207,8 +231,8 @@ function buildDualTaskTrials(p: PFParams, rng: () => number, idp = "pf"): TrialS
         trials.push({
           id: `${gid}-o${k}-${oi}`, spawnAt: at, duration: p.responseMs,
           kind: "distractor", decor: true, zone: "center",
-          position: [s.dx, 1.45 + s.dy, Z],
-          color: WHITE, emissive: WHITE, shape: sym, scale: 0.05,
+          position: [s.dx * 1.35, 1.45 + s.dy * 1.35, Z],
+          color: WHITE, emissive: WHITE, shape: sym, scale: 0.075,
         });
       });
 
@@ -219,12 +243,16 @@ function buildDualTaskTrials(p: PFParams, rng: () => number, idp = "pf"): TrialS
         requiredDirection: answerSlot.dir,
         groupId: gid, groupMode: "ordered", seq: 1 + k,
         color: WHITE, emissive: WHITE, shape: "ring", scale: 0.042,
-        label: p.span > 1 ? `WHICH? ${k + 1}/${p.span}` : "WHICH?",
-        meta: { pointDir: answerSlot.dir, central: true },
+        label: p.span > 1 ? `FLICK THE SHAPE YOU SAW  ${k + 1}/${p.span}` : "FLICK THE SHAPE YOU SAW",
+        // WHAT: four options at the cardinals. A diagonal is not an answer here, so a
+        // flick must never be READ as one.
+        meta: { pointDir: answerSlot.dir, axes: 4, central: true },
       });
     }
 
-    t = respAt + p.responseMs * (1 + p.span) + 700;
+    // a real breath between trials at low levels — a peripheral flash lands harder when
+    // the athlete has actually settled
+    t = respAt + p.responseMs * (1 + p.span) + Math.max(500, p.readyMs * 0.6);
   }
   return trials;
 }
@@ -280,12 +308,15 @@ export const PeripheralFieldVR: DrillDefinition = {
       parameters: {
         trials: 24,
         eccDeg: ecc,
+        // the LEAD-IN is where the early levels get their gentleness — not the flash
+        readyMs: ilerp50(1400, 600, i),
         flashMs: flash,
         maskMs: 180,
         span,
         distractors: dist,
         contrast: band >= 3 ? lerp50(1, 0.45, i) : 1,
-        responseMs: ilerp50(2200, 1300, i),
+        // a generous window to ANSWER in. Answering is not the skill being timed; seeing is.
+        responseMs: ilerp50(3200, 1600, i),
       },
     };
   }),
@@ -339,7 +370,9 @@ export const PeripheralFieldVR: DrillDefinition = {
 
   durationMs: (params) => {
     const p = params as unknown as PFParams;
-    const perTrial = p.span * (p.flashMs + 90) + p.maskMs + p.responseMs * (1 + p.span) + 700;
+    const perTrial =
+      p.readyMs + p.span * (p.flashMs + 90) + p.maskMs
+      + p.responseMs * (1 + p.span) + Math.max(500, p.readyMs * 0.6);
     return 1600 + p.trials * perTrial + 1500;
   },
 };

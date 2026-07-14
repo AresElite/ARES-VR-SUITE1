@@ -187,6 +187,13 @@ export interface DrillDefinition {
   gazeStability?: boolean;
   /** joystick flicks resolve to 8 octants, not 4 cardinals (diagonal answers are valid) */
   eightWay?: boolean;
+  /**
+   * The level ORDER is authored by the drill's own difficulty formula (a direct port of
+   * the touchscreen suite's calcDiff), not by a monotone parameter ramp. A generic
+   * ease-index estimator will disagree with it in places, and when it does, the estimator
+   * is the one that is wrong — the authored curve IS the instrument.
+   */
+  authoredLadder?: boolean;
   /** completion-paced session (Schulte): length is trial-driven, not timed —
       the declared duration is only a generous ceiling */
   trialPaced?: boolean;

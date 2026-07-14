@@ -378,7 +378,7 @@ function TargetMesh({
   demCursor?: { seq: number };
 }) {
   const group = useRef<THREE.Group>(null);
-  const labelRef = useRef<{ visible: boolean } | null>(null);
+  const labelRef = useRef<{ visible: boolean; fillOpacity: number } | null>(null);
   const demRing = useRef<THREE.Mesh>(null);
   const mat = useRef<THREE.MeshStandardMaterial>(null);
   const engine = useAppStore((s) => s.engine);
@@ -456,6 +456,15 @@ function TargetMesh({
     }
     // delayed label reveal (Pursuit-Pulse: direction shows AT the pulse)
     const labelAfter = spec.meta?.labelAfterMs as number | undefined;
+    /**
+     * MICRO-FLICKER. The elite Flanker bands flicker the stimulus so it cannot be
+     * comfortably foveated and held — the athlete has to resolve it in snatches. It is
+     * a visual-stability load on top of the conflict load, and it is what separates the
+     * top six levels from the rest.
+     */
+    if ((spec.meta?.flicker as boolean) && labelRef.current) {
+      labelRef.current.fillOpacity = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(age / 26));
+    }
     if (labelAfter !== undefined && labelRef.current) {
       labelRef.current.visible = age >= labelAfter;
     }
@@ -733,16 +742,13 @@ function JoystickListener({ cursor }: { cursor: { seq: number } }) {
      * suddenly read as a diagonal and be scored wrong on drills where diagonals are not
      * even a valid answer.
      */
-    const eight = engine.definition.eightWay === true;
     const ang = Math.atan2(-y, x); // gamepad Y is inverted
-    let dir: SliceDirection;
-    if (eight) {
+    const asOct = (): SliceDirection => {
       const OCT: SliceDirection[] = ["right", "upRight", "up", "upLeft", "left", "downLeft", "down", "downRight"];
-      const k = ((Math.round(ang / (Math.PI / 4)) % 8) + 8) % 8;
-      dir = OCT[k];
-    } else {
-      dir = Math.abs(x) > Math.abs(y) ? (x > 0 ? "right" : "left") : y > 0 ? "down" : "up";
-    }
+      return OCT[((Math.round(ang / (Math.PI / 4)) % 8) + 8) % 8];
+    };
+    const asCard = (): SliceDirection =>
+      Math.abs(x) > Math.abs(y) ? (x > 0 ? "right" : "left") : y > 0 ? "down" : "up";
     // DEM: resolve the CURRENT arrow in the ordered sequence.
     // Gaze Stabilization / DVA: no ordered group — fall back to the earliest
     // live go target so up/down/left/right flicks always register.
@@ -765,7 +771,24 @@ function JoystickListener({ cursor }: { cursor: { seq: number } }) {
       }
     }
     if (!target && !hasOrdered && earliest) target = { id: earliest.id };
-    if (target) engine.registerHit(target.id, dominant as Hand, dir);
+    if (target) {
+      /**
+       * THE ANSWER SET DECIDES THE AXES, NOT THE DRILL.
+       *
+       * eightWay was a drill-level flag, so in Peripheral Field the CENTRAL RECALL — whose
+       * four options sit at the cardinals — was resolved into eight octants too. A flick 25
+       * degrees off true "up" read as "upLeft" and was scored wrong. The athlete could SEE
+       * the shape they wanted and had no reliable way to select it. That is not a hard
+       * question; it is an unanswerable one.
+       *
+       * A target now declares how many axes ITS answer set has, and the flick snaps to
+       * that. Eight-way where diagonals are real answers; four-way where they are not.
+       */
+      const spec = engine.pool.slots.find((s) => s.active && s.spec?.id === target!.id)?.spec;
+      const axes = (spec?.meta?.axes as number | undefined)
+        ?? (engine.definition.eightWay === true ? 8 : 4);
+      engine.registerHit(target.id, dominant as Hand, axes === 8 ? asOct() : asCard());
+    }
   });
   return null;
 }

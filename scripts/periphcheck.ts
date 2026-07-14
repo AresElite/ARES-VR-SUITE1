@@ -56,6 +56,20 @@ for (const lvl of [1, 12, 26, 38, 44, 50]) {
       if (m.spawnAt < flashEnd) flag(`L${lvl}: the mask lands before the flash ends`);
     }
 
+    // THE ANSWER SET MUST MATCH THE FLICK RESOLUTION. The WHERE question has eight real
+    // answers; the WHAT question has four. If the recall were resolved into octants, a
+    // flick slightly off true up would read as up-left and be scored wrong — the athlete
+    // could see the shape they wanted and would have no reliable way to select it.
+    if (where.meta?.axes !== 8) flag(`L${lvl}: the WHERE response is not 8-way`);
+    for (const w of whats) {
+      if (w.meta?.axes !== 4) flag(`L${lvl}: a WHAT response is not 4-way — a diagonal flick would misresolve it`);
+    }
+    // there must be a READY beat before the flash, or the trial ambushes the athlete
+    const fix = items.find((s) => s.id.includes("-fix"));
+    if (!fix) flag(`L${lvl}: no fixation lead-in — the flash ambushes the athlete`);
+    else if (fix.duration < 550) flag(`L${lvl}: the ready beat is only ${fix.duration}ms`);
+    else if (fix.spawnAt + fix.duration > flash.spawnAt + 1) flag(`L${lvl}: the ready beat overlaps the flash`);
+
     // the central symbol must be at fixation, and it must be held (recalled after)
     const cen = items.filter((s) => s.id.includes("-c"));
     if (!cen.length) flag(`L${lvl}: no central symbol — nothing forces fixation`);

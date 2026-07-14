@@ -80,7 +80,10 @@ for (const id of ["gaze-stab-vorx1", "gaze-stab-vorx2"]) {
 
 // ---------- 4. Every training drill = 50 levels; assessments/rhythm exempt ----
 console.log("\n[4] Progression depth");
-const badDepth = ALL_DRILLS.filter((d) => !d.assessment && !d.rhythm && d.levels.length !== 50);
+// Ported ladders carry their OWN authored depth (Flanker 100, Stroop 60). The house
+// style is 50 levels; a ported instrument's curve is the instrument, and normalising it
+// to fit our convention would be changing the drill to satisfy a lint rule.
+const badDepth = ALL_DRILLS.filter((d) => !d.assessment && !d.rhythm && !d.authoredLadder && d.levels.length !== 50);
 (badDepth.length === 0 ? ok : fail)(`all training drills 50 levels (${badDepth.map((d) => d.id + ":" + d.levels.length).join(", ") || "none off"})`);
 
 // ---------- 5. Arena portal graph reachability ----------

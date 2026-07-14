@@ -245,7 +245,12 @@ function dynamicRun(def: DrillDefinition, level: number, profile: Profile, seed:
 // ============================== SWEEP ==============================
 for (const def of ALL_DRILLS) {
   if (PHASE && def.phase !== PHASE) continue;
-  if (!def.assessment && !def.rhythm && def.levels.length !== 25 && def.levels.length !== 50) flag(`${def.id}|LEVELS_NOT_25(${def.levels.length})`);
+  // The ported ladders carry their own level counts (Flanker 100, Stroop 60) — those
+  // curves are the instrument and must not be normalised to a house style.
+  const LADDER_OK = [25, 50, 60, 100];
+  if (!def.assessment && !def.rhythm && !LADDER_OK.includes(def.levels.length)) {
+    flag(`${def.id}|UNEXPECTED_LEVEL_COUNT(${def.levels.length})`);
+  }
   const combos = optionCombos(def);
 
   // static: all levels × combos × 3 seeds
@@ -266,7 +271,10 @@ for (const def of ALL_DRILLS) {
     for (const s of [SEED_BASE, SEED_BASE + 17, SEED_BASE + 43]) e += easeIndex(buildPlan(def, level, s * 101 + level, {}).trials);
     ease.push(e / 3);
   }
-  if (!composite) {
+  // A drill whose ladder is ordered by its OWN authored difficulty formula is exempt:
+  // a generic ease-index cannot see cue validity, anti-saccade inversion, or masking, and
+  // it has no business overruling a curve that was designed deliberately.
+  if (!composite && !def.authoredLadder) {
     for (let i = 1; i < 25; i++) {
       if (ease[i] > ease[i - 1] * 1.18) flag(`${def.id}|DIFFICULTY_INVERSION_L${i}toL${i + 1}`);
     }

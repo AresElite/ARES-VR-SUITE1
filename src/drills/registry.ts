@@ -2,7 +2,9 @@ import type { ARESPhase } from "@/ares/phases";
 import type { DrillDefinition } from "@/ares/drillTypes";
 // ---- Direct ports of the A.R.E.S. Performance Suite (exact names) ----
 import { SpeedSearch, SchulteTable, ContrastAssessment, RapidRecognition } from "./acquire/AcquireDrills";
-import { Sternberg, SternbergDigits, SternbergLetters, FlankerCompatibility, Stroop, PatternMemory, MultipleObjectTracking } from "./route/RouteDrills";
+import { Sternberg, SternbergDigits, SternbergLetters, PatternMemory, MultipleObjectTracking } from "./route/RouteDrills";
+import { FlankerCompatibility } from "./route/FlankerVR";
+import { Stroop } from "./route/StroopVR";
 import { ReactionGrid, EyeHandCoordination, RawReaction, ChoiceRT, GoNoGo, StopSignal, FocusFrenzy, SaccadeSwipe } from "./execute/ExecuteDrills";
 import { NeuralPhaseLock, DualStreamNeuralCollider, PursuitPulse, Occlusion, CognitiveCrossfire } from "./synchronize/SynchronizeDrills";
 // ---- VR-native originals (immersive extensions of the suite) ----
