@@ -48,6 +48,7 @@ const Z = -0.62;
  */
 const SS_FIELD = 20;    // 20 items, every level
 const SS_TRIALS = 20;   // 20 searches, every level
+const SEARCH_OPEN_MS = 900_000;  // "until found" — see openSearch
 const SS_Z = -1.25;     // pointer distance — you aim, you do not reach
 const SS_BAND = (i: number): "form" | "orientation" | "contrast" =>
   i < 16 ? "form" : i < 32 ? "orientation" : "contrast";
@@ -63,12 +64,31 @@ export const SpeedSearch: DrillDefinition = {
   responseMode: "pointer",
   environment: "arena",
   mvp: true,
+  /**
+   * NO TIME LIMIT, and a wrong click does not bail you out.
+   *
+   * The field stays up until the athlete FINDS the target. A search deadline would censor
+   * precisely the searches that carry the information — the hard ones — and overwrite a real
+   * search time with the deadline value, which measures nothing but the deadline. And when a
+   * decoy click used to clear the field and advance, an athlete losing a search could simply
+   * click their way out of it. Now the decoy stays, the error is logged, and the hunt goes on.
+   */
+  openSearch: true,
+  trialPaced: true,
+  /**
+   * The rotating fixation marker is REMOVED here. It is a spinning object in the middle of a
+   * field the athlete is supposed to be scanning — a permanent, moving distractor sitting in
+   * the highest-acuity part of the retina, competing with the exact process being measured.
+   * Fixation is not the task in a search drill; searching is.
+   */
+  noFixationMarker: true,
   instructions: [
     "1. TWENTY items appear across your field. Exactly ONE is the odd one out.",
     "2. Early levels: it is a PYRAMID among spheres and cubes. Find it by SHAPE.",
     "3. Level 17+: they become striped discs. Nineteen face the SAME way - ONE is rotated. Find it by its EDGES.",
     "4. Level 33+: the stripes also FADE and the angle difference narrows. Hunt the edge, not the shape.",
     "5. POINT at the odd one and pull the TRIGGER. Clicking a decoy counts against you.",
+    "6. There is NO time limit. The field stays until you find it. Keep hunting.",
   ],
   controlsHint: "FIND THE ODD ONE - POINT AND PULL THE TRIGGER",
   levels: levels50((i) => {
@@ -204,7 +224,8 @@ export const SpeedSearch: DrillDefinition = {
 
         if (p.band === "form") {
           trials.push({
-            id: `${groupId}-${i}`, spawnAt: t, duration: p.exposureMs,
+            id: `${groupId}-${i}`, spawnAt: t, duration: SEARCH_OPEN_MS,
+            gridSeq: s,
             kind: isTarget ? "go" : "distractor",
             zone, position: pos,
             color: SHAPE_COLOR, emissive: SHAPE_COLOR, // identical fill — no highlight
@@ -216,7 +237,8 @@ export const SpeedSearch: DrillDefinition = {
           // ORIENTATION / CONTRAST band — grating discs. No form cue, no colour cue.
           // The ONLY thing that separates the target from the crowd is its edges.
           trials.push({
-            id: `${groupId}-${i}`, spawnAt: t, duration: p.exposureMs,
+            id: `${groupId}-${i}`, spawnAt: t, duration: SEARCH_OPEN_MS,
+            gridSeq: s,
             kind: isTarget ? "go" : "distractor",
             zone, position: pos,
             color: "#808080",
@@ -232,7 +254,9 @@ export const SpeedSearch: DrillDefinition = {
           });
         }
       }
-      t += p.exposureMs + p.gapMs;
+      // Searches are COMPLETION-paced now, not clock-paced: search s+1 is spawned by the
+      // engine when search s is solved. spawnAt only matters for the first one.
+      t += p.gapMs;
     }
     return trials;
   },
@@ -245,12 +269,11 @@ export const SpeedSearch: DrillDefinition = {
     return [
       `${acc}% found across 20 searches of a 20-item field, ${avg}ms mean search time.`,
       "Set size is held at 20 at every level, so search times are directly comparable across the ladder.",
+      "No search was cut short by a deadline, so every one of these times is a real search time — including the slow ones, which are the informative ones.",
     ];
   },
-  durationMs: (params) => {
-    const p = params as { searches: number; exposureMs: number; gapMs: number };
-    return 1200 + p.searches * (p.exposureMs + p.gapMs) + 1500;
-  },
+  // Completion-paced. This is a generous ceiling, not a schedule.
+  durationMs: () => 900_000,
 };
 
 // ============================== SCHULTE TABLE ==============================

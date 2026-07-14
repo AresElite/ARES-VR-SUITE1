@@ -5,8 +5,10 @@ import { SpeedSearch, SchulteTable, ContrastAssessment, RapidRecognition } from 
 import { Sternberg, SternbergDigits, SternbergLetters, PatternMemory, MultipleObjectTracking } from "./route/RouteDrills";
 import { FlankerCompatibility } from "./route/FlankerVR";
 import { Stroop } from "./route/StroopVR";
-import { ReactionGrid, EyeHandCoordination, RawReaction, ChoiceRT, GoNoGo, StopSignal, FocusFrenzy, SaccadeSwipe } from "./execute/ExecuteDrills";
-import { NeuralPhaseLock, DualStreamNeuralCollider, PursuitPulse, Occlusion, CognitiveCrossfire } from "./synchronize/SynchronizeDrills";
+import { ReactionGrid, EyeHandCoordination, RawReaction, ChoiceRT, StopSignal, FocusFrenzy, SaccadeSwipe } from "./execute/ExecuteDrills";
+import { GoNoGo } from "./execute/GoNoGoVR";
+import { NeuralPhaseLock, DualStreamNeuralCollider, PursuitPulse, Occlusion } from "./synchronize/SynchronizeDrills";
+import { CognitiveCrossfire } from "./synchronize/CognitiveCrossfireVR";
 // ---- VR-native originals (immersive extensions of the suite) ----
 import { PeripheralFieldVR } from "./acquire/PeripheralFieldVR";
 import { PredictivePathwayVR } from "./route/PredictivePathwayVR";

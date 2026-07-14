@@ -500,75 +500,8 @@ const GNG_BAND = (k: number) =>
   k <= 9 ? "Central" : k <= 19 ? "Spatial" : k <= 29 ? "Tempo" :
   k <= 37 ? "Elite (white no-go)" : k <= 43 ? "Stop-Signal" : "Apex";
 
-export const GoNoGo: DrillDefinition = {
-  id: "go-no-go",
-  name: "Go/No Go",
-  shortName: "Go/No Go",
-  phase: "Execute",
-  description:
-    "Response inhibition across 50 levels and six bands: central foundation, peripheral field to 45 degrees, relentless tempo with RARE no-gos, the elite white-flip, mid-flight stop-signals, and a drifting-target apex. Strike GO colors; never strike the forbidden one.",
-  purpose: "Response inhibition, impulse control, discipline under speed.",
-  interaction: "touch",
-  responseMode: "strike",
-  environment: "arena",
-  mvp: true,
-  instructions: [
-    "1. GO COLORS: strike TEAL, BLUE, and ORANGE targets immediately (a 4th GO color joins at Elite).",
-    "2. NO-GO: DO NOT strike PURPLE targets. Freeze the hand.",
-    "3. Level 31+: the trap flips - WHITE becomes the no-go color.",
-    "4. Level 39+: some targets FLASH RED mid-flight - abort the strike you already started.",
-    "5. Apex levels drift. Rare no-gos are the most dangerous - stay disciplined.",
-  ],
-  controlsHint: "STRIKE GO COLORS - NEVER THE FORBIDDEN ONE",
-  levels: Array.from({ length: GNG_LEVELS }, (_, k) => ({
-    level: k + 1,
-    label: GNG_BAND(k),
-    parameters: gngParams(k) as unknown as Record<string, unknown>,
-  })),
-  buildTrials: (params, rng) => {
-    const p = params as unknown as GngParams;
-    const goColors = p.elite
-      ? (p.fourGo ? [CYAN, BLUE, ORANGE, TEAL] : [CYAN, BLUE, ORANGE])
-      : [TEAL, BLUE, ORANGE];
-    const noGoColor = p.elite ? WHITE : PURPLE;
-    const trials: TrialSpec[] = [];
-    let t = 1200;
-    for (let i = 0; i < p.trials; i++) {
-      const r = rng();
-      const isNoGo = r < p.noGoProb;
-      const isStop = !isNoGo && p.stopProb > 0 && r < p.noGoProb + p.stopProb;
-      const zone = p.spatial ? (pick(rng, PERIPHERAL_ZONES) as TargetZone) : "center";
-      const drift: [number, number, number] | undefined = p.drift
-        ? [(rng() - 0.5) * 2 * p.drift, (rng() - 0.5) * p.drift, 0]
-        : undefined;
-      trials.push({
-        id: `gng-${i}`,
-        spawnAt: t,
-        duration: p.showMs,
-        kind: isNoGo ? "noGo" : "go",
-        ...(isStop
-          ? { switchKindAt: t + 250 + rng() * 200, switchKindTo: "noGo" as const, switchColor: RED }
-          : {}),
-        zone,
-        // full strike distance — targets sit at arm's length, never in the face
-        position: p.spatial
-          ? strikePosition(zone, 8 + rng() * Math.max(1, p.eccMax - 8), 0.12, rng, 0.92)
-          : [(rng() - 0.5) * 0.55, 1.34 + (rng() - 0.5) * 0.34, -0.88],
-        ...(drift ? { velocity: drift } : {}),
-        color: isNoGo ? noGoColor : pick(rng, goColors),
-        emissive: isNoGo ? noGoColor : undefined,
-        shape: "sphere",
-        scale: p.size,
-      });
-      t += p.showMs + p.isiMin + rng() * (p.isiMax - p.isiMin);
-    }
-    return trials;
-  },
-  durationMs: (params) => {
-    const p = params as unknown as GngParams;
-    return 1200 + p.trials * (p.showMs + p.isiMax) + 1500;
-  },
-};
+/* GoNoGo moved to its own module — see execute/GoNoGoVR.ts (full 50-level port). */
+
 
 // =============================== STOP-SIGNAL ===============================
 // Go target appears; on stop trials a RED STOP RING flashes around it after

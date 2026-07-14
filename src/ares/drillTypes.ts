@@ -188,6 +188,18 @@ export interface DrillDefinition {
   /** joystick flicks resolve to 8 octants, not 4 cardinals (diagonal answers are valid) */
   eightWay?: boolean;
   /**
+   * DUAL INPUT. The athlete STRIKES with their hands and pulls TRIGGERS, at the same time,
+   * for two different tasks. Required by genuine dual-task drills, where the whole point is
+   * that the two channels compete: reaching for a peripheral target costs you the central
+   * problem, and that cost is the measurement.
+   *
+   * Strike resolves ordinary targets; the trigger resolves only targets flagged
+   * meta.triggerTarget, and strike ignores those. Without that routing the trigger would
+   * grab whichever target spawned first — which is almost always a peripheral one — and the
+   * central task would be unanswerable.
+   */
+  dualInput?: boolean;
+  /**
    * The level ORDER is authored by the drill's own difficulty formula (a direct port of
    * the touchscreen suite's calcDiff), not by a monotone parameter ramp. A generic
    * ease-index estimator will disagree with it in places, and when it does, the estimator
@@ -197,6 +209,20 @@ export interface DrillDefinition {
   /** completion-paced session (Schulte): length is trial-driven, not timed —
       the declared duration is only a generous ceiling */
   trialPaced?: boolean;
+  /**
+   * OPEN SEARCH. The field NEVER expires and a wrong click never ends the trial. The
+   * athlete searches until they find it, however long that takes.
+   *
+   * This is the only honest way to run a visual search. A timeout censors exactly the
+   * data you care about — the hard searches — and replaces a real search time with the
+   * timeout value, which is not a measurement of anything. And auto-advancing on a decoy
+   * click hands the athlete an escape hatch: spam-click out of a search you are losing.
+   * Under openSearch a decoy click is scored as an error and the decoy STAYS on the field,
+   * so the search is not made easier by failing at it.
+   */
+  openSearch?: boolean;
+  /** suppress the central fixation marker (drills where fixation is not the task) */
+  noFixationMarker?: boolean;
   /** beat-locked track (Perform): timing windows scored against arrival */
   rhythm?: { approachMs: number; bpm: number; style: "pulse" | "drive" | "wave" | "storm"; lengthBeats: number; countInBeats: number };
   /** trainer-configurable dropdowns; selections merge into build parameters */

@@ -1,7 +1,7 @@
 {
   "name": "ares-vr-performance-suite",
   "private": true,
-  "version": "0.16.0",
+  "version": "0.54.0",
   "description": "A.R.E.S. VR Performance Suite — immersive WebXR sports vision & neuro-performance training for Meta Quest (Acquire. Route. Execute. Synchronize.)",
   "type": "module",
   "scripts": {

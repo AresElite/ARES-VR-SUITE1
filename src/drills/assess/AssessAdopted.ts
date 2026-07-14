@@ -1,5 +1,6 @@
 import type { DrillDefinition } from "@/ares/drillTypes";
-import { GoNoGo } from "../execute/ExecuteDrills";
+import { } from "../execute/ExecuteDrills";
+import { GoNoGo } from "../execute/GoNoGoVR";
 import { SternbergDigits } from "../route/RouteDrills";
 import { FlankerCompatibility } from "../route/FlankerVR";
 

@@ -68,6 +68,7 @@ const DIRECTION_MIN_SPEED = 0.6; // m/s of hand motion needed to read a slice di
  * A wrong-hand error requires INTENT. These thresholds separate a strike from a
  * hand simply passing through the space on its way somewhere else.
  */
+const MASK_COLOR = "#0B0F2A";  // the arena background — a mask must be indistinguishable from empty space
 const WRONG_HAND_MIN_SPEED = 0.45; // m/s — below this it is travel, not a strike
 const WRONG_HAND_MIN_DOT = 0.35;   // must be moving INTO the target, not across it
 
@@ -162,6 +163,7 @@ function StrikeColliders() {
       const stillTouching = new Set<string>();
       for (const slot of engine.pool.slots) {
         if (!slot.active || !slot.spec || slot.spec.decor || slot.spec.meta?.decor) continue;
+        if (slot.spec.meta?.triggerTarget) continue; // answered with a trigger, not a hand
 
         /**
          * SWEPT CONTACT — test the segment the hand travelled this frame, not the
@@ -453,6 +455,39 @@ function TargetMesh({
       mat.current.transparent = true;
       mat.current.opacity = gated ? 1 : 0.14;
       mat.current.emissiveIntensity = gated ? 0.9 : 0.15;
+    }
+    /**
+     * BRIEF ONSET + BACKWARD MASK (Go/No-Go, ELITE band and above).
+     *
+     * The target flashes for briefMs, is overwritten by a dark mask for maskMs, and then
+     * is GONE — but the deadline has not expired, so it is still answerable. The athlete
+     * must respond to a stimulus that no longer exists, from an iconic-memory trace the
+     * mask is actively trying to erase. That is the entire point of a backward mask: it
+     * truncates visual persistence, so what you did not encode in the first 100 ms, you
+     * never get.
+     *
+     * CRITICAL: the mesh must stay `visible` the whole time. three.js's raycaster skips
+     * any object with visible === false, so hiding the target the honest way would also
+     * make it unclickable — and the athlete would be asked to respond to something the
+     * pointer can no longer hit. We fade it with material opacity instead, which leaves
+     * the collider live and the response genuinely possible.
+     */
+    const briefMs = spec.meta?.briefMs as number | undefined;
+    if (briefMs !== undefined && mat.current) {
+      const maskMs = (spec.meta?.maskMs as number | undefined) ?? 0;
+      mat.current.transparent = true;
+      if (age < briefMs) {
+        mat.current.opacity = 1;
+        mat.current.emissiveIntensity = 0.85;
+      } else if (age < briefMs + maskMs) {
+        mat.current.opacity = 1;
+        mat.current.color.set(MASK_COLOR);
+        mat.current.emissive.set(MASK_COLOR);
+        mat.current.emissiveIntensity = 0.05;
+      } else {
+        mat.current.opacity = 0;      // invisible, still hittable
+        mat.current.emissiveIntensity = 0;
+      }
     }
     // delayed label reveal (Pursuit-Pulse: direction shows AT the pulse)
     const labelAfter = spec.meta?.labelAfterMs as number | undefined;
@@ -1232,6 +1267,7 @@ export function DrillRunner() {
     () =>
       engine !== null &&
       !engine.definition.gazeStability &&
+      !engine.definition.noFixationMarker &&
       (engine.definition.phase === "Acquire" ||
         (engine.parameters.fixationLoad as boolean | undefined) === true),
     [engine],
@@ -1252,9 +1288,9 @@ export function DrillRunner() {
       <HitSparks pool={sparks} />
 
       {/* strike interaction (VR): hands/controllers hit targets directly */}
-      {inSession && engine.definition.responseMode === "strike" && <StrikeColliders />}
-      {inSession && engine.definition.responseMode === "trigger" && <TriggerListener />}
-      {!inSession && engine.definition.responseMode === "trigger" && <DesktopTriggerKeys />}
+      {inSession && (engine.definition.responseMode === "strike" || engine.definition.dualInput) && <StrikeColliders />}
+      {inSession && (engine.definition.responseMode === "trigger" || engine.definition.dualInput) && <TriggerListener />}
+      {!inSession && (engine.definition.responseMode === "trigger" || engine.definition.dualInput) && <DesktopTriggerKeys />}
       {engine.definition.gazeStability && <GazeAids />}
       {engine.definition.environment === "visibility" && <VisibilityField />}
       {engine.definition.monocular && <MonocularOccluder />}

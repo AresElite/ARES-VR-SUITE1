@@ -40,6 +40,9 @@ interface ActiveTarget {
   spawnClock: number;
   kind: TrialSpec["kind"];
   resolved: boolean;
+  /** openSearch: a decoy stays on the field after a wrong click, so it must not be
+      re-scorable on every frame the trigger is held. */
+  lastErrorAt?: number;
 }
 
 const COUNTDOWN_MS = 3000;
@@ -510,6 +513,9 @@ export class DrillEngine {
     const t = this.active.get(targetId);
     if (!t || t.resolved) return;
     const now = this.timing.now;
+    // openSearch decoys survive a wrong click, so the same decoy can be clicked again.
+    // 500ms of dead time stops a held trigger from logging fifty errors on one object.
+    if (t.lastErrorAt !== undefined && now - t.lastErrorAt < 500) return;
     // Ordered boards (DEM): every item spawns at once, so time-since-spawn is
     // cumulative and useless. The real per-item speed is the time since the
     // PREVIOUS item was completed.
@@ -597,6 +603,20 @@ export class DrillEngine {
     if (mode === "ordered" && t.spec.groupId && !correct && errorType === undefined) {
       // handled below
     }
+    /**
+     * OPEN SEARCH. A decoy click is an ERROR, not an exit. It is recorded (above) and then
+     * we stop: the decoy is not despawned, the group is not cleared, and the next search is
+     * not spawned. The field is unchanged and the athlete is still hunting.
+     *
+     * The default path below does the opposite — the first hit on ANY group member clears
+     * the whole group and advances. On a search drill that means one wrong click ends the
+     * search, which both destroys the trial and rewards giving up.
+     */
+    if (this.definition.openSearch && t.kind !== "go") {
+      t.lastErrorAt = now;   // debounce: a held trigger must not machine-gun errors
+      return;
+    }
+
     t.resolved = true;
     this.despawn(targetId);
 
@@ -649,9 +669,17 @@ export class DrillEngine {
    */
   registerTriggerResponse(hand: Hand): void {
     if (this.state !== "running") return;
+    /**
+     * In a DUAL-INPUT drill the trigger answers the CENTRAL task and the hands strike the
+     * periphery. Without this routing the trigger would resolve whichever target spawned
+     * earliest — almost always a peripheral orb — and the central problem could never be
+     * answered at all.
+     */
+    const dual = this.definition.dualInput === true;
     let earliest: { id: string; spawn: number } | null = null;
     for (const [id, t] of this.active) {
       if (t.resolved || t.spec.decor || t.spec.meta?.decor) continue;
+      if (dual && !t.spec.meta?.triggerTarget) continue;
       if (!earliest || t.spawnClock < earliest.spawn) earliest = { id, spawn: t.spawnClock };
     }
     if (earliest) this.registerHit(earliest.id, hand);
