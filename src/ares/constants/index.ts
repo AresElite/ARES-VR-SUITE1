@@ -7,7 +7,7 @@ export const ORG_NAME = "Ares Elite Sports Vision";
  * Version stamp — visible in the site footer and the VR arena so anyone can
  * instantly tell which build is live. Bump on every deploy.
  */
-export const APP_VERSION = "v0.48.1 — Cross-body reaching restored: midline guard removed, reach ceiling kept";
+export const APP_VERSION = "v0.48.2 — Gaze Stabilization: removed the competing rotating fixation diamond";
 
 /** Spatial UI distances (meters) — panels live 1.5–2.5m from the athlete. */
 export const PANEL_NEAR = 1.6;

@@ -1036,9 +1036,24 @@ export function DrillRunner() {
     }
   });
 
+  /**
+   * The generic Acquire fixation marker is a rotating diamond that anchors the
+   * gaze for peripheral-search drills — useful there, actively harmful here.
+   *
+   * Gaze-stabilization drills already render their OWN fixation dot (GazeAids),
+   * purpose-built and paired with the head-speed ring. Drawing the generic marker
+   * as well put a SECOND fixation cue 10 cm in front of the real one — and,
+   * worse, a MOVING one: a spinning diamond sitting right beside the point where
+   * the athlete is required to hold their eyes perfectly still.
+   *
+   * A rotating stimulus captures gaze. That is not a cosmetic annoyance in a VOR
+   * drill; it is the drill measuring its own distractor. Retinal slip against a
+   * fixation target the athlete keeps being pulled off is not gaze stability.
+   */
   const isAcquireStyle = useMemo(
     () =>
       engine !== null &&
+      !engine.definition.gazeStability &&
       (engine.definition.phase === "Acquire" ||
         (engine.parameters.fixationLoad as boolean | undefined) === true),
     [engine],
