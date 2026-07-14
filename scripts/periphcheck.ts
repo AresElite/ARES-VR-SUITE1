@@ -70,21 +70,30 @@ for (const lvl of [1, 12, 26, 38, 44, 50]) {
     else if (fix.duration < 550) flag(`L${lvl}: the ready beat is only ${fix.duration}ms`);
     else if (fix.spawnAt + fix.duration > flash.spawnAt + 1) flag(`L${lvl}: the ready beat overlaps the flash`);
 
-    // the central symbol must be at fixation, and it must be held (recalled after)
-    const cen = items.filter((s) => s.id.includes("-c"));
-    if (!cen.length) flag(`L${lvl}: no central symbol — nothing forces fixation`);
+    // the central symbol is a DIRECTIONAL ARROW at fixation; it is recalled by flicking the
+    // direction it pointed (no shuffled shape options — that was the confusing indirection).
+    const cen = items.filter((s) => /-c\d+$/.test(s.id));
+    if (!cen.length) flag(`L${lvl}: no central arrow — nothing forces fixation`);
+    for (const c of cen) {
+      if (c.shape !== "arrow" || !c.meta?.pointDir) flag(`L${lvl}: a central symbol is not a directional arrow`);
+    }
     if (whats.length !== (params.span as number)) {
       flag(`L${lvl}: ${whats.length} recall responses for a span of ${params.span}`);
     }
+    // WHERE and the WHATs form one completion-paced chain: the WHAT members are queued
+    // (spawnAt -1) and released only when the previous answer resolves — so the recall can
+    // never open before the peripheral answer, by construction.
+    if (where.chainId === undefined) flag(`L${lvl}: WHERE is not the head of a response chain`);
     for (const w of whats) {
-      if (w.spawnAt <= where.spawnAt) flag(`L${lvl}: the central recall opens before the peripheral answer`);
+      if (w.chainId !== where.chainId) flag(`L${lvl}: a WHAT is not chained to the WHERE — timing could overlap`);
+      if (w.spawnAt !== -1) flag(`L${lvl}: a WHAT is fixed-scheduled, not completion-paced`);
+      if ((w.seq ?? 0) <= (where.seq ?? 0)) flag(`L${lvl}: a WHAT does not sequence after the WHERE`);
     }
-    // the recall options must all be present, and exactly one must be the answer
-    for (let k = 0; k < (params.span as number); k++) {
-      const opts = items.filter((s) => s.id.includes(`-o${k}-`));
-      if (opts.length !== 4) flag(`L${lvl}: recall ${k} has ${opts.length} options, expected 4`);
-      if (new Set(opts.map((o) => o.shape)).size !== 4) flag(`L${lvl}: recall options are not four distinct shapes`);
-    }
+    // each WHAT's required direction must be a cardinal that matches its held arrow, in order
+    const heldDirs = cen.sort((a, b) => a.spawnAt - b.spawnAt).map((c) => c.meta!.pointDir);
+    whats.sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0)).forEach((w, k) => {
+      if (w.requiredDirection !== heldDirs[k]) flag(`L${lvl}: recall ${k} does not require the arrow's own direction`);
+    });
   }
 
   /**

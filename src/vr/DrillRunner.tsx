@@ -406,6 +406,13 @@ function TargetMesh({
       mat.current.color.set(c);
       mat.current.emissive.set(c);
     }
+    // MOT: a ball the athlete has already picked turns SELECTED blue and holds it, so the
+    // field visibly records the commitment and the same ball can't be picked twice.
+    if (spec.meta?.taken && mat.current) {
+      mat.current.color.set("#3B82F6");
+      mat.current.emissive.set("#3B82F6");
+      mat.current.emissiveIntensity = 0.9;
+    }
     // full-cycle blackout (Neural Phase Lock internal-clock phases)
     if (spec.meta?.blackout && mat.current) {
       mat.current.transparent = true;
@@ -1289,8 +1296,8 @@ export function DrillRunner() {
 
       {/* strike interaction (VR): hands/controllers hit targets directly */}
       {inSession && (engine.definition.responseMode === "strike" || engine.definition.dualInput) && <StrikeColliders />}
-      {inSession && (engine.definition.responseMode === "trigger" || engine.definition.dualInput) && <TriggerListener />}
-      {!inSession && (engine.definition.responseMode === "trigger" || engine.definition.dualInput) && <DesktopTriggerKeys />}
+      {inSession && (engine.definition.responseMode === "trigger" || engine.definition.dualInput || engine.definition.triggerSecondary) && <TriggerListener />}
+      {!inSession && (engine.definition.responseMode === "trigger" || engine.definition.dualInput || engine.definition.triggerSecondary) && <DesktopTriggerKeys />}
       {engine.definition.gazeStability && <GazeAids />}
       {engine.definition.environment === "visibility" && <VisibilityField />}
       {engine.definition.monocular && <MonocularOccluder />}

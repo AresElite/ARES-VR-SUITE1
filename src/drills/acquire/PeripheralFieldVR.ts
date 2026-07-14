@@ -1,4 +1,4 @@
-import type { DrillDefinition, TrialSpec, SliceDirection, TargetShape, TargetZone } from "@/ares/drillTypes";
+import type { DrillDefinition, TrialSpec, SliceDirection, TargetZone } from "@/ares/drillTypes";
 import { strikePosition } from "../shared/zones";
 import { levels50, lerp50, ilerp50 } from "../shared/levels";
 
@@ -58,18 +58,22 @@ const OCTANTS: { dir: SliceDirection; ang: number }[] = [
 ];
 
 /**
- * The central symbol is a SHAPE, not a letter. Letters would make this a reading test
- * at fixation, and reading has its own acuity floor that would confound the peripheral
- * measure. Four shapes, four recall options, a clean 4AFC with guessing pinned at 25%.
+ * THE CENTRAL TASK IS A DIRECTIONAL ARROW, RECALLED BY FLICKING ITS DIRECTION.
+ *
+ * The old central task showed four shapes at four SHUFFLED slots and asked the athlete to
+ * flick toward the slot holding the shape they saw. That is three tasks welded together —
+ * recall the shape, visually SEARCH four options for it, then MAP its position to a stick
+ * direction — under a sub-second clock. It read as "not functional" because it never was a
+ * clean response: a flick toward the remembered shape (rather than its shuffled slot) failed,
+ * and there was no learnable mapping to lean on.
+ *
+ * Now the central symbol is an ARROW. Recalling it is flicking the direction it pointed —
+ * a 1:1 memory-to-motor map with no search and no shuffle. The symbol IS its own answer.
+ * Orientation memory at fixation is a real, cleanly-measured skill, and it reuses the exact
+ * flick vocabulary of the WHERE question, so the athlete learns one control, not two. Four
+ * cardinal directions keep guessing pinned at 25%.
  */
-const SYMBOLS: TargetShape[] = ["sphere", "box", "diamond", "cone"];
-/** the four recall options sit at the cardinals; flick toward the one you saw */
-const RECALL_SLOTS: { dir: SliceDirection; dx: number; dy: number }[] = [
-  { dir: "up", dx: 0, dy: 0.22 },
-  { dir: "right", dx: 0.22, dy: 0 },
-  { dir: "down", dx: 0, dy: -0.22 },
-  { dir: "left", dx: -0.22, dy: 0 },
-];
+const CENTRAL_DIRS: SliceDirection[] = ["up", "right", "down", "left"];
 
 interface PFParams {
   trials: number;
@@ -82,6 +86,8 @@ interface PFParams {
   distractors: number;   // peripheral clutter the target hides among
   contrast: number;      // 0..1 — how bright the peripheral target is
   responseMs: number;
+  settleMs: number;      // a blank "prepare to answer" beat after the mask (no jump-cut)
+  interTrialMs: number;  // the breath between whole trials
 }
 
 /** Peripheral position: an eccentricity and a bearing, in the athlete's field. */
@@ -132,26 +138,31 @@ function buildDualTaskTrials(p: PFParams, rng: () => number, idp = "pf"): TrialS
     const ecc = p.eccDeg * (0.85 + rng() * 0.3);
     const pos = periphPos(ecc, oct.ang + (rng() - 0.5) * 14);
 
-    // the central symbols to be held (span 1..3)
-    const held: TargetShape[] = [];
+    // the central arrows to be held (span 1..3) — a direction to recall in order
+    const held: SliceDirection[] = [];
     for (let k = 0; k < p.span; k++) {
-      let s = SYMBOLS[Math.floor(rng() * SYMBOLS.length)];
+      let dir = CENTRAL_DIRS[Math.floor(rng() * CENTRAL_DIRS.length)];
       let guard = 0;
-      while (held.includes(s) && guard++ < 8) s = SYMBOLS[Math.floor(rng() * SYMBOLS.length)];
-      held.push(s);
+      // no two identical arrows in a row, so a multi-arrow hold is a real sequence
+      while (k > 0 && held[k - 1] === dir && guard++ < 8) dir = CENTRAL_DIRS[Math.floor(rng() * CENTRAL_DIRS.length)];
+      held.push(dir);
     }
 
     // ---------- 1. ENCODE + FLASH, at the same instant
     const flashAt = t;
+    // more air between successive arrows in a multi-arrow hold, so a span-2/3 sequence is
+    // encodable rather than a blur
+    const perSym = p.flashMs + (p.span > 1 ? 240 : 90);
     for (let k = 0; k < p.span; k++) {
       trials.push({
-        id: `${gid}-c${k}`, spawnAt: flashAt + k * (p.flashMs + 90), duration: p.flashMs,
+        id: `${gid}-c${k}`, spawnAt: flashAt + k * perSym, duration: p.flashMs,
         kind: "distractor", decor: true, zone: "center",
         position: [0, 1.45, Z],
-        color: WHITE, emissive: WHITE, shape: held[k], scale: 0.055,
+        color: WHITE, emissive: WHITE, shape: "arrow", scale: 0.06,
+        meta: { pointDir: held[k] },
       });
     }
-    const encodeEnd = flashAt + p.span * (p.flashMs + 90);
+    const encodeEnd = flashAt + p.span * perSym;
 
     // the peripheral target — brief, and simultaneous with the FIRST central symbol.
     // It is decor: it can never be struck. It exists only to be SEEN.
@@ -193,7 +204,9 @@ function buildDualTaskTrials(p: PFParams, rng: () => number, idp = "pf"): TrialS
       position: [0, 1.45, Z], color: "#5A5F72", emissive: "#5A5F72", shape: "box", scale: 0.06,
     });
 
-    const respAt = encodeEnd + p.maskMs;
+    // a blank beat so the mask -> prompt hand-off is a breath, not a jump-cut. This, more
+    // than the flash, is what made the drill feel "fast": nothing said "now answer".
+    const respAt = encodeEnd + p.maskMs + p.settleMs;
 
     /**
      * ---------- 3. WHERE? (seq 0)
@@ -202,57 +215,52 @@ function buildDualTaskTrials(p: PFParams, rng: () => number, idp = "pf"): TrialS
      * rendered at the answer's location it would simply hand the athlete the answer —
      * they would flick at a thing they can see rather than recall a thing they saw.
      */
+    // WHERE and WHAT are NOT grouped. Only one question is ever live at a time (they are
+    // separated in time), and grouping them under one groupId collapsed BOTH of their events
+    // onto that group id — which is exactly why the per-direction field map, filtered by
+    // "-where"/"-what", came back empty. Ungrouped, each records under its own id, the map
+    // fills, and the earliest-live-go resolver still serves them one at a time.
     trials.push({
       id: `${gid}-where`, spawnAt: respAt, duration: p.responseMs,
       kind: "go", zone: "center",
       position: [0, 1.45, Z],
       requiredDirection: oct.dir,
-      groupId: gid, groupMode: "ordered", seq: 0,
+      // COMPLETION-PACED. WHERE heads a chain; each WHAT spawns ~300ms after the previous
+      // answer resolves, not on a fixed clock. The old fixed schedule left the athlete
+      // staring at nothing for the full response window AFTER they had already flicked WHERE
+      // — which is a large part of why the drill "wasn't good enough". Now it advances the
+      // instant you answer.
+      chainId: `${gid}-resp`, seq: 0,
       color: TEAL, emissive: TEAL, shape: "ring", scale: 0.05,
       label: "WHERE WAS IT?",
-      // WHERE: eight real answers, diagonals included
-      meta: { pointDir: oct.dir, axes: 8, octant: oct.dir, eccDeg: ecc },
+      // WHERE: eight real answers, diagonals included. No pointDir — the prompt must never
+      // hint the direction; the athlete recalls where they SAW it.
+      meta: { axes: 8, octant: oct.dir, eccDeg: ecc },
     });
 
-    // ---------- 4. WHAT? (seq 1..span) — recall the held symbols, in order
+    // ---------- 4. WHICH WAY? (seq 1..span) — recall each held ARROW by flicking its direction.
+    //
+    // No options, no search, no shuffle: the arrow you held pointed a direction, so you flick
+    // that direction. One learnable memory-to-motor map. A faint ring sits behind the prompt so
+    // the CONTROL is obvious even though the ANSWER is from memory.
     for (let k = 0; k < p.span; k++) {
-      const slots = [...RECALL_SLOTS];
-      for (let j = slots.length - 1; j > 0; j--) {
-        const q = Math.floor(rng() * (j + 1));
-        [slots[j], slots[q]] = [slots[q], slots[j]];
-      }
-      const options = [...SYMBOLS];
-      const answerSlot = slots[options.indexOf(held[k])];
-      const at = respAt + p.responseMs + k * p.responseMs;
-
-      // the four options, rendered as decor — the athlete flicks toward one
-      options.forEach((sym, oi) => {
-        const s = slots[oi];
-        trials.push({
-          id: `${gid}-o${k}-${oi}`, spawnAt: at, duration: p.responseMs,
-          kind: "distractor", decor: true, zone: "center",
-          position: [s.dx * 1.35, 1.45 + s.dy * 1.35, Z],
-          color: WHITE, emissive: WHITE, shape: sym, scale: 0.075,
-        });
-      });
-
       trials.push({
-        id: `${gid}-what${k}`, spawnAt: at, duration: p.responseMs,
+        id: `${gid}-what${k}`, spawnAt: -1, duration: p.responseMs,
         kind: "go", zone: "center",
         position: [0, 1.45, Z],
-        requiredDirection: answerSlot.dir,
-        groupId: gid, groupMode: "ordered", seq: 1 + k,
-        color: WHITE, emissive: WHITE, shape: "ring", scale: 0.042,
-        label: p.span > 1 ? `FLICK THE SHAPE YOU SAW  ${k + 1}/${p.span}` : "FLICK THE SHAPE YOU SAW",
-        // WHAT: four options at the cardinals. A diagonal is not an answer here, so a
-        // flick must never be READ as one.
-        meta: { pointDir: answerSlot.dir, axes: 4, central: true },
+        requiredDirection: held[k],
+        chainId: `${gid}-resp`, seq: 1 + k, chainGapMs: 300,
+        color: WHITE, emissive: WHITE, shape: "ring", scale: 0.045,
+        label: p.span > 1 ? `WHICH WAY DID ARROW ${k + 1} POINT?` : "WHICH WAY DID THE ARROW POINT?",
+        // four cardinal answers — a diagonal is not one, so a flick must never be READ as one
+        meta: { axes: 4, central: true, prompt: true },
       });
     }
 
-    // a real breath between trials at low levels — a peripheral flash lands harder when
-    // the athlete has actually settled
-    t = respAt + p.responseMs * (1 + p.span) + Math.max(500, p.readyMs * 0.6);
+    // a real breath between trials. This is a worst-case budget (every response times out);
+    // when the athlete answers promptly the extra time simply becomes rest before the next
+    // fixation, never a mid-answer interruption.
+    t = respAt + (p.responseMs + 300) * (1 + p.span) + p.interTrialMs;
   }
   return trials;
 }
@@ -264,7 +272,7 @@ export const PeripheralFieldVR: DrillDefinition = {
   name: "Peripheral Field",
   shortName: "Peripheral Field",
   phase: "Acquire",
-  description: "Hold a symbol at the centre while a target flashes out in your periphery — both at the same instant, too fast to look at. Flick the stick toward WHERE it appeared (eight directions), then report WHAT you were holding. The flash gets shorter and the field gets wider, and the result is a map of your visual field, not a score.",
+  description: "Hold a symbol at the centre while a target flashes out in your periphery — both at the same instant, too fast to look at. Flick toward WHERE it appeared (eight directions), then flick the DIRECTION the centre arrow was pointing. The flash gets shorter and the field gets wider, and the result is a map of your visual field, not a score.",
   purpose: "Useful field of view under divided attention — an 8-direction field map.",
   interaction: "touch",
   responseMode: "joystick",
@@ -272,13 +280,13 @@ export const PeripheralFieldVR: DrillDefinition = {
   environment: "arena",
   mvp: true,
   instructions: [
-    "1. Keep your EYES ON THE CENTRE. Do not look away. You will not have time anyway.",
-    "2. A SHAPE flashes at the centre and a TARGET flashes out in your periphery, together.",
+    "1. Keep your EYES ON THE CENTRE. Do not look away - you will not have time anyway.",
+    "2. An ARROW flashes at the centre and a TARGET flashes out in your periphery, together.",
     "3. First: FLICK the stick toward WHERE the peripheral target was. Diagonals count.",
-    "4. Then: four shapes appear. FLICK toward the one you saw at the centre.",
-    "5. Get both. Looking at the periphery loses you the centre - and the flash is too short to look anyway.",
+    "4. Then: FLICK the direction the CENTRE ARROW was pointing. Up, right, down, or left.",
+    "5. Get both. Looking at the periphery loses you the arrow - and the flash is too short to look anyway.",
   ],
-  controlsHint: "EYES CENTRE - FLICK WHERE - THEN FLICK WHAT",
+  controlsHint: "EYES CENTRE  -  FLICK WHERE IT WAS  -  THEN FLICK THE ARROW",
   levels: levels50((i) => {
     const band = BAND(i);
     /**
@@ -286,7 +294,10 @@ export const PeripheralFieldVR: DrillDefinition = {
      * field IS wider than it is tall), so an 11deg request on a vertical bearing lands at
      * only 8deg — inside the parafovea, where 'peripheral' is a lie.
      */
-    const ecc = Math.round(lerp50(14, 44, i));
+    // Floor is 16deg, not 14: vertical eccentricity is compressed 0.72 and the per-trial
+    // jitter can dip to 0.85, so a 14deg vertical request lands near 8.6deg — inside the
+    // parafovea. 16 keeps even the worst-case vertical trial genuinely peripheral (>9deg).
+    const ecc = Math.round(lerp50(16, 48, i));
     /**
      * THE FLASH IS NEVER LONGER THAN A SACCADE. Not even at level 1.
      *
@@ -306,17 +317,27 @@ export const PeripheralFieldVR: DrillDefinition = {
     return {
       label: `${ecc} deg field - ${flash}ms flash - hold ${span}${dist ? ` - ${dist} clutter` : ""}`,
       parameters: {
-        trials: 24,
+        trials: 20,
         eccDeg: ecc,
-        // the LEAD-IN is where the early levels get their gentleness — not the flash
-        readyMs: ilerp50(1400, 600, i),
+        // the LEAD-IN is where the early levels get their gentleness — not the flash. A full
+        // 1.8s at level 1 so the athlete parks their eyes and the flash never ambushes them.
+        readyMs: ilerp50(1800, 700, i),
         flashMs: flash,
         maskMs: 180,
+        // the "now answer" beat after the mask — the single biggest fix for "it feels fast":
+        // there is finally a clear moment that hands the trial from seeing to answering.
+        settleMs: ilerp50(650, 280, i),
         span,
         distractors: dist,
         contrast: band >= 3 ? lerp50(1, 0.45, i) : 1,
-        // a generous window to ANSWER in. Answering is not the skill being timed; seeing is.
-        responseMs: ilerp50(3200, 1600, i),
+        // the timeout window for each flick. A flick takes well under a second, so this is
+        // generous — but NOT huge, because when it is huge the worst-case budget that spaces
+        // the trials balloons and a fast athlete waits out a long idle before the next flash.
+        // The gentleness of the early levels lives in the lead-in and the settle beat, which
+        // is where "it feels fast" actually comes from — not in a bloated answer window.
+        responseMs: ilerp50(2200, 1400, i),
+        // a real breath between trials, longest at the start
+        interTrialMs: ilerp50(1500, 700, i),
       },
     };
   }),
@@ -370,9 +391,10 @@ export const PeripheralFieldVR: DrillDefinition = {
 
   durationMs: (params) => {
     const p = params as unknown as PFParams;
+    const perSym = p.flashMs + (p.span > 1 ? 240 : 90);
     const perTrial =
-      p.readyMs + p.span * (p.flashMs + 90) + p.maskMs
-      + p.responseMs * (1 + p.span) + Math.max(500, p.readyMs * 0.6);
+      p.readyMs + p.span * perSym + p.maskMs + p.settleMs
+      + p.responseMs * (1 + p.span) + p.interTrialMs;
     return 1600 + p.trials * perTrial + 1500;
   },
 };

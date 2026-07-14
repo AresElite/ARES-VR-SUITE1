@@ -48,6 +48,26 @@ export interface TrialSpec {
   gridSeq?: number;
   /** curved-lane parameter for Route drills */
   lane?: { radius: number; angularSpeed: number; phase: number; y: number };
+  /**
+   * FREE-MOTION PHYSICS (Multiple Object Tracking). The target drifts in a straight line,
+   * bounces off the walls of a rectangular play window, and collides elastically with the
+   * other physics targets in its group. Motion is live only in [startMs, endMs] — before
+   * startMs it is stationary (the memorize phase) and after endMs it FREEZES where it
+   * stopped (the identify phase), so the athlete selects a still field.
+   *
+   * Real ball-ball collision is the entire difficulty of MOT: it is what makes a target's
+   * future position genuinely unpredictable and forces sustained tracking rather than
+   * dead-reckoning. A drift-only version can be solved by extrapolation and measures nothing.
+   */
+  physics?: { vx: number; vy: number; startMs: number; endMs: number; halfW: number; halfH: number };
+  /**
+   * SELECT-N, NO EXPIRY. The athlete makes exactly this many selections from the group and
+   * then it scores — there is no clock on the identify phase. A tracking answer window that
+   * times out would relieve the athlete of the search precisely when it is hardest; here they
+   * struggle through it. A wrong pick is recorded and spends one of the N, but never clears
+   * the field or ends the phase early.
+   */
+  selectBudget?: number;
   requiredHand?: HandRule;
   requiredDirection?: SliceDirection;
   color: string;
@@ -61,7 +81,7 @@ export interface TrialSpec {
   decor?: boolean;
   /** group resolution mode: single (default) = first hit resolves group;
       all = every go member must be hit; ordered = hit in seq order */
-  groupMode?: "single" | "all" | "ordered";
+  groupMode?: "single" | "all" | "ordered" | "selectN";
   /** position in an ordered group */
   seq?: number;
   /** chained spawning: members of a chain spawn when the previous resolves.
@@ -199,6 +219,13 @@ export interface DrillDefinition {
    * central task would be unanswerable.
    */
   dualInput?: boolean;
+  /**
+   * A SECONDARY TRIGGER CHANNEL without the strike channel. dualInput mounts BOTH hand-strike
+   * and trigger; a pointer-select drill with a concurrent central task (MOT) wants the trigger
+   * for the central problem but must NOT arm hand-strike, or a reach toward a ball would select
+   * it by proximity. triggerSecondary mounts only the trigger, alongside the pointer.
+   */
+  triggerSecondary?: boolean;
   /**
    * The level ORDER is authored by the drill's own difficulty formula (a direct port of
    * the touchscreen suite's calcDiff), not by a monotone parameter ramp. A generic

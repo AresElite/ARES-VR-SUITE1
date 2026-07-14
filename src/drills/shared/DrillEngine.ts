@@ -1,5 +1,5 @@
 import { classifyPrecision } from "@/ares/precision";
-import { clampToReach } from "./zones";
+import { clampToReach, EYE_Y } from "./zones";
 import type {
   DrillDefinition,
   Hand,
@@ -74,6 +74,8 @@ export class DrillEngine {
   private orderedProgress = new Map<string, number>(); // groupId -> next seq expected
   private orderedLastAt = new Map<string, number>();   // groupId -> when the previous item resolved
   private gridQueue = new Map<number, TrialSpec[]>(); // gridSeq -> members (spawn on prev grid completion)
+  private physVel = new Map<string, { vx: number; vy: number }>(); // live MOT ball velocity
+  private selectN = new Map<string, number>(); // groupId -> selections spent (selectBudget mode)
   private active = new Map<string, ActiveTarget>();
   private events: RawEvent[] = [];
   private listeners = new Set<(e: EngineEvent) => void>();
@@ -214,6 +216,8 @@ export class DrillEngine {
     // staircases terminate mid-protocol — the queued grids must go too, or the
     // completion gate (which waits on an empty grid queue) can never be met.
     this.gridQueue.clear();
+    this.physVel.clear();
+    this.selectN.clear();
   }
 
   /** Trainer stop — ends immediately and still produces a result. */
@@ -248,16 +252,23 @@ export class DrillEngine {
       const slot = this.pool.acquire(spec, now);
       if (slot) {
         this.active.set(spec.id, { spec, spawnClock: now, kind: spec.kind, resolved: false });
+        if (spec.physics) this.physVel.set(spec.id, { vx: spec.physics.vx, vy: spec.physics.vy });
         this.emit({ type: "spawn", spec });
       }
     }
+
+    // FREE-MOTION PHYSICS (MOT): integrate every live ball together so collisions couple
+    // them. Sub-stepped at 8ms so a fast ball cannot tunnel through a wall or a neighbour.
+    this.stepPhysics(now, deltaMs);
 
     // Advance movement + late cue changes + expiry
     for (const [id, t] of this.active) {
       if (t.resolved) continue;
       const age = now - t.spawnClock;
       const slot = this.pool.get(id);
-      if (slot && t.spec.wander) {
+      if (slot && t.spec.physics) {
+        // position owned by stepPhysics; nothing to do here
+      } else if (slot && t.spec.wander) {
         // bounded free-space oscillation around the anchor position
         const w = t.spec.wander;
         const s = age / 1000;
@@ -368,6 +379,65 @@ export class DrillEngine {
         let i = this.nextTrialIdx;
         while (i < this.trials.length && this.trials[i].spawnAt <= spec.spawnAt) i++;
         this.trials.splice(i, 0, spec);
+      }
+    }
+  }
+
+  /**
+   * MOT physics. All live balls integrated together, sub-stepped, with rectangular wall
+   * bounce and pairwise elastic collision within a group. Positions live in the pool slots.
+   */
+  private stepPhysics(now: number, deltaMs: number): void {
+    const live: { id: string; slot: import("./TargetSpawner").PoolSlot; ph: NonNullable<TrialSpec["physics"]>; vel: { vx: number; vy: number }; r: number }[] = [];
+    for (const [id, t] of this.active) {
+      const ph = t.spec.physics;
+      if (!ph || t.resolved) continue;
+      const age = now - t.spawnClock;
+      if (age < ph.startMs || age >= ph.endMs) continue; // stationary before, frozen after
+      const slot = this.pool.get(id);
+      const vel = this.physVel.get(id);
+      if (!slot || !vel) continue;
+      live.push({ id, slot, ph, vel, r: t.spec.scale });
+    }
+    if (live.length === 0) return;
+
+    const subMs = 8;
+    const steps = Math.max(1, Math.min(6, Math.ceil(deltaMs / subMs)));
+    const dt = deltaMs / 1000 / steps;
+    for (let step = 0; step < steps; step++) {
+      // integrate + wall bounce
+      for (const b of live) {
+        b.slot.pos[0] += b.vel.vx * dt;
+        b.slot.pos[1] += b.vel.vy * dt;
+        const minX = -b.ph.halfW + b.r, maxX = b.ph.halfW - b.r;
+        const minY = EYE_Y - b.ph.halfH + b.r, maxY = EYE_Y + b.ph.halfH - b.r;
+        if (b.slot.pos[0] < minX) { b.slot.pos[0] = minX; b.vel.vx = Math.abs(b.vel.vx); }
+        else if (b.slot.pos[0] > maxX) { b.slot.pos[0] = maxX; b.vel.vx = -Math.abs(b.vel.vx); }
+        if (b.slot.pos[1] < minY) { b.slot.pos[1] = minY; b.vel.vy = Math.abs(b.vel.vy); }
+        else if (b.slot.pos[1] > maxY) { b.slot.pos[1] = maxY; b.vel.vy = -Math.abs(b.vel.vy); }
+      }
+      // pairwise elastic collision (equal mass) within the same group
+      for (let i = 0; i < live.length; i++) {
+        for (let j = i + 1; j < live.length; j++) {
+          const a = live[i], c = live[j];
+          if (a.slot.spec?.groupId !== c.slot.spec?.groupId) continue;
+          const dx = c.slot.pos[0] - a.slot.pos[0];
+          const dy = c.slot.pos[1] - a.slot.pos[1];
+          const min = a.r + c.r;
+          const d2 = dx * dx + dy * dy;
+          if (d2 >= min * min || d2 === 0) continue;
+          const d = Math.sqrt(d2) || 1e-4;
+          const nx = dx / d, ny = dy / d;
+          const overlap = (min - d) * 0.5;
+          a.slot.pos[0] -= nx * overlap; a.slot.pos[1] -= ny * overlap;
+          c.slot.pos[0] += nx * overlap; c.slot.pos[1] += ny * overlap;
+          // exchange the velocity component along the collision normal
+          const p = (a.vel.vx - c.vel.vx) * nx + (a.vel.vy - c.vel.vy) * ny;
+          if (p > 0) {
+            a.vel.vx -= p * nx; a.vel.vy -= p * ny;
+            c.vel.vx += p * nx; c.vel.vy += p * ny;
+          }
+        }
       }
     }
   }
@@ -513,6 +583,9 @@ export class DrillEngine {
     const t = this.active.get(targetId);
     if (!t || t.resolved) return;
     const now = this.timing.now;
+    // MOT: a ball cannot be selected while it is still moving. Selection is the identify
+    // phase, which begins only once motion has frozen (age >= physics.endMs).
+    if (t.spec.physics && now - t.spawnClock < t.spec.physics.endMs) return;
     // openSearch decoys survive a wrong click, so the same decoy can be clicked again.
     // 500ms of dead time stops a held trigger from logging fifty errors on one object.
     if (t.lastErrorAt !== undefined && now - t.lastErrorAt < 500) return;
@@ -617,6 +690,30 @@ export class DrillEngine {
       return;
     }
 
+    /**
+     * SELECT-N (MOT identify phase). Every pick — a tracked ball or a distractor — is recorded
+     * and marks that ball taken so it cannot be double-counted, and spends one of the budget.
+     * The field is NOT cleared and there is no timer: the athlete keeps identifying until they
+     * have committed their N picks. Only then does the round score and the next one spawn.
+     */
+    if (t.spec.groupMode === "selectN" && t.spec.groupId) {
+      t.resolved = true;
+      // keep the ball visible-but-taken by leaving it in the pool, dimmed via meta
+      const slot = this.pool.get(targetId);
+      if (slot?.spec) slot.spec.meta = { ...slot.spec.meta, taken: true };
+      const gid = t.spec.groupId;
+      const spent = (this.selectN.get(gid) ?? 0) + 1;
+      this.selectN.set(gid, spent);
+      const budget = t.spec.selectBudget ?? 1;
+      if (spent >= budget) {
+        for (const [id, sib] of [...this.active]) {
+          if (sib.spec.groupId === gid) { sib.resolved = true; this.despawn(id); }
+        }
+        if (t.spec.gridSeq !== undefined) this.spawnGrid((t.spec.gridSeq ?? 0) + 1);
+      }
+      return;
+    }
+
     t.resolved = true;
     this.despawn(targetId);
 
@@ -675,7 +772,7 @@ export class DrillEngine {
      * earliest — almost always a peripheral orb — and the central problem could never be
      * answered at all.
      */
-    const dual = this.definition.dualInput === true;
+    const dual = this.definition.dualInput === true || this.definition.triggerSecondary === true;
     let earliest: { id: string; spawn: number } | null = null;
     for (const [id, t] of this.active) {
       if (t.resolved || t.spec.decor || t.spec.meta?.decor) continue;
