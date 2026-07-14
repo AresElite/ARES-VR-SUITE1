@@ -76,8 +76,27 @@ export interface TrialSpec {
   stereoShiftM?: number;
   /** grating disc spec (shape "grating"): Michelson contrast %, cycles, angle */
   grating?: { contrastPct: number; cycles: number; angleDeg: number; seed: number };
-  /** Landolt-C spec (shape "landolt"): Michelson contrast %, gap bearing in degrees */
-  landolt?: { contrastPct: number; gapDeg: number; seed: number };
+  /** Landolt-C spec (shape "landolt"): gap bearing in degrees, drawn at luminance.target */
+  landolt?: { gapDeg: number; seed: number };
+  /**
+   * THE VISIBILITY ENVIRONMENT for this trial.
+   *
+   * Contrast is not a property of a target — it is a RELATIONSHIP between a target
+   * and the field it sits in. So the field is specified per trial and the whole world
+   * changes with it: bright sky, floodlit night, flat dusk, washout, glare, clutter.
+   *
+   * Luminances are 0-255 display units. Weber contrast = (Lt - Lb) / Lb, and its SIGN
+   * matters enormously to an athlete: a dark ball on a bright sky and a bright ball on
+   * a dark sky are different visual problems solved by different mechanisms, and most
+   * people are measurably better at one of them.
+   */
+  luminance?: {
+    bg: number;          // background field luminance (0-255)
+    target: number;      // target luminance (0-255)
+    glare: number;       // 0-1: veiling glare source near the target
+    mottle: number;      // 0-1: background clutter / dapple
+    condition: string;   // human-readable label for the results panel
+  };
   /** ms from drill start at which this target's kind flips (late cue change) */
   switchKindAt?: number;
   switchKindTo?: TargetKind;
@@ -113,7 +132,7 @@ export type SportId =
   | "tactical"
   | "racquet";
 
-export type EnvironmentId = "arena" | SportId;
+export type EnvironmentId = "arena" | "visibility" | SportId;
 
 /** A drill definition: pure config + trial-plan builder. Engines are shared. */
 export interface DrillDefinition {

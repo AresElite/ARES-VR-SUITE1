@@ -225,6 +225,21 @@ function SportProps({ environment }: { environment: EnvironmentId }) {
 export function ArenaEnvironment({ environment = "arena" }: { environment?: EnvironmentId }) {
   const phase = useAppStore((s) => s.phase);
 
+  /**
+   * The VISIBILITY drill owns the entire visual world — the background luminance IS
+   * the independent variable. An arena with a glowing floor, sky dome, and sweeping
+   * coloured spotlights would silently modulate the very quantity being measured, so
+   * the arena stands down completely and the drill's own luminance dome takes over.
+   */
+  if (environment === "visibility") {
+    return (
+      <group>
+        <color attach="background" args={["#000000"]} />
+        <ambientLight intensity={0.02} />
+      </group>
+    );
+  }
+
   return (
     <group>
       <color attach="background" args={[ARES_COLORS.nearBlack]} />

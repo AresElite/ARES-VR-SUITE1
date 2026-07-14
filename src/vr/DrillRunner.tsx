@@ -6,13 +6,13 @@ import * as THREE from "three";
 import { ARES_COLORS, ARES_ACCENTS } from "@/ares/colors";
 import { PHASE_META } from "@/ares/phases";
 import { HUD_REFRESH_HZ } from "@/ares/constants";
-import type { Hand, SliceDirection } from "@/ares/drillTypes";
+import type { Hand, SliceDirection, TrialSpec } from "@/ares/drillTypes";
 import { useAppStore } from "@/app/providers/appStore";
 import { STRIKE_TOLERANCE_M } from "@/drills/shared/DrillEngine";
 import { handFromPointerEvent, sliceDirectionFromDelta } from "@/drills/shared/InputMapper";
 import type { PoolSlot } from "@/drills/shared/TargetSpawner";
 import { PERF_MODES } from "@/utils/performance";
-import { makeGratingTexture, makeLandoltTexture, makePlateTexture, makeRDSTexture } from "@/utils/platePainter";
+import { makeGratingTexture, makeLandoltTexture, makeMottleTexture, makePlateTexture, makeRDSTexture } from "@/utils/platePainter";
 import { sfx } from "@/utils/audio";
 import { rhythmMusic } from "@/perform/rhythmMusic";
 import { headMotion } from "./headMotion";
@@ -488,33 +488,28 @@ function TargetMesh({
   }
 
   /**
-   * LANDOLT C — the low-contrast optotype.
+   * LANDOLT C — the optotype, and NOTHING else.
    *
-   * Rendered with meshBasicMaterial: UNLIT, no emission, no tone mapping. The pixel
-   * luminance the athlete sees is exactly the luminance the painter specified, which
-   * is the only way a stated Michelson contrast means anything. The old version used
-   * a lit, emissive 3D torus, so the arena's moving purple and teal point lights were
-   * silently modulating the very quantity the drill claimed to be measuring.
+   * No backing panel. The surround is the VISIBILITY FIELD (below), a full luminance
+   * dome the drill drives per trial, so the optotype is drawn at an absolute grey level
+   * straight onto the world. Unlit, no emission, no tone mapping: what the athlete sees
+   * is exactly the luminance we specified, against exactly the background we specified.
    *
-   * The optotype is backed by a larger UNIFORM MID-GREY surround at the same mean
-   * luminance, so the stimulus sits in a defined field rather than against whatever
-   * happens to be behind it in the arena.
+   * The old version gave every target its own little mid-grey plate to sit on. It was
+   * physically correct and it looked like a slide deck.
    */
   if (spec.shape === "landolt" && spec.landolt) {
     const lc = spec.landolt;
+    const lum = spec.luminance?.target ?? 128;
     return (
       <group ref={group} position={spec.position} key={version}>
-        {/* controlled surround — defines the background luminance */}
-        <mesh position={[0, 0, -0.006]}>
-          <planeGeometry args={[spec.scale * 4.2, spec.scale * 4.2]} />
-          <meshBasicMaterial color="#808080" toneMapped={false} />
-        </mesh>
         <mesh onClick={onHitProxy(spec, engine, desktopClicks && !isDecor)}>
-          <planeGeometry args={[spec.scale * 2, spec.scale * 2]} />
+          <planeGeometry args={[spec.scale * 2.2, spec.scale * 2.2]} />
           <meshBasicMaterial
-            map={makeLandoltTexture(lc.contrastPct, lc.gapDeg, lc.seed)}
+            map={makeLandoltTexture(lum, lc.gapDeg, lc.seed)}
             toneMapped={false}
-            transparent={false}
+            transparent
+            depthWrite={false}
           />
         </mesh>
       </group>
@@ -823,6 +818,109 @@ function FixationMarker() {
 }
 
 /**
+ * THE VISIBILITY FIELD — the world becomes the background.
+ *
+ * Contrast is a RELATIONSHIP, not a property. You cannot state a target's contrast
+ * without stating the field it sits in — which is why the old drill, floating a
+ * "7% contrast" torus in a dark arena lit by moving purple spotlights, was measuring
+ * nothing at all.
+ *
+ * So the drill drives the entire visual world. A luminance dome encloses the athlete
+ * at the trial's background level; the optotype is drawn at an absolute luminance on
+ * top of it; and the field itself is hostile in the ways sport is hostile:
+ *
+ *   GLARE   a bright source offset from the target. This is not decoration — a real
+ *           glare source scatters light inside the eye and raises a VEILING LUMINANCE
+ *           across the whole retina, which lifts the effective background and crushes
+ *           the target's contrast without changing a single pixel of the target. That
+ *           is exactly what a low sun or a stadium light does to an outfielder, and it
+ *           is why an athlete can have a perfect chart score and still lose the ball.
+ *
+ *   MOTTLE  band-limited clutter around the field's mean. The mean (and therefore the
+ *           stated contrast) is preserved; the field just becomes busy. A packed stand
+ *           destroys detection far more than it lowers contrast.
+ */
+function VisibilityField() {
+  const engine = useAppStore((s) => s.engine);
+  const [lum, setLum] = useState<NonNullable<TrialSpec["luminance"]> | null>(null);
+  const dome = useRef<THREE.Mesh>(null);
+  const glare = useRef<THREE.Mesh>(null);
+  const glareMat = useRef<THREE.MeshBasicMaterial>(null);
+  const domeMat = useRef<THREE.MeshBasicMaterial>(null);
+
+  useFrame(() => {
+    if (!engine) return;
+    // the field is whatever the currently-live target asks for
+    let next: NonNullable<TrialSpec["luminance"]> | null = null;
+    for (const t of (engine as unknown as { active: Map<string, { spec: TrialSpec }> }).active.values()) {
+      if (t.spec.luminance) { next = t.spec.luminance; break; }
+    }
+    if (next && next.condition !== lum?.condition) setLum(next);
+    if (!lum) return;
+
+    // ease the field rather than snapping it — a hard luminance jump between trials
+    // would trigger a light/dark adaptation transient and we would be measuring that
+    // instead of the athlete
+    if (domeMat.current) {
+      const want = new THREE.Color(lum.bg / 255, lum.bg / 255, lum.bg / 255);
+      domeMat.current.color.lerp(want, 0.06);
+    }
+    if (glareMat.current) {
+      glareMat.current.opacity += (lum.glare * 0.92 - glareMat.current.opacity) * 0.06;
+    }
+  });
+
+  if (!lum) return null;
+  const bg = lum.bg / 255;
+
+  return (
+    <group>
+      {/* the dome IS the background. Everything else in the arena is behind it. */}
+      <mesh ref={dome} renderOrder={-100}>
+        <sphereGeometry args={[7, 24, 18]} />
+        <meshBasicMaterial
+          ref={domeMat}
+          side={THREE.BackSide}
+          color={new THREE.Color(bg, bg, bg)}
+          toneMapped={false}
+          map={lum.mottle > 0.02 ? makeMottleTexture(lum.bg, lum.mottle, 7) : null}
+          depthWrite
+        />
+      </mesh>
+
+      {/* GLARE — a bright source beside the target, plus the veiling wash it throws
+          across the whole field. The wash is the part that actually hurts. */}
+      {lum.glare > 0.02 && (
+        <>
+          <mesh position={[0.62, 1.92, -1.55]}>
+            <circleGeometry args={[0.20, 28]} />
+            <meshBasicMaterial color="#FFFFFF" toneMapped={false} transparent opacity={0.95} />
+          </mesh>
+          <mesh position={[0.62, 1.92, -1.56]}>
+            <circleGeometry args={[0.46, 28]} />
+            <meshBasicMaterial color="#FFFFFF" toneMapped={false} transparent opacity={0.35 * lum.glare} />
+          </mesh>
+          {/* the veiling luminance: intraocular scatter, which is what a glare source
+              actually does to a human. It lifts the effective background everywhere. */}
+          <mesh ref={glare} position={[0, 1.5, -1.35]} renderOrder={90}>
+            <planeGeometry args={[6, 4]} />
+            <meshBasicMaterial
+              ref={glareMat}
+              color="#FFFFFF"
+              transparent
+              opacity={0}
+              depthTest={false}
+              depthWrite={false}
+              toneMapped={false}
+            />
+          </mesh>
+        </>
+      )}
+    </group>
+  );
+}
+
+/**
  * StroboscopicLayer — binocular occlusion. A full-field black quad locked to
  * the camera toggles opaque/clear on the drill's frame clock (so it pauses
  * with the drill). Level 1 = quick/sparse occlusion; Level 5 = long/frequent.
@@ -1112,6 +1210,7 @@ export function DrillRunner() {
       {inSession && engine.definition.responseMode === "trigger" && <TriggerListener />}
       {!inSession && engine.definition.responseMode === "trigger" && <DesktopTriggerKeys />}
       {engine.definition.gazeStability && <GazeAids />}
+      {engine.definition.environment === "visibility" && <VisibilityField />}
       {engine.definition.monocular && <MonocularOccluder />}
       {strobeLevel > 0 && engine.definition.supportsStrobe && <StroboscopicLayer />}
       <HeadMotionTracker />

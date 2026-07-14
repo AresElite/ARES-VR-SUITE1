@@ -202,29 +202,23 @@ export function makeRDSTexture(seed: number): THREE.CanvasTexture {
 
 
 /**
- * LANDOLT C — a REAL one, at a REAL contrast.
+ * LANDOLT C — drawn on a TRANSPARENT canvas, at an absolute luminance.
  *
- * The old contrast drill encoded "contrast" as a hex colour on a lit, emissive
- * 3D torus floating in a dark arena with coloured point lights sweeping across
- * it. Michelson contrast is defined against a background luminance; there was no
- * defined background, and the stimulus glowed. The 92%-to-7% ladder was fiction —
- * the actual retinal contrast depended on where the athlete happened to be looking
- * and which arena light was passing overhead.
+ * The previous version painted the optotype onto its own little mid-grey panel so the
+ * surround was controlled. It was physically correct and it looked like a slide deck:
+ * grey boxes floating in an arena. That is not an instrument an athlete respects.
  *
- * This draws the optotype the way it is drawn in every clinical chart: a ring whose
- * stroke and gap are each exactly 1/5 of the outer diameter, painted at a specified
- * Michelson contrast against a MID-GREY field, on a canvas. It is rendered with an
- * UNLIT material so the pixel luminance the athlete sees is exactly the luminance we
- * asked for — no lighting, no emission, no tone mapping.
- *
- *   Michelson C = (Lmax - Lmin) / (Lmax + Lmin), around a mean of 128.
+ * The surround is now the WORLD — a full luminance dome that the drill drives — so the
+ * optotype needs no backing plate at all. It is drawn at an absolute grey level on a
+ * transparent canvas and rendered unlit, so what the athlete sees is exactly the
+ * luminance we asked for, sitting directly on the field we built for it.
  */
 export function makeLandoltTexture(
-  contrastPct: number,
+  targetLum: number,
   gapDeg: number,
   seed: number,
 ): THREE.CanvasTexture {
-  const key = `lc-${contrastPct.toFixed(2)}-${gapDeg}-${seed}`;
+  const key = `lc-${Math.round(targetLum)}-${gapDeg}-${seed}`;
   const hit = cache.get(key);
   if (hit) return hit;
 
@@ -233,28 +227,21 @@ export function makeLandoltTexture(
   cv.width = S;
   cv.height = S;
   const g = cv.getContext("2d")!;
-
-  const MEAN = 128;
-  const amp = (Math.max(0, Math.min(100, contrastPct)) / 100) * MEAN;
-  const bg = MEAN + amp;   // light surround
-  const ink = MEAN - amp;  // dark optotype — the pair straddles the mean exactly
-
-  // the controlled background IS the stimulus surround. It must be uniform.
-  g.fillStyle = `rgb(${bg | 0},${bg | 0},${bg | 0})`;
-  g.fillRect(0, 0, S, S);
+  g.clearRect(0, 0, S, S); // transparent — the WORLD is the background
 
   // Landolt proportions: outer diameter D, stroke D/5, gap D/5.
-  const D = S * 0.62;
+  const D = S * 0.82;
   const stroke = D / 5;
   const R = (D - stroke) / 2;
   const cx = S / 2, cy = S / 2;
-  // the gap subtends the stroke width at the ring radius
   const gapRad = stroke / R;
   const a0 = (gapDeg * Math.PI) / 180 - gapRad / 2;
   const a1 = (gapDeg * Math.PI) / 180 + gapRad / 2;
 
-  g.strokeStyle = `rgb(${ink | 0},${ink | 0},${ink | 0})`;
+  const L = Math.max(0, Math.min(255, Math.round(targetLum)));
+  g.strokeStyle = `rgb(${L},${L},${L})`;
   g.lineWidth = stroke;
+  g.lineCap = "butt";
   g.beginPath();
   g.arc(cx, cy, R, a1, a0 + Math.PI * 2);
   g.stroke();
@@ -263,6 +250,60 @@ export function makeLandoltTexture(
   tex.needsUpdate = true;
   tex.minFilter = THREE.LinearFilter;
   tex.magFilter = THREE.LinearFilter;
+  tex.generateMipmaps = false;
+  cache.set(key, tex);
+  return tex;
+}
+
+/**
+ * MOTTLE — low-frequency background clutter.
+ *
+ * A uniform field is the easy case and almost never the sport case. A ball against a
+ * packed stand, dappled light through trees, a mottled pitch — the background is
+ * BUSY, and busy backgrounds destroy detection far more than they lower contrast.
+ * This paints band-limited noise around the field's mean, so the mean luminance (and
+ * therefore the stated contrast) is preserved while the field becomes hostile.
+ */
+export function makeMottleTexture(bgLum: number, amount: number, seed: number): THREE.CanvasTexture {
+  const key = `mo-${Math.round(bgLum)}-${amount.toFixed(2)}-${seed}`;
+  const hit = cache.get(key);
+  if (hit) return hit;
+
+  const S = 256;
+  const cv = document.createElement("canvas");
+  cv.width = S;
+  cv.height = S;
+  const g = cv.getContext("2d")!;
+  const img = g.createImageData(S, S);
+  const r = rng(seed);
+
+  // a few octaves of smooth blobs — clutter, not television static
+  const blobs = Array.from({ length: 26 }, () => ({
+    x: r() * S, y: r() * S, s: 18 + r() * 55, a: (r() - 0.5) * 2,
+  }));
+  for (let y = 0; y < S; y++) {
+    for (let x = 0; x < S; x++) {
+      let v = 0;
+      for (const b of blobs) {
+        const d2 = ((x - b.x) ** 2 + (y - b.y) ** 2) / (b.s * b.s);
+        v += b.a * Math.exp(-d2);
+      }
+      const L = Math.max(0, Math.min(255, bgLum + v * amount * 46));
+      const i = (y * S + x) * 4;
+      img.data[i] = L;
+      img.data[i + 1] = L;
+      img.data[i + 2] = L;
+      img.data[i + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+
+  const tex = new THREE.CanvasTexture(cv);
+  tex.needsUpdate = true;
+  tex.minFilter = THREE.LinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
   tex.generateMipmaps = false;
   cache.set(key, tex);
   return tex;

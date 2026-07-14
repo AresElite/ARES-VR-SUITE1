@@ -354,213 +354,263 @@ export const SchulteTable: DrillDefinition = {
 // A 'C' (gapped ring) appears at center — strike THROUGH the gap direction.
 // Contrast falls as levels rise. ~25 trials.
 /**
- * LOW-CONTRAST PICKUP — the contrast-sensitivity TRAINING drill.
+ * A.R.E.S. VISIBILITY — target pickup across hostile visual environments.
  *
- * The old version was broken in four independent ways, and every one of them
- * invalidated the thing it claimed to measure:
+ * The question this drill answers is not "what is your contrast threshold". It is the
+ * question an athlete actually cares about: WHERE DO YOU LOSE THE BALL?
  *
- *   1. CONTRAST WAS A COLOUR. It encoded contrast as a hex value on a LIT,
- *      EMISSIVE 3D torus in a dark arena with coloured point lights sweeping over
- *      it. Michelson contrast is defined against a background luminance; there was
- *      no defined background and the stimulus glowed. The ladder was fiction.
- *   2. IT WASN'T A LANDOLT C. The "C" was a torus with 6 radial segments and a
- *      1.7pi sweep — a chunky hexagonal three-quarter donut whose gap was defined
- *      by GEOMETRY, not luminance, and subtended ~54 degrees instead of the
- *      standard 1/5 of the diameter.
- *   3. THE RESPONSE WAS A STRIKE. The athlete had to physically strike THROUGH the
- *      gap. That layers an eye-hand motor act on top of a perception threshold: a
- *      failure could be "I couldn't see it" or "I couldn't hit it", and the drill
- *      could not tell you which. Contrast sensitivity is a PERCEPTION measure. It
- *      must not be gated on the arm.
- *   4. NO STAIRCASE. Contrast was fixed per level, so 25 trials all ran at one
- *      contrast. A fixed-contrast block tells you nothing about a threshold.
+ * Contrast is a RELATIONSHIP between a target and the field it sits in — so the field
+ * is the independent variable, and it changes. Six environments, each a real one:
  *
- * Rebuilt:
- *   - a real Landolt C (stroke = gap = 1/5 of outer diameter), painted at a stated
- *     Michelson contrast against a uniform mid-grey surround, rendered UNLIT so the
- *     luminance we asked for is the luminance the athlete gets;
- *   - a 4-alternative forced choice on the GAP DIRECTION, answered with a joystick
- *     flick — a pure perceptual judgment with no motor confound;
- *   - an ADAPTIVE STAIRCASE that walks contrast down on correct answers and back up
- *     on errors, so the athlete trains AT their own threshold instead of grinding a
- *     contrast that is either trivially visible or hopeless.
+ *   BRIGHT SKY    light field, DARK target.  A ball against an overcast sky.
+ *   FLOODLIT      dark field, LIGHT target.  A white ball under stadium lights.
+ *   FLAT DUSK     dark field, DARK target.   Low light, dark ball. The killer.
+ *   WASHOUT       very bright field, light target. Everything blown out.
+ *   GLARE         mid field + a bright source beside the target.
+ *   CLUTTER       mottled field. A ball against a packed stand.
  *
- * This is TRAINING, not measurement. The Assess phase owns the threshold test
- * (assess-contrast-sensitivity, a proper two-phase grating staircase). This drill
- * adds what a threshold test deliberately excludes: time pressure, peripheral
- * placement, and visual clutter — the conditions a low-contrast ball actually
- * appears under.
+ * THE SIGN OF THE CONTRAST MATTERS, and this is the part a single "contrast score"
+ * throws away. A dark target on a bright field and a light target on a dark field are
+ * different visual problems, solved by different retinal pathways (OFF and ON centre),
+ * and most people are measurably better at one of them. An athlete who is fine against
+ * the sky and blind at dusk has a specific, trainable, coachable deficit — and a single
+ * number would have told you nothing about it.
+ *
+ * GLARE is modelled honestly. A glare source does not simply sit next to the target: it
+ * scatters inside the eye and raises a VEILING LUMINANCE across the whole retina, which
+ * lifts the effective background and crushes the target's contrast without changing one
+ * pixel of the target. That is exactly what a low sun does to an outfielder, and it is
+ * why an athlete can score perfectly on a wall chart and still lose the ball in the air.
+ *
+ * Each environment carries its OWN independent staircase, so the drill returns six
+ * thresholds, not one — a visibility PROFILE. The task is a 4AFC Landolt gap answered
+ * with a joystick flick: pure perception, no motor confound, guessing controlled at 25%.
  */
-const LC_DIRS = [
+type VisCondition = {
+  id: string;
+  label: string;
+  bg: number;              // background luminance, 0-255
+  sign: 1 | -1;            // +1 = target LIGHTER than field, -1 = DARKER
+  glare: number;
+  mottle: number;
+};
+
+const VIS_CONDITIONS: VisCondition[] = [
+  { id: "sky",      label: "Bright Sky",  bg: 205, sign: -1, glare: 0,    mottle: 0 },
+  { id: "floodlit", label: "Floodlit",    bg: 38,  sign: +1, glare: 0,    mottle: 0 },
+  { id: "dusk",     label: "Flat Dusk",   bg: 52,  sign: -1, glare: 0,    mottle: 0 },
+  /**
+   * WASHOUT was originally a bright field with a BRIGHTER target — which is physically
+   * almost impossible: there is no headroom above white, so the contrast capped at 9%
+   * and the staircase could not move at all. A real washout is not a brighter ball; it
+   * is a blown-out field in which the ball becomes a faint dark SILHOUETTE. Sign flipped.
+   */
+  { id: "washout",  label: "Washout",     bg: 232, sign: -1, glare: 0.25, mottle: 0 },
+  { id: "glare",    label: "Glare",       bg: 150, sign: -1, glare: 0.85, mottle: 0 },
+  { id: "clutter",  label: "Clutter",     bg: 120, sign: -1, glare: 0,    mottle: 0.9 },
+];
+
+const VIS_DIRS = [
   { dir: "right" as const, deg: 0 },
-  { dir: "up" as const, deg: 270 },   // canvas Y is down, so 270deg points up
+  { dir: "up" as const, deg: 270 },   // canvas Y runs down, so 270deg points up
   { dir: "left" as const, deg: 180 },
   { dir: "down" as const, deg: 90 },
 ];
 
+/**
+ * WEBER CONTRAST, which is the right measure for a target on a uniform field:
+ *   C = |Lt - Lb| / Lb
+ * Given a background and a signed contrast, this returns the target luminance. It is
+ * clamped into the displayable range, and the drill never asks for a contrast the panel
+ * cannot actually render — an unrenderable stimulus is an invisible one, and we would
+ * be recording a threshold that was really a hardware limit.
+ */
+function targetLuminance(bg: number, contrast: number, sign: 1 | -1): number {
+  return Math.max(2, Math.min(253, bg + sign * contrast * bg));
+}
+/** the highest contrast this background can actually display, in the given direction */
+function maxRenderable(bg: number, sign: 1 | -1): number {
+  return sign > 0 ? (253 - bg) / bg : (bg - 2) / bg;
+}
+
 export const ContrastAssessment: DrillDefinition = {
   id: "contrast-assessment",
-  name: "Low-Contrast Pickup",
-  shortName: "Low-Contrast",
+  name: "Visibility",
+  shortName: "Visibility",
   phase: "Acquire",
-  description: "A faint Landolt C appears at a controlled contrast against a fixed grey field. Find the GAP and FLICK the joystick that way. The contrast adapts to you — it drops when you are right and lifts when you are wrong, so you train at the edge of what you can actually see.",
-  purpose: "Low-contrast target pickup, trained at threshold (4AFC, adaptive).",
+  environment: "visibility",
+  description: "The whole world becomes the test. Six environments — bright sky, floodlit night, flat dusk, washout, glare, clutter — each with its own adaptive staircase. Find the gap in the ring and flick the stick. You get six thresholds, not one: a map of exactly where you lose the ball.",
+  purpose: "Target pickup across hostile visual environments (6 independent staircases, 4AFC).",
   interaction: "touch",
   responseMode: "joystick",
-  environment: "arena",
   mvp: true,
   instructions: [
-    "1. A faint ring with a GAP appears on a grey panel. It is a letter C, rotated.",
-    "2. Find the gap: UP, DOWN, LEFT or RIGHT.",
-    "3. FLICK the dominant joystick in the direction of the GAP. Let it recenter between answers.",
-    "4. Get it right and the ring gets FAINTER. Get it wrong and it comes back up.",
-    "5. Do not guess. Sitting near 70-75% correct means you are exactly where you should be.",
+    "1. The ENVIRONMENT changes: bright sky, floodlit dark, flat dusk, washout, glare, clutter.",
+    "2. In each one, a ring with a GAP appears. Sometimes it is DARKER than the field, sometimes LIGHTER.",
+    "3. Find the gap - UP, DOWN, LEFT or RIGHT - and FLICK the dominant joystick that way.",
+    "4. Each environment gets HARDER on its own as you get it right, and easier when you miss.",
+    "5. Do not guess. You will finish with six separate thresholds - a map of where you lose the ball.",
   ],
   controlsHint: "FIND THE GAP - FLICK THE STICK THAT WAY",
   levels: levels50((i) => ({
-    label: `start ${Math.round(lerp50(70, 22, i))}% - ${i < 17 ? "central" : i < 34 ? "near periphery" : "periphery + clutter"}`,
+    label: `${Math.round(lerp50(0.70, 0.10, i) * 100)}% start - ${i < 17 ? "central" : i < 34 ? "near periphery" : "periphery + speed"}`,
     parameters: {
-      trials: 30,
-      // the staircase STARTS here; where it ends is up to the athlete
-      startContrast: lerp50(70, 22, i),
-      // the optotype shrinks -> higher spatial frequency, harder at low contrast
-      size: lerp50(0.085, 0.038, i),
-      showMs: ilerp50(2200, 900, i),
-      // level pushes the C out into the periphery, where contrast sensitivity is worse
-      eccDeg: lerp50(0, 24, i),
-      clutter: i < 34 ? 0 : lerp50(0, 1, i),
+      trials: 54,                                  // 9 per environment — enough for six staircases to settle
+      startContrast: lerp50(0.70, 0.10, i),        // Weber, where each staircase begins
+      size: lerp50(0.10, 0.042, i),
+      showMs: ilerp50(2400, 900, i),               // pickup SPEED is part of the skill
+      eccDeg: lerp50(0, 22, i),
     },
   })),
   buildTrials: (params, rng) => {
     const p = params as {
-      trials: number; startContrast: number; size: number;
-      showMs: number; eccDeg: number; clutter: number;
+      trials: number; startContrast: number; size: number; showMs: number; eccDeg: number;
     };
     const trials: TrialSpec[] = [];
-    let t = 1800;
+    let t = 2000;
 
-    // optional surround clutter — never overlaps the optotype's own grey field
-    const clutterN = Math.round(p.clutter * 14);
-    for (let c = 0; c < clutterN; c++) {
-      const a = rng() * Math.PI * 2;
-      const r = 0.42 + rng() * 0.3;
-      trials.push({
-        id: `lc-bg${c}`, spawnAt: 1200,
-        duration: 1200 + p.trials * (p.showMs + 900) + 3000,
-        kind: "distractor", decor: true, zone: "center",
-        position: [Math.cos(a) * r, 1.45 + Math.sin(a) * r * 0.7, Z - 0.05],
-        color: "#5A5F72", shape: "sphere", scale: 0.02 + rng() * 0.02,
-      });
+    /**
+     * Environments are INTERLEAVED, never blocked. If we ran six bright-sky trials in a
+     * row the athlete's eyes would light-adapt to the sky and we would be measuring
+     * adaptation, not visibility. Shuffled interleaving keeps every environment a fresh
+     * demand — and it is also the honest sport case, where the light changes on you.
+     */
+    const order: VisCondition[] = [];
+    const per = Math.ceil(p.trials / VIS_CONDITIONS.length);
+    for (let k = 0; k < per; k++) order.push(...VIS_CONDITIONS);
+    for (let k = order.length - 1; k > 0; k--) {
+      const j = Math.floor(rng() * (k + 1));
+      [order[k], order[j]] = [order[j], order[k]];
     }
 
     for (let i = 0; i < p.trials; i++) {
-      const g = pick(rng, LC_DIRS);
-      // eccentric placement — a random bearing at the level's eccentricity
+      const cond = order[i];
+      const g = pick(rng, VIS_DIRS);
       const bearing = rng() * Math.PI * 2;
-      const ecc = (p.eccDeg * Math.PI) / 180;
-      const off = Math.tan(ecc) * Math.abs(Z);
+      const off = Math.tan((p.eccDeg * Math.PI) / 180) * Math.abs(Z);
+      const c0 = Math.min(p.startContrast, maxRenderable(cond.bg, cond.sign));
+
       trials.push({
         id: `ca-${i}`,
         spawnAt: t,
         duration: p.showMs,
         kind: "go",
         zone: "center",
-        position: [Math.cos(bearing) * off, 1.45 + Math.sin(bearing) * off, Z],
+        position: [Math.cos(bearing) * off, 1.45 + Math.sin(bearing) * off * 0.8, Z],
         requiredDirection: g.dir,
         color: "#808080",
         shape: "landolt",
         scale: p.size,
-        landolt: { contrastPct: p.startContrast, gapDeg: g.deg, seed: 100 + i },
-        meta: { pointDir: g.dir, startContrast: p.startContrast },
+        landolt: { gapDeg: g.deg, seed: 100 + i },
+        luminance: {
+          bg: cond.bg,
+          target: targetLuminance(cond.bg, c0, cond.sign),
+          glare: cond.glare,
+          mottle: cond.mottle,
+          condition: cond.label,
+        },
+        meta: { pointDir: g.dir, cond: cond.id, startContrast: c0 },
       });
-      t += p.showMs + 700 + rng() * 300;
+      // a beat of the new field BEFORE the target lands — the eye needs a moment to
+      // settle into a changed environment, and not giving it one measures adaptation
+      t += p.showMs + 600 + rng() * 250;
     }
     return trials;
   },
 
   /**
-   * THE STAIRCASE. A 3-down/1-up rule, which converges on ~79% correct — the
-   * standard target for a 4AFC task, and almost exactly the Goldilocks band the
-   * rest of the suite trains in. Three right in a row and the C gets fainter; one
-   * wrong and it comes straight back up. The athlete spends the session at the
-   * edge of their own vision instead of grinding a contrast that is either
-   * trivially visible or completely hopeless.
+   * SIX INDEPENDENT STAIRCASES, one per environment.
+   *
+   * A single staircase across mixed environments would converge on a meaningless
+   * average — the athlete's sky threshold dragging their dusk threshold around and
+   * vice versa. Each environment therefore walks its own two-phase ladder (coarse
+   * bracketing until the first error, then 3-down/1-up with log-symmetric steps),
+   * and the drill returns a PROFILE.
    */
   onSpawnAdapt: (spec, snap) => {
-    if (!spec.landolt) return;
-    const st = lcState;
-    // The staircase is module state, so it MUST be re-armed at the start of every
-    // run — otherwise the second athlete inherits the first athlete's threshold and
-    // starts the session somewhere they have never been.
+    if (!spec.luminance || !spec.meta) return;
+    const cid = spec.meta.cond as string;
+    const cond = VIS_CONDITIONS.find((c) => c.id === cid)!;
+
+    // re-arm every ladder at the top of a run — otherwise athlete #2 inherits
+    // athlete #1's thresholds and starts somewhere they have never been
     if (spec.id === "ca-0") {
-      st.contrast = (spec.meta?.startContrast as number) ?? 60;
-      st.correctRun = 0;
-      st.bracketed = false;
-      spec.landolt = { ...spec.landolt, contrastPct: st.contrast };
-      return;
-    }
-    /**
-     * TWO-PHASE STAIRCASE.
-     *
-     * A pure 3-down/1-up rule converges on ~79% correct, which is the right target
-     * for a 4AFC task — but it descends slowly, and from a high starting contrast
-     * it burns the whole 30-trial run just getting DOWN to the athlete. In testing
-     * an athlete whose true threshold was 30% finished the session sitting at 45%:
-     * the staircase was still travelling when the drill ended, so they never trained
-     * at threshold at all.
-     *
-     * So the run has two phases, exactly like the stereopsis ladder:
-     *
-     *   COARSE  before the first error, every correct answer cuts contrast hard
-     *           (x0.55). This is a bracketing phase — get into the athlete's
-     *           neighbourhood fast, and stop wasting trials on contrasts they can
-     *           see without trying.
-     *   FINE    after the first error we know roughly where they live. Switch to
-     *           3-down/1-up with gentle steps and let it settle.
-     */
-    if (snap.lastEventCorrect === true) {
-      if (!st.bracketed) {
-        st.contrast = Math.max(1.2, st.contrast * 0.55);   // COARSE: bracket fast
-      } else {
-        st.correctRun++;
-        if (st.correctRun >= 3) {
-          st.contrast = Math.max(1.2, st.contrast * 0.82); // FINE: 3-down
-          st.correctRun = 0;
-        }
+      for (const c of VIS_CONDITIONS) {
+        visState[c.id] = {
+          contrast: Math.min(spec.meta.startContrast as number, maxRenderable(c.bg, c.sign)),
+          run: 0,
+          bracketed: false,
+        };
       }
-    } else if (snap.lastEventCorrect === false) {
-      // the first error ends the bracketing phase — now we know where they are
-      st.bracketed = true;
-      // The up-step must be the INVERSE of the down-step (1/0.82 = 1.22), or the
-      // staircase is asymmetric in log units and drifts. With a 1.35 up against a
-      // 0.82 down it kept climbing away from the athlete's threshold.
-      st.contrast = Math.min(90, st.contrast * 1.22);      // 1-up
-      st.correctRun = 0;
     }
-    if (st.contrast <= 0) st.contrast = (spec.meta?.startContrast as number) ?? 60;
-    spec.landolt = { ...spec.landolt, contrastPct: st.contrast };
+    const st = visState[cid] ?? (visState[cid] = {
+      contrast: spec.meta.startContrast as number, run: 0, bracketed: false,
+    });
+
+    // the LAST result belongs to whichever environment was on screen last — so only
+    // step the ladder that actually produced it
+    if (lastCond && snap.lastEventCorrect !== undefined) {
+      const ls = visState[lastCond];
+      if (ls) {
+        if (snap.lastEventCorrect) {
+          if (!ls.bracketed) ls.contrast *= 0.55;          // COARSE: bracket fast
+          else if (++ls.run >= 3) { ls.contrast *= 0.82; ls.run = 0; }  // FINE: 3-down
+        } else {
+          ls.bracketed = true;
+          ls.contrast *= 1.22;                            // 1-up (log-symmetric)
+          ls.run = 0;
+        }
+        ls.contrast = Math.max(0.012, Math.min(maxRenderable(
+          VIS_CONDITIONS.find((c) => c.id === lastCond)!.bg,
+          VIS_CONDITIONS.find((c) => c.id === lastCond)!.sign,
+        ), ls.contrast));
+      }
+    }
+    lastCond = cid;
+
+    spec.luminance = {
+      ...spec.luminance,
+      target: targetLuminance(cond.bg, st.contrast, cond.sign),
+    };
+    spec.meta = { ...spec.meta, appliedContrast: st.contrast };
   },
 
   analyze: (events) => {
     const scored = events.filter((e) => e.trialId.startsWith("ca-") && e.errorType !== "correctRejection");
     if (!scored.length) return [];
     const acc = Math.round((scored.filter((e) => e.correct).length / scored.length) * 1000) / 10;
-    const reached = lcState.contrast;
-    const logCS = reached > 0 ? Math.log10(100 / reached) : 0;
+
+    // the PROFILE — this is the whole point of the drill
+    const rows = VIS_CONDITIONS.map((c) => {
+      const st = visState[c.id];
+      const thr = st ? st.contrast : 0;
+      return `${c.label}: ${(thr * 100).toFixed(1)}%`;
+    });
+
+    // where do they actually lose the ball?
+    const ranked = VIS_CONDITIONS
+      .map((c) => ({ c, thr: visState[c.id]?.contrast ?? 9 }))
+      .sort((a, b) => b.thr - a.thr);
+    const worst = ranked[0];
+    const best = ranked[ranked.length - 1];
+
     return [
-      `Trained down to ${reached.toFixed(1)}% contrast (log CS ~ ${logCS.toFixed(2)}) at ${acc}% correct.`,
+      `Visibility profile (Weber threshold, lower is better) — ${rows.join("  |  ")}`,
+      `Strongest: ${best.c.label}. Weakest: ${worst.c.label} — ${(worst.thr / Math.max(0.01, best.thr)).toFixed(1)}x the contrast needed.`,
+      `${acc}% correct across ${scored.length} forced-choice trials.`,
       "TRAINING drill, adaptive. The Assess phase owns the validated contrast threshold.",
     ];
   },
 
   durationMs: (params) => {
     const p = params as { trials: number; showMs: number };
-    return 1800 + p.trials * (p.showMs + 900) + 1500;
+    return 2000 + p.trials * (p.showMs + 850) + 1500;
   },
 };
 
-/** staircase state — re-armed on trial ca-0 at the start of every run */
-const lcState = { contrast: 0, correctRun: 0, bracketed: false };
+/** per-environment staircase state — re-armed on trial ca-0 at the start of every run */
+const visState: Record<string, { contrast: number; run: number; bracketed: boolean }> = {};
+let lastCond: string | null = null;
 
 // ============================ RAPID RECOGNITION ============================
 // Match-to-sample under pressure. A central CUE shows the target; options
