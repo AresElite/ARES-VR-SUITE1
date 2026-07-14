@@ -1,6 +1,6 @@
 import type { DrillDefinition, TrialSpec } from "@/ares/drillTypes";
 import { levels25, lerp25, ilerp25, levels50, lerp50, ilerp50 } from "../shared/levels";
-import { buildPeripheralTrials } from "../acquire/PeripheralFieldVR";
+import { buildPeripheralTrials, type SimplePeripheralParams } from "../acquire/PeripheralFieldVR";
 import { buildReactionTrials } from "../execute/ReactionStrikeVR";
 import { buildDepthSliceTrials } from "../execute/DepthSliceVR";
 
@@ -24,7 +24,7 @@ interface Params {
 export function buildChaosTrials(p: Params, rng: () => number): TrialSpec[] {
   const streams: TrialSpec[][] = [];
 
-  streams.push(buildPeripheralTrials(p.peripheral as never, rng, "cx-pf"));
+  streams.push(buildPeripheralTrials(p.peripheral as unknown as SimplePeripheralParams, rng, "cx-pf"));
   const reaction = buildReactionTrials(p.reaction as never, rng, "cx-rs").map((t) => ({
     ...t,
     spawnAt: t.spawnAt + 900, // phase-shift the Execute stream against Acquire

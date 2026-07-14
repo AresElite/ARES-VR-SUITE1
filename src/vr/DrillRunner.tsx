@@ -718,8 +718,31 @@ function JoystickListener({ cursor }: { cursor: { seq: number } }) {
     }
     if (mag < 0.7 || !armed.current) return;
     armed.current = false;
-    const dir: SliceDirection =
-      Math.abs(x) > Math.abs(y) ? (x > 0 ? "right" : "left") : y > 0 ? "down" : "up";
+
+    /**
+     * EIGHT-WAY FLICKS.
+     *
+     * The listener only ever read four directions — a flick was collapsed onto
+     * whichever axis happened to be larger. That is fine for DEM arrows and DVA, where
+     * the answer IS cardinal, but it makes a diagonal literally inexpressible. A drill
+     * that wants to ask "how far can you see up-and-to-the-left" had no way for the
+     * athlete to answer.
+     *
+     * Eight-way is opt-in per drill (`eightWay`), because turning it on globally would
+     * be a regression: a sloppy cardinal flick that drifts 25 degrees off-axis would
+     * suddenly read as a diagonal and be scored wrong on drills where diagonals are not
+     * even a valid answer.
+     */
+    const eight = engine.definition.eightWay === true;
+    const ang = Math.atan2(-y, x); // gamepad Y is inverted
+    let dir: SliceDirection;
+    if (eight) {
+      const OCT: SliceDirection[] = ["right", "upRight", "up", "upLeft", "left", "downLeft", "down", "downRight"];
+      const k = ((Math.round(ang / (Math.PI / 4)) % 8) + 8) % 8;
+      dir = OCT[k];
+    } else {
+      dir = Math.abs(x) > Math.abs(y) ? (x > 0 ? "right" : "left") : y > 0 ? "down" : "up";
+    }
     // DEM: resolve the CURRENT arrow in the ordered sequence.
     // Gaze Stabilization / DVA: no ordered group — fall back to the earliest
     // live go target so up/down/left/right flicks always register.

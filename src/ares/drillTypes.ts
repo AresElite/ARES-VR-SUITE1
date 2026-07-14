@@ -185,6 +185,8 @@ export interface DrillDefinition {
   monocular?: boolean;
   /** gaze-stabilization drill: render fixation dot + head-speed feedback ring */
   gazeStability?: boolean;
+  /** joystick flicks resolve to 8 octants, not 4 cardinals (diagonal answers are valid) */
+  eightWay?: boolean;
   /** completion-paced session (Schulte): length is trial-driven, not timed —
       the declared duration is only a generous ceiling */
   trialPaced?: boolean;
