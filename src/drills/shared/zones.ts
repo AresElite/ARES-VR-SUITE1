@@ -104,7 +104,15 @@ export function strikePosition(
   const x = Math.sin(ecc) * reach * dx + jx;
   const y = EYE_Y - 0.15 + Math.sin(ecc) * reach * 0.62 * dy + jy;
   const z = -Math.cos(ecc * 0.55) * reach;
-  return clampToReach([x, Math.min(1.85, Math.max(0.95, y)), z]);
+  /**
+   * The vertical floor is 1.05 m, not 0.95 m. On the strike shell (~0.6 m out) a
+   * target at 0.95 m sits 47 degrees below the horizon — and to strike it the athlete
+   * must LOOK 47 degrees down, which is deep enough to arm the control dock and bury
+   * the target behind a menu. Below the hip a strike is an awkward, low-value rep
+   * anyway; raising the floor 10 cm costs nothing and keeps every target above the
+   * dock's sightline.
+   */
+  return clampToReach([x, Math.min(1.85, Math.max(1.05, y)), z]);
 }
 
 /** Legacy far-field position (visual anchors, decorative movers). */

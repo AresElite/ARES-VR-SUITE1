@@ -16,89 +16,236 @@ const WHITE = "#EAF0FF";
 const Z = -0.62;
 
 // ============================== SPEED-SEARCH ==============================
-// Find the single PYRAMID among sphere/cube decoys. All shapes share one
-// color — the target is found by 3D FORM alone, never by a highlight.
-// Phase 1 (Shapes): size ramps 60->20px, central fraction 0.8->0.2 (L1-30).
+/**
+ * SPEED-SEARCH — a three-band visual-search ladder.
+ *
+ * The field is ALWAYS 20 items and the run is ALWAYS 20 searches. Set size is not
+ * a difficulty knob here: in visual search, changing the set size changes what the
+ * slope of the search function even means, so holding it constant at 20 is what
+ * makes level-to-level comparison honest. Difficulty comes from WHAT you are
+ * searching for and WHERE you have to look for it.
+ *
+ *   L1-16   FORM.        Find the one PYRAMID among 19 spheres and cubes. Large,
+ *                        fairly central, high contrast. The target pops out on 3D
+ *                        shape — this is the entry task.
+ *
+ *   L17-32  ORIENTATION. The shapes are gone. Now it is 20 grating discs, 19 of
+ *                        them at the SAME angle and one rotated. There is no form
+ *                        cue and no colour cue left: the only thing distinguishing
+ *                        the target is the direction its EDGES run. Contrast is
+ *                        still generous; the field pushes out into the periphery.
+ *
+ *   L33-50  CONTRAST.    The same orientation singleton, but the contrast now falls
+ *                        (70% -> 8%) AND the angle difference narrows (90deg -> 25deg).
+ *                        At the top the athlete is hunting a barely-visible patch
+ *                        whose edges run only slightly off the crowd's, out at 40deg
+ *                        eccentricity. This is edge and contrast detection, not
+ *                        shape recognition, and it is the skill that finds a ball
+ *                        against a cluttered stand in flat light.
+ *
+ * Across all three bands the field grows outward and the items shrink, so the
+ * athlete is pushed from a comfortable foveal search into a genuinely peripheral one.
+ */
+const SS_FIELD = 20;    // 20 items, every level
+const SS_TRIALS = 20;   // 20 searches, every level
+const SS_Z = -1.25;     // pointer distance — you aim, you do not reach
+const SS_BAND = (i: number): "form" | "orientation" | "contrast" =>
+  i < 16 ? "form" : i < 32 ? "orientation" : "contrast";
+
 export const SpeedSearch: DrillDefinition = {
   id: "speed-search",
   name: "Speed-Search",
   shortName: "Speed-Search",
   phase: "Acquire",
-  description: "A field of 3D shapes floods the board — spheres and cubes. Find the single PYRAMID (all the same color, no highlight) and strike it before the field collapses.",
-  purpose: "Fast saccades, crowd discrimination, target selection.",
+  description: "20 items, 20 searches. Early levels: find the one PYRAMID among spheres and cubes. Later: the shapes become grating discs — 19 facing the same way and ONE rotated, found by its EDGES alone. At the top the contrast drops and the angle difference narrows, out in the far periphery.",
+  purpose: "Peripheral visual search — form, then orientation, then low-contrast edge detection.",
   interaction: "ray",
   responseMode: "pointer",
   environment: "arena",
   mvp: true,
   instructions: [
-    "1. A field of 3D shapes appears ahead - SPHERES and CUBES, all one color.",
-    "2. Exactly ONE PYRAMID hides among them. There is NO color highlight - find it by shape.",
-    "3. POINT your controller at the pyramid and pull the TRIGGER.",
-    "4. Clicking any decoy counts against you. Higher levels: smaller shapes, wider field.",
+    "1. TWENTY items appear across your field. Exactly ONE is the odd one out.",
+    "2. Early levels: it is a PYRAMID among spheres and cubes. Find it by SHAPE.",
+    "3. Level 17+: they become striped discs. Nineteen face the SAME way - ONE is rotated. Find it by its EDGES.",
+    "4. Level 33+: the stripes also FADE and the angle difference narrows. Hunt the edge, not the shape.",
+    "5. POINT at the odd one and pull the TRIGGER. Clicking a decoy counts against you.",
   ],
-  controlsHint: "POINT AT THE PYRAMID - PULL THE TRIGGER",
-  levels: levels50((i) => ({
-    label: `field of ${6 + Math.floor(i / 6)} — ${Math.round(lerp50(56, 20, i))}px`,
-    parameters: {
-      searches: 10, fieldSize: 6 + Math.floor(i / 6),
-      exposureMs: ilerp50(3000, 1250, i), gapMs: 1000,
-      scale: Math.max(0.024, lerp50(56, 20, i) * 0.0011),
-      spreadDeg: lerp50(12, 40, i),
-    },
-  })),
+  controlsHint: "FIND THE ODD ONE - POINT AND PULL THE TRIGGER",
+  levels: levels50((i) => {
+    const band = SS_BAND(i);
+    const ecc = Math.round(lerp50(19, 48, i));
+    const label =
+      band === "form"
+        ? `FORM - 20 items - ${ecc} deg field`
+        : band === "orientation"
+          ? `ORIENTATION - 20 items - ${ecc} deg field`
+          : `CONTRAST ${Math.round(lerp50(70, 8, (i - 32) * (49 / 17)))}% - ${ecc} deg field`;
+    return {
+      label,
+      parameters: {
+        searches: SS_TRIALS,
+        fieldSize: SS_FIELD,
+        band,
+        exposureMs: ilerp50(3400, 1500, i),
+        gapMs: 700,
+        // items shrink as the field widens — the two together are what makes it peripheral
+        scale: lerp50(0.062, 0.022, i),
+        /**
+         * 20 non-overlapping items impose a FLOOR on how central the field can be:
+         * a disc of angular radius t needs a field of roughly 4.7t to pack 20 of
+         * them, so with large early targets the field simply cannot be tighter than
+         * ~16deg without them fusing into a blob. The lever is therefore the TOP of
+         * the ladder, not the bottom — pushed to 48deg, which is genuinely
+         * peripheral and still well inside the headset's field of view.
+         */
+        eccDeg: lerp50(19, 48, i),
+        /**
+         * CONTRAST only becomes a difficulty axis in the top band. In the
+         * orientation band it stays high on purpose: we want to isolate ORIENTATION
+         * discrimination first, then load contrast on top of it. Moving both at once
+         * would leave us unable to say which one the athlete actually failed.
+         */
+        contrastPct: band === "contrast" ? lerp50(70, 8, (i - 32) * (49 / 17)) : 88,
+        /** how far the target's stripes are rotated from the crowd's */
+        angleDiff: band === "contrast" ? lerp50(90, 25, (i - 32) * (49 / 17)) : 90,
+        cycles: Math.round(lerp50(5, 8, i)),
+      },
+    };
+  }),
   buildTrials: (params, rng) => {
-    const p = params as { searches: number; fieldSize: number; exposureMs: number; gapMs: number; scale: number; spreadDeg: number };
+    const p = params as {
+      searches: number; fieldSize: number; band: "form" | "orientation" | "contrast";
+      exposureMs: number; gapMs: number; scale: number; eccDeg: number;
+      contrastPct: number; angleDiff: number; cycles: number;
+    };
     const decoyShapes = ["sphere", "box"] as const;
-    const SHAPE_COLOR = "#9FA8D6"; // one color for every shape — no highlight
+    const SHAPE_COLOR = "#9FA8D6"; // one colour for every shape — never a highlight
     const trials: TrialSpec[] = [];
     let t = 1200;
+
+    // the field radius that the level's eccentricity actually implies
+    const maxR = Math.tan((p.eccDeg * Math.PI) / 180) * Math.abs(SS_Z);
+    const minSep = p.scale * 2.2 + 0.012;
+
     for (let s = 0; s < p.searches; s++) {
       const groupId = `sps-g${s}`;
       const targetIdx = Math.floor(rng() * p.fieldSize);
-      // golden-angle spiral lattice: geometric guarantee that every shape in
-      // the field keeps clean strike separation, however dense the level
-      const maxR = 0.18 + (p.spreadDeg / 36) * 0.42;
-      const minSep = p.scale * 2.6 + 0.02;
+
+      /**
+       * The old version also clamped items to |x| < 0.88 and y in [0.98, 1.88],
+       * which silently capped eccentricity at roughly 20 degrees no matter what the
+       * level asked for. That clamp is why the drill never felt peripheral: the
+       * field was being folded back into the centre behind the designer's back.
+       *
+       * PACK 20 ITEMS WITHOUT EVER OVERLAPPING THEM.
+       *
+       * Two bugs lived here, and both produced a visually broken field:
+       *
+       *   1. r = maxR * sqrt(k/N) only stays inside maxR while k < N — but k is the
+       *      ATTEMPT counter. The moment the separation test rejected a candidate and
+       *      k ran past 20, the radius grew without bound and flung items clean
+       *      outside the intended field. The index now WRAPS.
+       *
+       *   2. When the spiral starved, the code fell back to placing the remaining
+       *      items at RANDOM — with no separation test at all. So the levels where
+       *      packing was hardest were exactly the levels that silently produced
+       *      overlapping, fused blobs. A fallback that violates the invariant the
+       *      main path exists to protect is worse than no fallback.
+       *
+       * Geometry does not negotiate: 20 discs of diameter d need a field of radius
+       * about 2.9d to pack into a flattened ellipse. If the level's eccentricity is
+       * tighter than that, the honest answer is to WIDEN THE FIELD, not to overlap
+       * the items — so the field grows until they fit, and they never fuse.
+       */
       const lattice: [number, number][] = [];
       const GA = Math.PI * (3 - Math.sqrt(5));
-      const spin = rng() * Math.PI * 2;
-      for (let k = 0; lattice.length < p.fieldSize && k < 80; k++) {
-        const r = maxR * Math.sqrt((k + 0.5) / p.fieldSize);
-        const a = spin + k * GA;
-        const px = Math.cos(a) * r * 1.15;
-        const py = 1.42 + Math.sin(a) * r * 0.75;
-        if (py < 0.98 || py > 1.88 || Math.abs(px) > 0.88) continue;
-        if (lattice.every(([qx, qy]) => Math.hypot(px - qx, py - qy) >= minSep)) lattice.push([px, py]);
+      let R = maxR;
+      for (let attempt = 0; attempt < 14 && lattice.length < p.fieldSize; attempt++) {
+        lattice.length = 0;
+        const spin = rng() * Math.PI * 2;
+        for (let k = 0; lattice.length < p.fieldSize && k < 600; k++) {
+          const idx = k % p.fieldSize;
+          const jitter = k < p.fieldSize ? 1 : 1 + (rng() - 0.5) * 0.18;
+          const r = Math.min(R, R * Math.sqrt((idx + 0.5) / p.fieldSize) * jitter);
+          const a = spin + k * GA;
+          const px = Math.cos(a) * r;
+          const py = 1.45 + Math.sin(a) * r * 0.72; // the eye scans wider than it scans tall
+          /**
+           * The vertical clip is a SIGHTLINE bound, not a taste call. Below y ~0.98
+           * a target sits more than ~28 degrees under the horizon, which is where the
+           * control dock lives — the athlete would be hunting a grating through a
+           * menu. The eye scans wider than it scans tall anyway, so the field is
+           * flattened rather than truncated, and it loses nothing.
+           */
+          if (py < 0.98 || py > 2.20) continue;
+          if (lattice.every(([qx, qy]) => Math.hypot(px - qx, py - qy) >= minSep)) lattice.push([px, py]);
+        }
+        if (lattice.length < p.fieldSize) R *= 1.1; // too tight for 20 of these — widen
       }
-      while (lattice.length < p.fieldSize) {
-        lattice.push([(rng() - 0.5) * 1.4, 1.1 + rng() * 0.7]);
-      }
-      // shuffle so the target's lattice slot is unpredictable
+
       for (let k = lattice.length - 1; k > 0; k--) {
         const j = Math.floor(rng() * (k + 1));
         [lattice[k], lattice[j]] = [lattice[j], lattice[k]];
       }
+
+      /**
+       * The crowd's orientation is RANDOM on every trial. If the decoys always ran
+       * vertical, the athlete would learn "look for the horizontal one" and stop
+       * searching altogether — we would be measuring memory, not search.
+       */
+      const baseAngle = Math.round(rng() * 180);
+      const targetAngle = (baseAngle + p.angleDiff) % 180;
+
       for (let i = 0; i < p.fieldSize; i++) {
-        const zone = pick(rng, PERIPHERAL_ZONES.concat(["center"]) as TargetZone[]);
         const isTarget = i === targetIdx;
-        const pos: [number, number, number] = [lattice[i][0] * 1.35, lattice[i][1], -1.25];
-        trials.push({
-          id: `${groupId}-${i}`,
-          spawnAt: t,
-          duration: p.exposureMs,
-          kind: isTarget ? "go" : "distractor",
-          zone,
-          position: pos,
-          color: SHAPE_COLOR,
-          emissive: SHAPE_COLOR, // identical fill for every shape — no target highlight
-          shape: isTarget ? "pyramid" : pick(rng, decoyShapes),
-          scale: p.scale,
-          groupId,
-        });
+        const pos: [number, number, number] = [lattice[i][0], lattice[i][1], SS_Z];
+        const zone: TargetZone =
+          Math.abs(lattice[i][0]) < 0.16 ? "center" : lattice[i][0] < 0 ? "left" : "right";
+
+        if (p.band === "form") {
+          trials.push({
+            id: `${groupId}-${i}`, spawnAt: t, duration: p.exposureMs,
+            kind: isTarget ? "go" : "distractor",
+            zone, position: pos,
+            color: SHAPE_COLOR, emissive: SHAPE_COLOR, // identical fill — no highlight
+            shape: isTarget ? "pyramid" : pick(rng, decoyShapes),
+            scale: p.scale,
+            groupId,
+          });
+        } else {
+          // ORIENTATION / CONTRAST band — grating discs. No form cue, no colour cue.
+          // The ONLY thing that separates the target from the crowd is its edges.
+          trials.push({
+            id: `${groupId}-${i}`, spawnAt: t, duration: p.exposureMs,
+            kind: isTarget ? "go" : "distractor",
+            zone, position: pos,
+            color: "#808080",
+            shape: "grating",
+            scale: p.scale,
+            grating: {
+              contrastPct: p.contrastPct,
+              cycles: p.cycles,
+              angleDeg: isTarget ? targetAngle : baseAngle,
+              seed: 300 + s * 31 + i,
+            },
+            groupId,
+          });
+        }
       }
       t += p.exposureMs + p.gapMs;
     }
     return trials;
+  },
+  analyze: (events) => {
+    const scored = events.filter((e) => e.trialId.startsWith("sps-") && e.errorType !== "correctRejection");
+    if (!scored.length) return [];
+    const acc = Math.round((scored.filter((e) => e.correct).length / scored.length) * 1000) / 10;
+    const rts = scored.filter((e) => e.correct && e.reactionMs !== undefined).map((e) => e.reactionMs!);
+    const avg = rts.length ? Math.round(rts.reduce((a, b) => a + b, 0) / rts.length) : 0;
+    return [
+      `${acc}% found across 20 searches of a 20-item field, ${avg}ms mean search time.`,
+      "Set size is held at 20 at every level, so search times are directly comparable across the ladder.",
+    ];
   },
   durationMs: (params) => {
     const p = params as { searches: number; exposureMs: number; gapMs: number };
@@ -111,7 +258,13 @@ export const SpeedSearch: DrillDefinition = {
 // number and click the trigger in ascending order. Trial-paced (5 grids per
 // level) — each grid stays until completed, then the next appears. Grids grow
 // 3x3 -> 7x7 across the ladder; boxes shrink and spread wider each level.
-const SCHULTE_Z = -1.5; // pointer distance — you aim, you don't reach
+/**
+ * The grid sat at -1.5 and the HUD panel at -1.75 — so the grid was rendering
+ * literally IN FRONT OF the menu, and the athlete was reading numbers through a
+ * scoreboard. Pushed 20% back, which also gives the pointer ray a longer, steadier
+ * lever arm for the small cells at the top of the ladder.
+ */
+const SCHULTE_Z = -1.8; // pointer distance — you aim, you don't reach
 const SCHULTE_GRIDS = 5;
 
 export const SchulteTable: DrillDefinition = {
