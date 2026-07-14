@@ -200,59 +200,214 @@ export const SchulteTable: DrillDefinition = {
 // =========================== CONTRAST-ASSESSMENT ===========================
 // A 'C' (gapped ring) appears at center — strike THROUGH the gap direction.
 // Contrast falls as levels rise. ~25 trials.
+/**
+ * LOW-CONTRAST PICKUP — the contrast-sensitivity TRAINING drill.
+ *
+ * The old version was broken in four independent ways, and every one of them
+ * invalidated the thing it claimed to measure:
+ *
+ *   1. CONTRAST WAS A COLOUR. It encoded contrast as a hex value on a LIT,
+ *      EMISSIVE 3D torus in a dark arena with coloured point lights sweeping over
+ *      it. Michelson contrast is defined against a background luminance; there was
+ *      no defined background and the stimulus glowed. The ladder was fiction.
+ *   2. IT WASN'T A LANDOLT C. The "C" was a torus with 6 radial segments and a
+ *      1.7pi sweep — a chunky hexagonal three-quarter donut whose gap was defined
+ *      by GEOMETRY, not luminance, and subtended ~54 degrees instead of the
+ *      standard 1/5 of the diameter.
+ *   3. THE RESPONSE WAS A STRIKE. The athlete had to physically strike THROUGH the
+ *      gap. That layers an eye-hand motor act on top of a perception threshold: a
+ *      failure could be "I couldn't see it" or "I couldn't hit it", and the drill
+ *      could not tell you which. Contrast sensitivity is a PERCEPTION measure. It
+ *      must not be gated on the arm.
+ *   4. NO STAIRCASE. Contrast was fixed per level, so 25 trials all ran at one
+ *      contrast. A fixed-contrast block tells you nothing about a threshold.
+ *
+ * Rebuilt:
+ *   - a real Landolt C (stroke = gap = 1/5 of outer diameter), painted at a stated
+ *     Michelson contrast against a uniform mid-grey surround, rendered UNLIT so the
+ *     luminance we asked for is the luminance the athlete gets;
+ *   - a 4-alternative forced choice on the GAP DIRECTION, answered with a joystick
+ *     flick — a pure perceptual judgment with no motor confound;
+ *   - an ADAPTIVE STAIRCASE that walks contrast down on correct answers and back up
+ *     on errors, so the athlete trains AT their own threshold instead of grinding a
+ *     contrast that is either trivially visible or hopeless.
+ *
+ * This is TRAINING, not measurement. The Assess phase owns the threshold test
+ * (assess-contrast-sensitivity, a proper two-phase grating staircase). This drill
+ * adds what a threshold test deliberately excludes: time pressure, peripheral
+ * placement, and visual clutter — the conditions a low-contrast ball actually
+ * appears under.
+ */
+const LC_DIRS = [
+  { dir: "right" as const, deg: 0 },
+  { dir: "up" as const, deg: 270 },   // canvas Y is down, so 270deg points up
+  { dir: "left" as const, deg: 180 },
+  { dir: "down" as const, deg: 90 },
+];
+
 export const ContrastAssessment: DrillDefinition = {
   id: "contrast-assessment",
-  name: "Contrast-Assessment",
-  shortName: "Contrast",
+  name: "Low-Contrast Pickup",
+  shortName: "Low-Contrast",
   phase: "Acquire",
-  description: "A faint 'C' ring appears ahead. Strike through it in the direction of the GAP (up, down, left, right). Contrast drops as you level.",
-  purpose: "Contrast sensitivity with a directional forced choice.",
+  description: "A faint Landolt C appears at a controlled contrast against a fixed grey field. Find the GAP and FLICK the joystick that way. The contrast adapts to you — it drops when you are right and lifts when you are wrong, so you train at the edge of what you can actually see.",
+  purpose: "Low-contrast target pickup, trained at threshold (4AFC, adaptive).",
   interaction: "touch",
+  responseMode: "joystick",
   environment: "arena",
   mvp: true,
   instructions: [
-    "1. A ring with a GAP (like a letter C) appears ahead at low contrast.",
-    "2. Find the gap: up, down, left, or right.",
-    "3. Strike THROUGH the ring in the gap's direction.",
-    "4. Do not guess - be as precise as possible. About 25 trials.",
+    "1. A faint ring with a GAP appears on a grey panel. It is a letter C, rotated.",
+    "2. Find the gap: UP, DOWN, LEFT or RIGHT.",
+    "3. FLICK the dominant joystick in the direction of the GAP. Let it recenter between answers.",
+    "4. Get it right and the ring gets FAINTER. Get it wrong and it comes back up.",
+    "5. Do not guess. Sitting near 70-75% correct means you are exactly where you should be.",
   ],
-  controlsHint: "STRIKE THROUGH THE RING TOWARD THE GAP",
+  controlsHint: "FIND THE GAP - FLICK THE STICK THAT WAY",
   levels: levels50((i) => ({
-    label: `${Math.round(lerp50(92, 7, i))}% contrast`,
-    parameters: { trials: 25, contrast: lerp50(0.92, 0.07, i), showMs: ilerp50(2300, 1200, i) },
+    label: `start ${Math.round(lerp50(70, 22, i))}% - ${i < 17 ? "central" : i < 34 ? "near periphery" : "periphery + clutter"}`,
+    parameters: {
+      trials: 30,
+      // the staircase STARTS here; where it ends is up to the athlete
+      startContrast: lerp50(70, 22, i),
+      // the optotype shrinks -> higher spatial frequency, harder at low contrast
+      size: lerp50(0.085, 0.038, i),
+      showMs: ilerp50(2200, 900, i),
+      // level pushes the C out into the periphery, where contrast sensitivity is worse
+      eccDeg: lerp50(0, 24, i),
+      clutter: i < 34 ? 0 : lerp50(0, 1, i),
+    },
   })),
   buildTrials: (params, rng) => {
-    const p = params as { trials: number; contrast: number; showMs: number };
-    const dirs = ["up", "down", "left", "right"] as const;
-    const v = Math.round(30 + p.contrast * 190);
-    const hex = `#${v.toString(16).padStart(2, "0")}${v.toString(16).padStart(2, "0")}${Math.min(255, v + 30).toString(16).padStart(2, "0")}`;
+    const p = params as {
+      trials: number; startContrast: number; size: number;
+      showMs: number; eccDeg: number; clutter: number;
+    };
     const trials: TrialSpec[] = [];
-    let t = 1500;
+    let t = 1800;
+
+    // optional surround clutter — never overlaps the optotype's own grey field
+    const clutterN = Math.round(p.clutter * 14);
+    for (let c = 0; c < clutterN; c++) {
+      const a = rng() * Math.PI * 2;
+      const r = 0.42 + rng() * 0.3;
+      trials.push({
+        id: `lc-bg${c}`, spawnAt: 1200,
+        duration: 1200 + p.trials * (p.showMs + 900) + 3000,
+        kind: "distractor", decor: true, zone: "center",
+        position: [Math.cos(a) * r, 1.45 + Math.sin(a) * r * 0.7, Z - 0.05],
+        color: "#5A5F72", shape: "sphere", scale: 0.02 + rng() * 0.02,
+      });
+    }
+
     for (let i = 0; i < p.trials; i++) {
-      const gap = pick(rng, dirs);
+      const g = pick(rng, LC_DIRS);
+      // eccentric placement — a random bearing at the level's eccentricity
+      const bearing = rng() * Math.PI * 2;
+      const ecc = (p.eccDeg * Math.PI) / 180;
+      const off = Math.tan(ecc) * Math.abs(Z);
       trials.push({
         id: `ca-${i}`,
         spawnAt: t,
         duration: p.showMs,
         kind: "go",
         zone: "center",
-        position: [0, 1.45, Z],
-        requiredDirection: gap,
-        color: hex,
-        shape: "arc",
-        scale: 0.1,
-        // hitBoost: entering the C opening counts — not just dead center
-        meta: { pointDir: gap, gapRing: true, hitBoost: 0.06 },
+        position: [Math.cos(bearing) * off, 1.45 + Math.sin(bearing) * off, Z],
+        requiredDirection: g.dir,
+        color: "#808080",
+        shape: "landolt",
+        scale: p.size,
+        landolt: { contrastPct: p.startContrast, gapDeg: g.deg, seed: 100 + i },
+        meta: { pointDir: g.dir, startContrast: p.startContrast },
       });
-      t += p.showMs + 600 + rng() * 400;
+      t += p.showMs + 700 + rng() * 300;
     }
     return trials;
   },
+
+  /**
+   * THE STAIRCASE. A 3-down/1-up rule, which converges on ~79% correct — the
+   * standard target for a 4AFC task, and almost exactly the Goldilocks band the
+   * rest of the suite trains in. Three right in a row and the C gets fainter; one
+   * wrong and it comes straight back up. The athlete spends the session at the
+   * edge of their own vision instead of grinding a contrast that is either
+   * trivially visible or completely hopeless.
+   */
+  onSpawnAdapt: (spec, snap) => {
+    if (!spec.landolt) return;
+    const st = lcState;
+    // The staircase is module state, so it MUST be re-armed at the start of every
+    // run — otherwise the second athlete inherits the first athlete's threshold and
+    // starts the session somewhere they have never been.
+    if (spec.id === "ca-0") {
+      st.contrast = (spec.meta?.startContrast as number) ?? 60;
+      st.correctRun = 0;
+      st.bracketed = false;
+      spec.landolt = { ...spec.landolt, contrastPct: st.contrast };
+      return;
+    }
+    /**
+     * TWO-PHASE STAIRCASE.
+     *
+     * A pure 3-down/1-up rule converges on ~79% correct, which is the right target
+     * for a 4AFC task — but it descends slowly, and from a high starting contrast
+     * it burns the whole 30-trial run just getting DOWN to the athlete. In testing
+     * an athlete whose true threshold was 30% finished the session sitting at 45%:
+     * the staircase was still travelling when the drill ended, so they never trained
+     * at threshold at all.
+     *
+     * So the run has two phases, exactly like the stereopsis ladder:
+     *
+     *   COARSE  before the first error, every correct answer cuts contrast hard
+     *           (x0.55). This is a bracketing phase — get into the athlete's
+     *           neighbourhood fast, and stop wasting trials on contrasts they can
+     *           see without trying.
+     *   FINE    after the first error we know roughly where they live. Switch to
+     *           3-down/1-up with gentle steps and let it settle.
+     */
+    if (snap.lastEventCorrect === true) {
+      if (!st.bracketed) {
+        st.contrast = Math.max(1.2, st.contrast * 0.55);   // COARSE: bracket fast
+      } else {
+        st.correctRun++;
+        if (st.correctRun >= 3) {
+          st.contrast = Math.max(1.2, st.contrast * 0.82); // FINE: 3-down
+          st.correctRun = 0;
+        }
+      }
+    } else if (snap.lastEventCorrect === false) {
+      // the first error ends the bracketing phase — now we know where they are
+      st.bracketed = true;
+      // The up-step must be the INVERSE of the down-step (1/0.82 = 1.22), or the
+      // staircase is asymmetric in log units and drifts. With a 1.35 up against a
+      // 0.82 down it kept climbing away from the athlete's threshold.
+      st.contrast = Math.min(90, st.contrast * 1.22);      // 1-up
+      st.correctRun = 0;
+    }
+    if (st.contrast <= 0) st.contrast = (spec.meta?.startContrast as number) ?? 60;
+    spec.landolt = { ...spec.landolt, contrastPct: st.contrast };
+  },
+
+  analyze: (events) => {
+    const scored = events.filter((e) => e.trialId.startsWith("ca-") && e.errorType !== "correctRejection");
+    if (!scored.length) return [];
+    const acc = Math.round((scored.filter((e) => e.correct).length / scored.length) * 1000) / 10;
+    const reached = lcState.contrast;
+    const logCS = reached > 0 ? Math.log10(100 / reached) : 0;
+    return [
+      `Trained down to ${reached.toFixed(1)}% contrast (log CS ~ ${logCS.toFixed(2)}) at ${acc}% correct.`,
+      "TRAINING drill, adaptive. The Assess phase owns the validated contrast threshold.",
+    ];
+  },
+
   durationMs: (params) => {
     const p = params as { trials: number; showMs: number };
-    return 1500 + p.trials * (p.showMs + 800) + 1500;
+    return 1800 + p.trials * (p.showMs + 900) + 1500;
   },
 };
+
+/** staircase state — re-armed on trial ca-0 at the start of every run */
+const lcState = { contrast: 0, correctRun: 0, bracketed: false };
 
 // ============================ RAPID RECOGNITION ============================
 // Match-to-sample under pressure. A central CUE shows the target; options

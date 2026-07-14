@@ -199,3 +199,71 @@ export function makeRDSTexture(seed: number): THREE.CanvasTexture {
   cache.set(key, tex);
   return tex;
 }
+
+
+/**
+ * LANDOLT C — a REAL one, at a REAL contrast.
+ *
+ * The old contrast drill encoded "contrast" as a hex colour on a lit, emissive
+ * 3D torus floating in a dark arena with coloured point lights sweeping across
+ * it. Michelson contrast is defined against a background luminance; there was no
+ * defined background, and the stimulus glowed. The 92%-to-7% ladder was fiction —
+ * the actual retinal contrast depended on where the athlete happened to be looking
+ * and which arena light was passing overhead.
+ *
+ * This draws the optotype the way it is drawn in every clinical chart: a ring whose
+ * stroke and gap are each exactly 1/5 of the outer diameter, painted at a specified
+ * Michelson contrast against a MID-GREY field, on a canvas. It is rendered with an
+ * UNLIT material so the pixel luminance the athlete sees is exactly the luminance we
+ * asked for — no lighting, no emission, no tone mapping.
+ *
+ *   Michelson C = (Lmax - Lmin) / (Lmax + Lmin), around a mean of 128.
+ */
+export function makeLandoltTexture(
+  contrastPct: number,
+  gapDeg: number,
+  seed: number,
+): THREE.CanvasTexture {
+  const key = `lc-${contrastPct.toFixed(2)}-${gapDeg}-${seed}`;
+  const hit = cache.get(key);
+  if (hit) return hit;
+
+  const S = 256;
+  const cv = document.createElement("canvas");
+  cv.width = S;
+  cv.height = S;
+  const g = cv.getContext("2d")!;
+
+  const MEAN = 128;
+  const amp = (Math.max(0, Math.min(100, contrastPct)) / 100) * MEAN;
+  const bg = MEAN + amp;   // light surround
+  const ink = MEAN - amp;  // dark optotype — the pair straddles the mean exactly
+
+  // the controlled background IS the stimulus surround. It must be uniform.
+  g.fillStyle = `rgb(${bg | 0},${bg | 0},${bg | 0})`;
+  g.fillRect(0, 0, S, S);
+
+  // Landolt proportions: outer diameter D, stroke D/5, gap D/5.
+  const D = S * 0.62;
+  const stroke = D / 5;
+  const R = (D - stroke) / 2;
+  const cx = S / 2, cy = S / 2;
+  // the gap subtends the stroke width at the ring radius
+  const gapRad = stroke / R;
+  const a0 = (gapDeg * Math.PI) / 180 - gapRad / 2;
+  const a1 = (gapDeg * Math.PI) / 180 + gapRad / 2;
+
+  g.strokeStyle = `rgb(${ink | 0},${ink | 0},${ink | 0})`;
+  g.lineWidth = stroke;
+  g.beginPath();
+  g.arc(cx, cy, R, a1, a0 + Math.PI * 2);
+  g.stroke();
+
+  const tex = new THREE.CanvasTexture(cv);
+  tex.needsUpdate = true;
+  tex.minFilter = THREE.LinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.generateMipmaps = false;
+  cache.set(key, tex);
+  return tex;
+}

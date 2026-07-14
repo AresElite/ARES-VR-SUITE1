@@ -15,7 +15,7 @@ export type TargetZone =
 export type TargetKind = "go" | "noGo" | "distractor";
 export type HandRule = "left" | "right" | "either" | "both";
 export type Hand = "left" | "right" | "both" | "unknown";
-export type TargetShape = "sphere" | "box" | "diamond" | "ring" | "cone" | "pyramid" | "arc" | "pad" | "plate" | "stereo" | "grating" | "arrow" | "line";
+export type TargetShape = "sphere" | "box" | "diamond" | "ring" | "cone" | "pyramid" | "arc" | "pad" | "plate" | "stereo" | "grating" | "arrow" | "line" | "landolt";
 
 export type SliceDirection =
   | "up"
@@ -76,6 +76,8 @@ export interface TrialSpec {
   stereoShiftM?: number;
   /** grating disc spec (shape "grating"): Michelson contrast %, cycles, angle */
   grating?: { contrastPct: number; cycles: number; angleDeg: number; seed: number };
+  /** Landolt-C spec (shape "landolt"): Michelson contrast %, gap bearing in degrees */
+  landolt?: { contrastPct: number; gapDeg: number; seed: number };
   /** ms from drill start at which this target's kind flips (late cue change) */
   switchKindAt?: number;
   switchKindTo?: TargetKind;

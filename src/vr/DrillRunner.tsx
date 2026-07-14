@@ -12,7 +12,7 @@ import { STRIKE_TOLERANCE_M } from "@/drills/shared/DrillEngine";
 import { handFromPointerEvent, sliceDirectionFromDelta } from "@/drills/shared/InputMapper";
 import type { PoolSlot } from "@/drills/shared/TargetSpawner";
 import { PERF_MODES } from "@/utils/performance";
-import { makeGratingTexture, makePlateTexture, makeRDSTexture } from "@/utils/platePainter";
+import { makeGratingTexture, makeLandoltTexture, makePlateTexture, makeRDSTexture } from "@/utils/platePainter";
 import { sfx } from "@/utils/audio";
 import { rhythmMusic } from "@/perform/rhythmMusic";
 import { headMotion } from "./headMotion";
@@ -482,6 +482,40 @@ function TargetMesh({
         <mesh position={[0, 0, -0.005]}>
           <ringGeometry args={[spec.scale, spec.scale * 1.06, 40]} />
           <meshBasicMaterial color="#2D234F" />
+        </mesh>
+      </group>
+    );
+  }
+
+  /**
+   * LANDOLT C — the low-contrast optotype.
+   *
+   * Rendered with meshBasicMaterial: UNLIT, no emission, no tone mapping. The pixel
+   * luminance the athlete sees is exactly the luminance the painter specified, which
+   * is the only way a stated Michelson contrast means anything. The old version used
+   * a lit, emissive 3D torus, so the arena's moving purple and teal point lights were
+   * silently modulating the very quantity the drill claimed to be measuring.
+   *
+   * The optotype is backed by a larger UNIFORM MID-GREY surround at the same mean
+   * luminance, so the stimulus sits in a defined field rather than against whatever
+   * happens to be behind it in the arena.
+   */
+  if (spec.shape === "landolt" && spec.landolt) {
+    const lc = spec.landolt;
+    return (
+      <group ref={group} position={spec.position} key={version}>
+        {/* controlled surround — defines the background luminance */}
+        <mesh position={[0, 0, -0.006]}>
+          <planeGeometry args={[spec.scale * 4.2, spec.scale * 4.2]} />
+          <meshBasicMaterial color="#808080" toneMapped={false} />
+        </mesh>
+        <mesh onClick={onHitProxy(spec, engine, desktopClicks && !isDecor)}>
+          <planeGeometry args={[spec.scale * 2, spec.scale * 2]} />
+          <meshBasicMaterial
+            map={makeLandoltTexture(lc.contrastPct, lc.gapDeg, lc.seed)}
+            toneMapped={false}
+            transparent={false}
+          />
         </mesh>
       </group>
     );
