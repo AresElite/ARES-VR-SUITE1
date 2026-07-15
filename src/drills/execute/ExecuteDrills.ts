@@ -11,6 +11,7 @@ import { levels25, lerp25, ilerp25, levels50, lerp50, ilerp50 } from "../shared/
  * physical strike with hand/controller in VR.
  */
 
+import { LAUNCH_Z, holeCount, sizeSawtooth, launchVelocity, travelMsFor, holeMarkers, pickHole } from "./launcher";
 const TEAL = "#2998AA";
 const BLUE = "#7FD3DE";
 const ORANGE = "#007A8A";
@@ -304,8 +305,6 @@ export const EyeHandCoordination: DrillDefinition = {
 // A ball is SHOT from the central launcher toward the athlete after a random
 // delay. Response = index-trigger CLICK (either hand) the instant it fires.
 // 25 trials at every level; full RT metric set on the results panel.
-const LAUNCH_Z = -6;
-
 export const RawReaction: DrillDefinition = {
   id: "raw-reaction",
   name: "Raw-Reaction",
@@ -326,42 +325,43 @@ export const RawReaction: DrillDefinition = {
   ],
   controlsHint: "CLICK THE TRIGGER THE INSTANT THE BALL FIRES",
   levels: levels50((i) => ({
-    label: `${(lerp50(6, 14, i)).toFixed(1)} m/s launches, delays up to ${(ilerp50(1400, 3400, i) / 1000).toFixed(1)}s`,
+    label: `${holeCount(i + 1)} hole${holeCount(i + 1) > 1 ? "s" : ""} · ${(lerp50(6, 14, i)).toFixed(1)} m/s · delays up to ${(ilerp50(1400, 3400, i) / 1000).toFixed(1)}s`,
     parameters: {
+      level: i + 1,
       trials: 25,
       speed: lerp50(6, 14, i),
       minDelay: 600,
       maxDelay: ilerp50(1400, 3400, i),
-      size: lerp50(0.09, 0.05, i),
     },
   })),
   buildTrials: (params, rng) => {
-    const p = params as { trials: number; speed: number; minDelay: number; maxDelay: number; size: number };
-    const travelMs = (Math.abs(LAUNCH_Z) / p.speed) * 1000;
+    const p = params as { level: number; trials: number; speed: number; minDelay: number; maxDelay: number };
+    const size = sizeSawtooth(p.level);
     const trials: TrialSpec[] = [];
     let t = 1500;
     for (let i = 0; i < p.trials; i++) {
       t += p.minDelay + rng() * (p.maxDelay - p.minDelay);
+      const hole = pickHole(p.level, rng);
+      const travelMs = travelMsFor(hole, p.speed);
       trials.push({
         id: `rr-${i}`,
         spawnAt: t,
         duration: travelMs + 250,
         kind: "go",
         zone: "center",
-        position: [0, 1.45, LAUNCH_Z],
-        velocity: [(rng() - 0.5) * 0.3, (rng() - 0.5) * 0.2, p.speed],
-        color: TEAL,
-        emissive: TEAL,
-        shape: "sphere",
-        scale: p.size,
+        position: [hole[0], hole[1], LAUNCH_Z],
+        velocity: launchVelocity(hole, p.speed),
+        color: TEAL, emissive: TEAL, shape: "sphere", scale: size,
       });
       t += travelMs + 400;
     }
+    // mark every active hole so the athlete sees where shots can come from
+    trials.push(...holeMarkers(p.level, t + 1500, "rr"));
     return trials;
   },
   durationMs: (params) => {
     const p = params as { trials: number; speed: number; maxDelay: number };
-    const travelMs = (Math.abs(LAUNCH_Z) / p.speed) * 1000;
+    const travelMs = (Math.abs(LAUNCH_Z) / p.speed) * 1000 * 1.4; // side holes are farther
     return 1500 + p.trials * (p.maxDelay + travelMs + 650) + 1500;
   },
 };
@@ -390,18 +390,18 @@ export const ChoiceRT: DrillDefinition = {
   ],
   controlsHint: "PURPLE = RIGHT TRIGGER - TEAL = LEFT TRIGGER",
   levels: levels50((i) => ({
-    label: `${(lerp50(5.5, 13, i)).toFixed(1)} m/s launches, delays up to ${(ilerp50(1500, 3400, i) / 1000).toFixed(1)}s`,
+    label: `${holeCount(i + 1)} hole${holeCount(i + 1) > 1 ? "s" : ""} · ${(lerp50(5.5, 13, i)).toFixed(1)} m/s · delays up to ${(ilerp50(1500, 3400, i) / 1000).toFixed(1)}s`,
     parameters: {
+      level: i + 1,
       trials: 24, // rep limit per athlete feedback — 50+ ran way too long
       speed: lerp50(5.5, 13, i),
       minDelay: 600,
       maxDelay: ilerp50(1500, 3400, i),
-      size: lerp50(0.09, 0.05, i),
     },
   })),
   buildTrials: (params, rng) => {
-    const p = params as { trials: number; speed: number; minDelay: number; maxDelay: number; size: number };
-    const travelMs = (Math.abs(LAUNCH_Z) / p.speed) * 1000;
+    const p = params as { level: number; trials: number; speed: number; minDelay: number; maxDelay: number };
+    const size = sizeSawtooth(p.level);
     const deck = Array.from({ length: p.trials }, (_, k) => k % 2 === 0);
     for (let k = deck.length - 1; k > 0; k--) {
       const j = Math.floor(rng() * (k + 1));
@@ -412,27 +412,29 @@ export const ChoiceRT: DrillDefinition = {
     for (let i = 0; i < p.trials; i++) {
       t += p.minDelay + rng() * (p.maxDelay - p.minDelay);
       const isPurple = deck[i];
+      const hole = pickHole(p.level, rng);
+      const travelMs = travelMsFor(hole, p.speed);
       trials.push({
         id: `crt-${i}`,
         spawnAt: t,
         duration: travelMs + 250,
         kind: "go",
         zone: "center",
-        position: [0, 1.45, LAUNCH_Z],
-        velocity: [(rng() - 0.5) * 0.3, (rng() - 0.5) * 0.2, p.speed],
+        position: [hole[0], hole[1], LAUNCH_Z],
+        velocity: launchVelocity(hole, p.speed),
         requiredHand: isPurple ? "right" : "left",
         color: isPurple ? PURPLE : TEAL,
         emissive: isPurple ? PURPLE : TEAL,
-        shape: "sphere",
-        scale: p.size,
+        shape: "sphere", scale: size,
       });
       t += travelMs + 400;
     }
+    trials.push(...holeMarkers(p.level, t + 1500, "crt"));
     return trials;
   },
   durationMs: (params) => {
     const p = params as { trials: number; speed: number; maxDelay: number };
-    const travelMs = (Math.abs(LAUNCH_Z) / p.speed) * 1000;
+    const travelMs = (Math.abs(LAUNCH_Z) / p.speed) * 1000 * 1.4;
     return 1500 + p.trials * (p.maxDelay + travelMs + 650) + 1500;
   },
 };

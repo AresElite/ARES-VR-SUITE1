@@ -4,7 +4,7 @@ import { ffLevel } from "../src/drills/execute/FocusFrenzyVR";
 
 const mul = (a: number) => () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 const d = ALL_DRILLS.find((x) => x.id === "focus-frenzy")!;
-const HALF_W = 0.66, HALF_H = 0.44, EYE_Y = 1.5;
+const HALF_W = 0.34, HALF_H = 0.30, EYE_Y = 1.5, MAX_REACH = 0.82;
 let fails = 0;
 const ok = (c: boolean, m: string) => { console.log(`${c ? "  PASS" : "  FAIL"}  ${m}`); if (!c) fails++; };
 const st = (e: DrillEngine) => (e as unknown as { state: string }).state;
@@ -59,6 +59,27 @@ console.log("\nMOVEMENT — orbs stay inside the invisible box.");
     if (st(e) === "complete") break;
   }
   ok(worstWall < 0.01, `orbs stay in the box (worst wall overshoot ${(worstWall * 1000).toFixed(1)}mm)`);
+}
+
+console.log("\nREACH — every orb, original or replacement, stays within arm's reach.");
+{
+  for (const lvl of [1, 50, 100]) {
+    const trials = d.buildTrials({ level: lvl }, mul(lvl * 3));
+    const e = new DrillEngine(d, { level: lvl }, trials, 40);
+    e.start(); e.update(3100);
+    let worstReach = 0;
+    for (let i = 0; i < 600; i++) {
+      e.update(16);
+      if (st(e) === "complete") break;
+      const now = (e as unknown as { timing: { now: number } }).timing.now;
+      for (const sl of e.pool.slots) {
+        if (!sl.active || !sl.spec?.physics) continue;
+        worstReach = Math.max(worstReach, Math.hypot(sl.pos[0], sl.pos[1] - EYE_Y, sl.pos[2]));
+        if (now - sl.spawnClock > 40) e.registerHit(sl.spec.id, "right", undefined, 0.0, 0.9);
+      }
+    }
+    ok(worstReach <= MAX_REACH, `L${lvl}: farthest orb was ${(worstReach * 1000).toFixed(0)}mm out (limit ${MAX_REACH * 1000}mm)`);
+  }
 }
 
 console.log("\nSCORING — a fast striker clears many and survives longer than a passive one.");

@@ -54,55 +54,68 @@ console.log("\nCOGNITIVE CROSSFIRE — the trigger must NEVER resolve a peripher
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-console.log("\nGO / NO-GO — a masked target must still be answerable AFTER it vanishes.");
+console.log("\nGO / NO-GO — a launcher drill: balls fire from holes; trigger on go, hold on purple.");
 {
   const d = D("go-no-go");
+  ok(d.responseMode === "trigger" && (d as { launcher?: boolean }).launcher === true, "Go/No-Go is a launcher/trigger drill");
   for (const lvl of [1, 8, 17, 30, 41, 50]) {
     const L = GNG_LEVELS[lvl - 1];
     const trials = d.buildTrials({ level: lvl }, mulberry(lvl * 31));
-    const t0 = trials[0];
-    const gone = (L.briefOnset ?? Infinity) + (L.mask ? L.maskDur : 0);
-    const answerWindow = t0.duration - (Number.isFinite(gone) ? gone : 0);
-    ok(trials.length === 50, `L${lvl} (${L.family}): 50 trials`);
-    ok(answerWindow > 250, `L${lvl}: ${Math.round(answerWindow)}ms of answerable time after the mask clears`);
-    // NOTE: the source sets peripheral:true on L5-8 but spatial:false, so the flag is inert
-    // there and the target stays central. Ported faithfully — see the message to Joe.
-    if (L.spatial && L.peripheral) {
-      const ecc = trials.map((t) => Math.hypot(t.position[0], t.position[1] - 1.5));
-      const minDeg = (Math.atan2(Math.min(...ecc), 1.6) * 180) / Math.PI;
-      ok(minDeg >= 10, `L${lvl}: nearest target sits at ${minDeg.toFixed(1)}deg — genuinely peripheral`);
-    }
+    const shots = trials.filter((t) => t.id.startsWith("gng-") && !t.id.includes("hole"));
+    ok(shots.length === 50, `L${lvl} (${L.family}): 50 shots`);
+    // balls fire from a hole downfield and fly toward the athlete
+    ok(shots.every((t) => t.position[2] <= -5.5 && (t.velocity?.[2] ?? 0) > 0), `L${lvl}: every ball fires from a hole and flies at the athlete`);
+    // holes: one per five-level band
+    const holes = new Set(shots.map((t) => `${t.position[0].toFixed(2)},${t.position[1].toFixed(2)}`));
+    const expected = Math.min(10, Math.ceil(lvl / 5));
+    ok(holes.size === expected, `L${lvl}: shots come from ${holes.size} hole(s) (expected ${expected})`);
+    // hole markers rendered
+    ok(trials.filter((t) => t.id.includes("-hole")).length === expected, `L${lvl}: ${expected} hole marker(s) drawn`);
   }
-  // Go/No-Go balance and the inhibition path
+
+  // balance + inhibition via the TRIGGER path
   const trials = d.buildTrials({ level: 45 }, mulberry(3));
   const noGo = trials.filter((t) => t.kind === "noGo").length;
-  ok(noGo >= 10 && noGo <= 28, `L45: ${noGo}/50 NO-GO trials (~38% expected)`);
-  const e = new DrillEngine(d, { level: 45 }, trials, 8);
+  ok(noGo >= 10 && noGo <= 28, `L45: ${noGo}/50 NO-GO shots (~38% expected)`);
+  const e = new DrillEngine(d, { level: 45 }, trials, 64);
   e.start(); e.update(3100);
-  for (let t = 0; t < 200_000; t += 20) e.update(20);   // respond to NOTHING
+  for (let t = 0; t < 300_000; t += 20) e.update(20);   // pull NOTHING
   const ev = e.getEvents();
   const cr = ev.filter((x) => x.errorType === "correctRejection").length;
-  ok(cr === noGo, `withholding on every trial scores ${cr}/${noGo} correct rejections`);
+  ok(cr === noGo, `withholding lets every purple pass as a correct rejection (${cr}/${noGo})`);
 
-  /**
-   * d' MUST FALL when the athlete stops discriminating. This is the check that catches a
-   * mislabelled errorType: if the false-alarm filter never matches, faRate stays at floor and
-   * d' comes back HIGH for an athlete who pressed everything — a perfect score for a strategy
-   * that involves no perception at all.
-   */
+  // a live shooter: pull the trigger only for GO balls, hold on purple -> all correct
+  {
+    const t2 = d.buildTrials({ level: 22 }, mulberry(8));
+    const e2 = new DrillEngine(d, { level: 22 }, t2, 64);
+    e2.start(); e2.update(3100);
+    const done = new Set<string>();
+    for (let t = 0; t < 300_000; t += 20) {
+      e2.update(20);
+      for (const sl of e2.pool.slots) {
+        if (!sl.active || !sl.spec || sl.spec.decor || done.has(sl.spec.id)) continue;
+        if (sl.spec.kind === "go") { done.add(sl.spec.id); e2.registerTriggerResponse("right"); }
+      }
+    }
+    const goEv = e2.getEvents().filter((x) => x.trialId.startsWith("gng-"));
+    const goHits = goEv.filter((x) => x.correct && x.errorType !== "correctRejection").length;
+    const goCount = t2.filter((t) => t.kind === "go").length;
+    ok(goHits === goCount, `every GO ball was fired on and scored (${goHits}/${goCount})`);
+    ok(!goEv.some((x) => x.errorType === "noGoFailure"), "no purple ball was ever fired on");
+  }
+
   const notes = d.analyze!(ev)!;
   const dWithheld = Number(/d' = (-?[\d.]+)/.exec(notes.join(" "))![1]);
 
+  // press EVERYTHING -> d' must collapse
   const t2 = d.buildTrials({ level: 45 }, mulberry(3));
-  const e2 = new DrillEngine(d, { level: 45 }, t2, 8);
-  e2.start(); e2.update(3100);
-  for (let t = 0; t < 200_000; t += 20) {
-    e2.update(20);
-    for (const s of e2.pool.slots) {
-      if (s.active && s.spec && !s.spec.decor) e2.registerHit(s.spec.id, "right");  // press EVERYTHING
-    }
+  const e3 = new DrillEngine(d, { level: 45 }, t2, 64);
+  e3.start(); e3.update(3100);
+  for (let t = 0; t < 300_000; t += 20) {
+    e3.update(20);
+    for (const s2 of e3.pool.slots) if (s2.active && s2.spec && !s2.spec.decor) e3.registerTriggerResponse("right");
   }
-  const n2 = d.analyze!(e2.getEvents())!;
+  const n2 = d.analyze!(e3.getEvents())!;
   const dSpam = Number(/d' = (-?[\d.]+)/.exec(n2.join(" "))![1]);
   ok(dSpam < dWithheld, `press-everything d'=${dSpam.toFixed(2)} scores BELOW withhold-everything d'=${dWithheld.toFixed(2)}`);
   ok(dSpam < 0.6, `press-everything cannot fake sensitivity (d'=${dSpam.toFixed(2)})`);

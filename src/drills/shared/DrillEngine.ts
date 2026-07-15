@@ -74,7 +74,7 @@ export class DrillEngine {
   private orderedProgress = new Map<string, number>(); // groupId -> next seq expected
   private orderedLastAt = new Map<string, number>();   // groupId -> when the previous item resolved
   private gridQueue = new Map<number, TrialSpec[]>(); // gridSeq -> members (spawn on prev grid completion)
-  private physVel = new Map<string, { vx: number; vy: number }>(); // live MOT ball velocity
+  private physVel = new Map<string, { vx: number; vy: number; speed: number }>(); // live physics velocity + its CONSTANT target speed
   private livesLost = 0;   // survival-with-lives (Rapid Recognition)
   private livesRegen = 0;  // a streak of streakForLife correct answers earns one back
   private pendingFinish = false;  // lives ran out mid-resolution; end at the next safe point
@@ -255,7 +255,7 @@ export class DrillEngine {
       const slot = this.pool.acquire(spec, now);
       if (slot) {
         this.active.set(spec.id, { spec, spawnClock: now, kind: spec.kind, resolved: false });
-        if (spec.physics) this.physVel.set(spec.id, { vx: spec.physics.vx, vy: spec.physics.vy });
+        if (spec.physics) this.physVel.set(spec.id, { vx: spec.physics.vx, vy: spec.physics.vy, speed: Math.hypot(spec.physics.vx, spec.physics.vy) });
         this.emit({ type: "spawn", spec });
       }
     }
@@ -413,7 +413,7 @@ export class DrillEngine {
    * bounce and pairwise elastic collision within a group. Positions live in the pool slots.
    */
   private stepPhysics(now: number, deltaMs: number): void {
-    const live: { id: string; slot: import("./TargetSpawner").PoolSlot; ph: NonNullable<TrialSpec["physics"]>; vel: { vx: number; vy: number }; r: number }[] = [];
+    const live: { id: string; slot: import("./TargetSpawner").PoolSlot; ph: NonNullable<TrialSpec["physics"]>; vel: { vx: number; vy: number; speed: number }; r: number }[] = [];
     for (const [id, t] of this.active) {
       const ph = t.spec.physics;
       if (!ph || t.resolved) continue;
@@ -463,6 +463,18 @@ export class DrillEngine {
             c.vel.vx += p * nx; c.vel.vy += p * ny;
           }
         }
+      }
+      /**
+       * CONSTANT SPEED. A true equal-mass elastic exchange redistributes speed between the two
+       * balls, so one leaves a collision faster and the other slower — over a run the swarm
+       * visibly slows to a crawl. Correct for billiards, but not what this drill wants: a bounce
+       * should change DIRECTION only, and every ball should hold the level's set pace. So after
+       * resolving the collision we restore each ball's velocity to its own constant target
+       * speed, keeping the new heading. Higher levels are faster, but constant within a level.
+       */
+      for (const b of live) {
+        const m = Math.hypot(b.vel.vx, b.vel.vy);
+        if (m > 1e-6 && b.vel.speed > 0) { const k = b.vel.speed / m; b.vel.vx *= k; b.vel.vy *= k; }
       }
     }
   }

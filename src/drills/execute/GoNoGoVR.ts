@@ -1,5 +1,5 @@
 import type { DrillDefinition, TrialSpec, ProgressionLevel, TargetZone } from "@/ares/drillTypes";
-import { EYE_Y } from "../shared/zones";
+import { LAUNCH_Z, holeCount, sizeSawtooth, launchVelocity, travelMsFor, holeMarkers, pickHole } from "./launcher";
 
 /**
  * GO / NO-GO — 50 levels, ported whole from the touchscreen drill.
@@ -23,35 +23,26 @@ import { EYE_Y } from "../shared/zones";
  * stops measuring inhibition at all. Dropping toward 62% keeps the Go response prepotent
  * enough to be worth stopping, while making the stop frequent enough to score.
  *
- * ── ONE DELIBERATE DEVIATION FROM THE SOURCE, AND WHY ──────────────────────────────────
+ * ── RESPONSE = HAND TOUCH ──────────────────────────────────────────────────────────────
  *
- * RESPONSE = RAY + TRIGGER, not a hand strike.
+ * The athlete REACHES OUT AND TOUCHES the go target — no laser pointer, no trigger. Targets
+ * therefore live on the reachable strike shell, not on a distant plane. A hand strike costs
+ * real arm transport a tap on glass does not, so every deadline carries a uniform +320 ms aim
+ * allowance: it lifts the whole authored curve to be fair to a reach WITHOUT reshaping the
+ * progression, so the relative difficulty between levels is exactly the source's.
  *
- * On glass, the thumb is already resting on the target plane: a tap costs ~0 ms of travel,
- * so a 540 ms deadline is a pure decision deadline. A VR hand strike to a peripheral target
- * costs 300-450 ms of arm transport. Port the deadline literally onto a strike and LEGEND
- * stops measuring inhibition and starts measuring how fast the athlete can swing — the
- * deadline would be entirely consumed by travel, and every athlete would fail identically.
- *
- * A controller ray costs a wrist rotation. It preserves BOTH of the source's requirements —
- * you must acquire the target (the source only counts a tap within r+40px) AND beat the
- * deadline — at a motor cost small enough that the deadline curve still separates athletes.
- *
- * It also protects the No-Go measure, which is the whole drill. Withholding a trigger is a
- * clean stop. Withholding a full-arm strike is contaminated: you cannot tell an athlete who
- * inhibited from one who simply never got moving in time, and those are opposite findings.
- *
- * The deadlines carry a uniform +150 ms aim allowance. Uniform is the point — it translates
- * the curve without reshaping it, so the progression is exactly the one that was authored.
+ * The No-Go measure survives touch cleanly: PURPLE is answered by doing nothing at all, and a
+ * withheld reach is as clean a stop as a withheld tap — you simply never move toward it.
  */
 
 const COLORS_STANDARD = { teal: "#2998AA", blue: "#3498db", red: "#e74c3c", nogo: "#8B5CF6" };
 const COLORS_CONTRAST = { teal: "#22D3EE", blue: "#3B82F6", red: "#F97316", nogo: "#FFFFFF" };
 
-const Z = -1.6;                  // stimulus plane
-const PX = 0.0015;               // metres per reference pixel
-const MIN_SCALE = 0.015;         // a 3cm ball is the pointer/render floor; px would go to 9mm
-const AIM_ALLOWANCE_MS = 150;    // see header
+// The launcher fires the stimulus from a hole; the athlete has the ball's FLIGHT TIME to
+// decide. A tighter authored deadline becomes a FASTER ball, so the decision window shrinks
+// exactly as the source intends — speed IS the deadline.
+const AIM_DIST = 6.2;            // ~centre hole to the athlete (m)
+function speedFor(deadlineMs: number): number { return AIM_DIST / (deadlineMs / 1000); }
 const TRIALS = 50;
 
 type Level = {
@@ -127,26 +118,6 @@ export function zPhi(p: number): number {
   return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5]) * q / (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r + 1);
 }
 
-const CENTRAL: TargetZone[] = ["center"];
-const SPREAD: TargetZone[] = ["center", "left", "right", "up", "down", "upLeft", "upRight", "downLeft", "downRight"];
-const PERIPH: TargetZone[] = ["left", "right", "up", "down", "upLeft", "upRight", "downLeft", "downRight"];
-
-/** The source pushes any target within 150px of centre out to 200px. In VR that floor is an
- *  ECCENTRICITY floor: peripheral levels never place a target inside 14°, so every trial
- *  costs a real saccade away from fixation. */
-function place(L: Level, rng: () => number): { pos: [number, number, number]; zone: TargetZone } {
-  if (!L.spatial) return { pos: [0, EYE_Y, Z], zone: "center" };
-  const pool = L.peripheral ? PERIPH : SPREAD;
-  const zone = pool[Math.floor(rng() * pool.length)];
-  const ecc = L.peripheral ? 14 + rng() * 20 : rng() * 24;
-  const ang = { center: 0, left: 180, right: 0, up: 90, down: 270,
-    upLeft: 135, upRight: 45, downLeft: 225, downRight: 315 }[zone] ?? 0;
-  const jit = (rng() - 0.5) * 26;
-  const th = ((ang + jit) * Math.PI) / 180;
-  const rad = Math.abs(Z) * Math.tan((ecc * Math.PI) / 180);
-  return { pos: [Math.cos(th) * rad, EYE_Y + Math.sin(th) * rad * 0.82, Z], zone };
-}
-
 function buildGNGTrials(level: number, rng: () => number, highContrast: boolean): TrialSpec[] {
   const L = GNG_LEVELS[Math.min(Math.max(level, 1), 50) - 1];
   const P = highContrast ? COLORS_CONTRAST : COLORS_STANDARD;
@@ -155,52 +126,50 @@ function buildGNGTrials(level: number, rng: () => number, highContrast: boolean)
     { c: P.blue, n: "blue" },
     { c: P.red, n: "red" },
   ];
+  const size = sizeSawtooth(level, 0.11, 0.055);
+  const speed = speedFor(L.deadline);
 
   const out: TrialSpec[] = [];
-  let t = 900;
+  let t = 1500;
   for (let i = 0; i < L.trials; i++) {
     const isGo = rng() < L.goProb;
     const pick = goPool[Math.floor(rng() * goPool.length)];
     const base = isGo ? pick.c : P.nogo;
     const color = jitterHue(base, L.hueJitter, rng);
-    const { pos, zone } = place(L, rng);
-    const scale = Math.max(MIN_SCALE, L.radius * PX);
-    const deadline = L.deadline + AIM_ALLOWANCE_MS;
+    const hole = pickHole(level, rng);
+    const travelMs = travelMsFor(hole, speed);
 
+    /**
+     * THE BALL FIRES FROM A HOLE. GO (teal / blue / red) -> pull the trigger, either hand.
+     * NO-GO (purple) -> pull NOTHING and let it fly past. Withholding IS the answer, and the
+     * ball reaching the athlete unfired is scored as the correct rejection.
+     */
     out.push({
       id: `gng-${i}`,
       spawnAt: t,
-      duration: deadline,
+      duration: travelMs + 220,
       kind: isGo ? "go" : "noGo",
-      zone,
-      position: pos,
-      color,
-      emissive: color,
-      shape: "sphere",
-      scale,
-      meta: {
-        gColor: isGo ? pick.n : "nogo",
-        family: L.family,
-        ...(L.briefOnset ? { briefMs: L.briefOnset, maskMs: L.mask ? L.maskDur : 0 } : {}),
-        // visual noise: a mottled surface degrades the target's edge, which is what the
-        // source's fullscreen noise overlay costs you — detectability, not identity.
-        ...(L.noise ? { noise: true } : {}),
-      },
+      zone: "center",
+      position: [hole[0], hole[1], LAUNCH_Z],
+      velocity: launchVelocity(hole, speed),
+      color, emissive: color,
+      shape: "sphere", scale: size,
+      meta: { gColor: isGo ? pick.n : "nogo", family: L.family },
     });
 
-    // FOREPERIOD. Fixed 800ms below Advanced; jittered 400-1200ms above it. The jitter is
-    // load-bearing: a fixed foreperiod is learnable, and an athlete who has learned it is
-    // timing the clock instead of reacting to the stimulus — which inflates RT scores and
-    // destroys the No-Go measure, because a predicted onset is a pre-launched response.
+    // FOREPERIOD. Jittered above Advanced (a fixed onset is learnable, and a predicted onset is
+    // a pre-launched response that destroys the No-Go measure).
     const gap = L.jitter ? 400 + Math.floor(rng() * 801) : 800;
-    t += deadline + 200 + gap;
+    t += travelMs + 220 + gap;
   }
+  // the holes the athlete watches — one more every five levels
+  out.push(...holeMarkers(level, t + 1500, "gng"));
   return out;
 }
 
 const levels: ProgressionLevel[] = GNG_LEVELS.map((L) => ({
   level: L.id,
-  label: `L${L.id} · ${L.family} · ${L.deadline + AIM_ALLOWANCE_MS}ms · ${Math.round(L.goProb * 100)}% GO · ${L.radius * 2}px${L.briefOnset ? ` · ${L.briefOnset}ms onset` : ""}${L.mask ? " · MASK" : ""}`,
+  label: `L${L.id} · ${L.family} · ${holeCount(L.id)} hole${holeCount(L.id) > 1 ? "s" : ""} · ${Math.round(speedFor(L.deadline) * 10) / 10} m/s · ${Math.round(L.goProb * 100)}% GO`,
   parameters: { level: L.id },
 }));
 
@@ -209,22 +178,23 @@ export const GoNoGo: DrillDefinition = {
   name: "Go / No Go",
   shortName: "Go/No Go",
   phase: "Execute",
-  interaction: "ray",
-  responseMode: "pointer",
+  interaction: "touch",
+  responseMode: "trigger",
+  launcher: true,
   authoredLadder: true,
-  trialPaced: true,
   environment: "arena",
   mvp: true,
   description:
-    "TEAL, BLUE and RED mean GO — point and pull. PURPLE means STOP — do nothing at all. 50 levels across six bands: the deadline tightens, the target shrinks and moves out into the periphery, and from ELITE upward it flashes and is wiped by a mask before you can answer, so you are responding to a memory. No-Go gets more frequent as you climb, which is exactly what makes stopping hard.",
+    "Balls fire from the holes and fly at you. TEAL, BLUE and RED mean GO — pull the trigger, either hand. PURPLE means STOP — pull nothing and let it pass. 50 levels: the ball gets faster, and every five levels adds another hole it can come from, so you never know where the next shot appears. No-Go stays frequent enough that the reflex to fire is always primed — which is exactly what makes withholding hard.",
   purpose: "Response inhibition and processing speed under a hard deadline.",
   instructions: [
-    "1. GO: TEAL, BLUE, or RED. Point your ray at it and pull the trigger. Fast.",
-    "2. NO-GO: PURPLE. Do NOTHING. Let it expire. Withholding IS the correct answer.",
-    "3. From ELITE up, the target FLASHES and is wiped by a mask - answer where it WAS.",
+    "1. Balls FIRE from the holes and fly toward you after random delays.",
+    "2. GO: TEAL, BLUE, or RED. PULL THE TRIGGER - either hand - the instant you see it.",
+    "3. NO-GO: PURPLE. Pull NOTHING. Let it fly past. Withholding IS the correct answer.",
     "4. A false alarm on purple costs more than a miss. Speed is worthless without the stop.",
+    "5. Every five levels adds another hole a ball can shoot from - you never know which.",
   ],
-  controlsHint: "RAY + TRIGGER  ·  TEAL/BLUE/RED = GO  ·  PURPLE = DO NOTHING",
+  controlsHint: "TRIGGER ON TEAL / BLUE / RED  ·  HOLD ON PURPLE",
   levels,
   options: [
     {
@@ -240,11 +210,12 @@ export const GoNoGo: DrillDefinition = {
   buildTrials: (params, rng) =>
     buildGNGTrials((params.level as number) ?? 1, rng, params.contrast === "highContrast"),
 
-  // Generous ceiling: 50 trials x (deadline + 200ms clear + worst-case 1200ms foreperiod).
+  // Generous ceiling: 50 shots x (worst-case flight + 220ms clear + worst-case 1200ms foreperiod).
   durationMs: (params) => {
     const L = GNG_LEVELS[Math.min(Math.max((params.level as number) ?? 1, 1), 50) - 1];
     const gap = L.jitter ? 1200 : 800;
-    return 900 + TRIALS * (L.deadline + AIM_ALLOWANCE_MS + 200 + gap) + 2000;
+    const flight = (AIM_DIST / speedFor(L.deadline)) * 1000 * 1.4; // side holes fly farther
+    return 900 + TRIALS * (flight + 220 + gap) + 2000;
   },
 
   analyze: (events) => {

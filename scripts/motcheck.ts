@@ -91,6 +91,44 @@ console.log("\nCOLLISIONS actually occur — the difficulty is real, not decorat
   ok(reversals > 20, `heading of travel changes abruptly ${reversals} times over the swarm — walls and collisions are deflecting balls`);
 }
 
+console.log("\nCONSTANT SPEED — collisions change direction but NOT pace (no cumulative slowdown).");
+{
+  const lvl = 60;
+  const seedTrials = d.buildTrials({ level: lvl }, mul(21));
+  const seed = seedTrials.find((t) => t.physics)!.physics!;
+  const target = Math.hypot(seed.vx, seed.vy);
+  const startMs = seed.startMs, endMs = seed.endMs;
+
+  // sample per-ball frame speeds ONLY during the motion window; bin by early vs late motion.
+  const e = new DrillEngine(d, { level: lvl }, seedTrials, 40);
+  e.start(); e.update(3100);
+  const prev = new Map<string, [number, number]>();
+  const early: number[] = [], late: number[] = [];
+  const nowOf = () => (e as unknown as { timing: { now: number } }).timing.now;
+  for (let f = 0; f < 700; f++) {
+    e.update(16);
+    const t = nowOf();
+    for (const sl of e.pool.slots) {
+      if (!sl.active || !sl.spec?.physics) continue;
+      const age = t - sl.spawnClock;
+      const p = prev.get(sl.spec.id);
+      if (p && age > startMs + 200 && age < endMs) {
+        const sp = Math.hypot(sl.pos[0] - p[0], sl.pos[1] - p[1]) / 0.016;
+        if (sp > 1e-4) (age < startMs + 3000 ? early : late).push(sp);
+      }
+      prev.set(sl.spec.id, [sl.pos[0], sl.pos[1]]);
+    }
+  }
+  const median = (v: number[]) => { const a = [...v].sort((x, y) => x - y); return a.length ? a[Math.floor(a.length / 2)] : 0; };
+  const me = median(early), ml = median(late);
+  ok(early.length > 50 && late.length > 50, `sampled ${early.length} early and ${late.length} late motion speeds`);
+  // MEDIAN frame speed is robust to the minority of frames that contained a bounce; it must
+  // sit right on the level's target pace, both early AND late — proving no decay.
+  ok(Math.abs(me - target) / target < 0.15, `early median pace ${me.toFixed(3)} m/s ~ target ${target.toFixed(3)}`);
+  ok(Math.abs(ml - target) / target < 0.15, `late median pace ${ml.toFixed(3)} m/s ~ target (no slowdown over the run)`);
+  ok(ml > me * 0.9, `late pace (${ml.toFixed(3)}) is not slower than early (${me.toFixed(3)}) — the collision decay bug is gone`);
+}
+
 // ── IDENTIFY: no expiry, select-N, decoy does not end the round ──────────────────────────
 console.log("\nIDENTIFY — no clock, struggle through it, wrong pick costs but does not bail out.");
 {

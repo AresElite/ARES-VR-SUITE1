@@ -23,11 +23,19 @@ import type { DrillDefinition, TrialSpec, ProgressionLevel } from "@/ares/drillT
  * is the escalation. A target expiring ends the run (endOnExpiry) — the failure condition.
  */
 
-const Z = -1.5;
-const HALF_W = 0.66;
-const HALF_H = 0.44;
+/**
+ * STRIKE GEOMETRY. Focus Frenzy is a HAND-STRIKE drill, so every orb must sit within arm's
+ * reach — on the strike shell (~0.6 m out), not on the distant pointer plane. The earlier
+ * version placed orbs 1.5 m away; the engine's reach clamp only rescued the first orb of each
+ * stream at spawn, so the REPLACEMENTS that appear as you clear orbs stayed out of reach. Now
+ * the whole box lives on the strike shell, so every orb — original or replacement — is
+ * reachable, at the SAME comfortable distance throughout the run.
+ */
+const Z = -0.60;
+const HALF_W = 0.34;
+const HALF_H = 0.30;
 const PX = 0.0011;          // metres per reference pixel
-const VEL = 0.0011;         // metres/sec per reference px/sec
+const VEL = 0.00060;        // metres/sec per reference px/sec (the box is closer and smaller now)
 
 // the ramp: calm -> urgent. Purple lifted from the reference's near-black so it reads in VR.
 const STAGE_COLOR = { purple: "#6D5FA8", teal: "#2998AA", blue: "#3B82F6", orange: "#FB923C", red: "#EF4444" };
