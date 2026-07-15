@@ -27,15 +27,86 @@ const shuffle = <T,>(arr: T[], rng: () => number): T[] => {
   return arr;
 };
 
+/**
+ * THRESHOLD STAIRCASE — finds the FASTEST ball speed the athlete can still handle RELIABLY.
+ *
+ * The old ladder multiplied speed by the streak, and the engine zeroes the streak on any miss,
+ * so a single miss dropped the ball all the way back to the starting speed. That is not a
+ * threshold search — it is a yo-yo. This staircase instead:
+ *
+ *   • climbs one step for every 3 CLEAN reps in a row (the reliability bar), and
+ *   • on a miss drops back only to the LAST CONFIRMED step — the fastest speed the athlete has
+ *     already proven 3-in-a-row — never to the start.
+ *
+ * The threshold is the fastest step ever confirmed. `MS = STEP * mul` sets how big each step is.
+ */
+const STAIR_MUL = 0.07;      // +7% ball speed per confirmed step
+const STAIR_NEED = 3;        // consecutive clean reps to confirm a step (the "3 in a row")
+const STAIR_MAX = 20;        // cap (~2.4x the start speed)
+export interface RtStairState {
+  stepIdx: number;           // the step the NEXT ball is fired at
+  confirmedStep: number;     // highest step passed 3-in-a-row so far (the miss floor)
+  bestStep: number;          // highest step ever confirmed (the threshold)
+  hits: number;              // consecutive clean reps at the current step
+  lastResolved: number;      // hits+errors seen at the previous adapt, to detect a new outcome
+}
+export function makeRtStair(): RtStairState { return { stepIdx: 0, confirmedStep: 0, bestStep: 0, hits: 0, lastResolved: 0 }; }
+
+/** advance the staircase from the latest outcome; returns the current speed FACTOR. */
+export function stairFactor(st: RtStairState, snap: { hits: number; errors: number; lastEventCorrect?: boolean }): number {
+  const resolved = snap.hits + snap.errors;
+  if (resolved > st.lastResolved) {          // a trial resolved since we last looked
+    st.lastResolved = resolved;
+    if (snap.lastEventCorrect) {
+      st.hits += 1;
+      if (st.hits >= STAIR_NEED) {           // confirmed — this speed is reliable, push faster
+        st.confirmedStep = st.stepIdx;
+        st.bestStep = Math.max(st.bestStep, st.stepIdx);
+        st.stepIdx = Math.min(STAIR_MAX, st.stepIdx + 1);
+        st.hits = 0;
+      }
+    } else {                                  // a miss — fall back ONLY to the last confirmed step
+      st.stepIdx = st.confirmedStep;
+      st.hits = 0;
+    }
+  }
+  return 1 + st.stepIdx * STAIR_MUL;
+}
+
+/** threshold report for the results panel: fastest confirmed speed, in m/s, mph, and the
+ *  response window (ms) it leaves at the ball's travel distance. */
+export function stairThreshold(st: RtStairState, baseSpeed: number, travelDist: number): string {
+  if (st.bestStep <= 0 && st.hits < STAIR_NEED) {
+    return "Threshold not established — no speed was completed 3 times in a row. Start speed is the floor.";
+  }
+  const spd = baseSpeed * (1 + st.bestStep * STAIR_MUL);
+  const mph = Math.round(spd * 2.23694 * 10) / 10;
+  const windowMs = Math.round((travelDist / spd) * 1000);
+  return `Reliable threshold: ${Math.round(spd * 10) / 10} m/s (${mph} mph) — a ${windowMs}ms response window, confirmed with ${STAIR_NEED} clean reps in a row.`;
+}
+
 // ==================== 1. FINE MOTOR RAW REACTION TIME ====================
 // Dominant hand selected before the protocol; only that trigger counts.
 // Release delays are fully randomized (uniform 500–3500 ms — no rhythm).
+const fmrStair = makeRtStair();
+const fmcStair = makeRtStair();
+/** Fine-motor adapt: scale the whole launch velocity by the staircase factor, so a faster ball
+ *  = a tighter response window; the threshold is the tightest window held 3-in-a-row. */
+function fineAdapt(spec: TrialSpec, st: RtStairState, snap: { hits: number; errors: number; lastEventCorrect?: boolean }): void {
+  const bv = spec.meta?.baseVel as [number, number, number] | undefined;
+  const base = spec.meta?.baseSpeed as number | undefined;
+  if (!bv || !base) return;
+  const f = stairFactor(st, snap);
+  spec.velocity = [bv[0] * f, bv[1] * f, bv[2] * f];
+  spec.duration = ((spec.meta?.travelDist as number) / (base * f)) * 1000 + 250;
+}
+
 export const FineMotorRawRT: DrillDefinition = {
   id: "assess-fm-raw-rt",
   name: "Fine Motor Raw Reaction Time",
   shortName: "FM Raw RT",
   phase: "Assess",
-  description: "25 trials. A PURPLE sphere fires from the central hole after a FULLY RANDOMIZED delay — click the trigger of your DOMINANT hand the instant it launches.",
+  description: "ADAPTIVE THRESHOLD. A PURPLE sphere fires from the hole after a fully randomized delay — click your DOMINANT-hand trigger the instant it launches. Each clean rep speeds the next ball up; a miss drops it back only to the last speed you held 3-in-a-row, never to the start. Your threshold is the fastest ball (tightest window) you can beat reliably.",
   purpose: "Simple visuomotor reaction time (dominant-hand trigger).",
   interaction: "touch",
   responseMode: "trigger",
@@ -56,6 +127,7 @@ export const FineMotorRawRT: DrillDefinition = {
   controlsHint: "DOMINANT TRIGGER ONLY - RANDOM DELAYS - 25 TRIALS",
   levels: STANDARD({ trials: 25, speed: 8, size: 0.08 }),
   buildTrials: (params, rng) => {
+    Object.assign(fmrStair, makeRtStair());
     const p = params as { trials: number; speed: number; size: number; dominantHand?: string };
     const dom = p.dominantHand === "left" ? "left" : "right";
     const travelMs = (Math.abs(LAUNCH_Z) / p.speed) * 1000;
@@ -63,16 +135,20 @@ export const FineMotorRawRT: DrillDefinition = {
     let t = 1500;
     for (let i = 0; i < p.trials; i++) {
       t += 500 + rng() * 3000; // 100% randomized release delay
+      const jx = (rng() - 0.5) * 0.2, jy = (rng() - 0.5) * 0.15;
       trials.push({
         id: `fmr-${i}`, spawnAt: t, duration: travelMs + 250, kind: "go", zone: "center",
-        position: [0, 1.45, LAUNCH_Z], velocity: [(rng() - 0.5) * 0.2, (rng() - 0.5) * 0.15, p.speed],
+        position: [0, 1.45, LAUNCH_Z], velocity: [jx, jy, p.speed],
         requiredHand: dom as "left" | "right",
         color: PURPLE, emissive: PURPLE, shape: "sphere", scale: p.size,
+        meta: { baseVel: [jx, jy, p.speed], baseSpeed: p.speed, travelDist: Math.abs(LAUNCH_Z) },
       });
       t += travelMs + 300 + rng() * 300;
     }
     return trials;
   },
+  onSpawnAdapt: (spec, snapshot) => fineAdapt(spec, fmrStair, snapshot),
+  analyze: () => [stairThreshold(fmrStair, 8, Math.abs(LAUNCH_Z))],
   durationMs: (params) => {
     const p = params as { trials: number; speed: number };
     return 1500 + p.trials * (3500 + (Math.abs(LAUNCH_Z) / p.speed) * 1000 + 600) + 1500;
@@ -87,7 +163,7 @@ export const FineMotorChoiceRT: DrillDefinition = {
   name: "Fine Motor Choice Reaction Time",
   shortName: "FM Choice RT",
   phase: "Assess",
-  description: "25 randomized trials, fully randomized release delays. PURPLE = RIGHT trigger, TEAL = LEFT trigger. Results split right vs left reaction time and accuracy, with post-error slowing.",
+  description: "ADAPTIVE THRESHOLD. Fully randomized delays. PURPLE = RIGHT trigger, TEAL = LEFT trigger. Each clean rep speeds the next ball up; a miss drops it back only to the last speed you held 3-in-a-row, never to the start. Your threshold is the fastest ball you can still classify and beat reliably. Right vs left RT and accuracy are split out.",
   purpose: "Two-choice reaction time with per-hand analytics.",
   interaction: "touch",
   responseMode: "trigger",
@@ -105,6 +181,7 @@ export const FineMotorChoiceRT: DrillDefinition = {
   controlsHint: "PURPLE = RIGHT - TEAL = LEFT - RANDOM DELAYS - 25 TRIALS",
   levels: STANDARD({ trials: 25, speed: 7.5, size: 0.08 }),
   buildTrials: (params, rng) => {
+    Object.assign(fmcStair, makeRtStair());
     const p = params as { trials: number; speed: number; size: number };
     const travelMs = (Math.abs(LAUNCH_Z) / p.speed) * 1000;
     const deck = shuffle(Array.from({ length: p.trials }, (_, k) => k % 2 === 0), rng);
@@ -113,18 +190,22 @@ export const FineMotorChoiceRT: DrillDefinition = {
     for (let i = 0; i < p.trials; i++) {
       t += 500 + rng() * 3000; // 100% randomized release delay
       const isPurple = deck[i];
+      const jx = (rng() - 0.5) * 0.2, jy = (rng() - 0.5) * 0.15;
       trials.push({
         id: `fmc-${i}`, spawnAt: t, duration: travelMs + 250, kind: "go",
         zone: isPurple ? "right" : "left",
-        position: [0, 1.45, LAUNCH_Z], velocity: [(rng() - 0.5) * 0.2, (rng() - 0.5) * 0.15, p.speed],
+        position: [0, 1.45, LAUNCH_Z], velocity: [jx, jy, p.speed],
         requiredHand: isPurple ? "right" : "left",
         color: isPurple ? PURPLE : TEAL, emissive: isPurple ? PURPLE : TEAL,
         shape: "sphere", scale: p.size,
+        meta: { baseVel: [jx, jy, p.speed], baseSpeed: p.speed, travelDist: Math.abs(LAUNCH_Z) },
       });
       t += travelMs + 300 + rng() * 300;
     }
     return trials;
   },
+  onSpawnAdapt: (spec, snapshot) => fineAdapt(spec, fmcStair, snapshot),
+  analyze: () => [stairThreshold(fmcStair, 7.5, Math.abs(LAUNCH_Z))],
   durationMs: (params) => {
     const p = params as { trials: number; speed: number };
     return 1500 + p.trials * (3500 + (Math.abs(LAUNCH_Z) / p.speed) * 1000 + 600) + 1500;
@@ -180,12 +261,15 @@ function buildGrossTrials(
   return trials;
 }
 
-/** speed ladder: +7% per streak step, capped at 2.4×; misses reset streak. */
-function grossAdapt(spec: TrialSpec, snapshot: { streak: number }): void {
+// per-session threshold staircases, reset in each drill's buildTrials (module state, like the
+// stereo/contrast staircases already in this file).
+const gmrStair = makeRtStair();
+const gmcStair = makeRtStair();
+/** Gross-motor adapt: the ball speed follows the threshold staircase, not the raw streak. */
+function grossAdapt(spec: TrialSpec, st: RtStairState, snap: { hits: number; errors: number; lastEventCorrect?: boolean }): void {
   const base = spec.meta?.baseSpeed as number;
   if (!base) return;
-  const factor = Math.min(2.4, 1 + snapshot.streak * 0.07);
-  const speed = base * factor;
+  const speed = base * stairFactor(st, snap);
   const ratio = spec.meta?.lenRatio as number;
   const ux = spec.meta?.baseVx as number;
   const uy = spec.meta?.baseVy as number;
@@ -198,7 +282,7 @@ export const GrossMotorRawRT: DrillDefinition = {
   name: "Gross Motor Raw Reaction Time",
   shortName: "GM Raw RT",
   phase: "Assess",
-  description: "120 seconds. PURPLE balls fire from the hexagon — intercept with your DOMINANT hand. Every catch speeds the next launch up (+7% per streak step); misses ease it back. Finds your fastest coordinated interception speed.",
+  description: "120 seconds. PURPLE balls fire from the hexagon — intercept with your DOMINANT hand. THRESHOLD LADDER: three clean catches in a row confirm a speed and push faster; a miss drops back only to the last confirmed speed, never to the start. Your threshold is the fastest interception speed you hold 3-in-a-row.",
   purpose: "Adaptive whole-arm interception speed ceiling.",
   interaction: "touch",
   responseMode: "strike",
@@ -220,8 +304,9 @@ export const GrossMotorRawRT: DrillDefinition = {
   ],
   controlsHint: "120s - DOMINANT HAND - EVERY CATCH SPEEDS IT UP",
   levels: STANDARD({ speed: 4.2, size: 0.09, choice: false }),
-  buildTrials: (params, rng) => buildGrossTrials(params as never, rng, "gmr"),
-  onSpawnAdapt: (spec, snapshot) => grossAdapt(spec, snapshot),
+  buildTrials: (params, rng) => { Object.assign(gmrStair, makeRtStair()); return buildGrossTrials(params as never, rng, "gmr"); },
+  onSpawnAdapt: (spec, snapshot) => grossAdapt(spec, gmrStair, snapshot),
+  analyze: () => [stairThreshold(gmrStair, 4.2, Math.abs(LAUNCH_Z) + 0.35)],
   durationMs: () => 122000,
 };
 
@@ -230,7 +315,7 @@ export const GrossMotorChoiceRT: DrillDefinition = {
   name: "Gross Motor Choice Reaction Time",
   shortName: "GM Choice RT",
   phase: "Assess",
-  description: "120 seconds from the hexagon: PURPLE = RIGHT hand, TEAL = LEFT hand. The launch speed climbs with your streak and eases after misses. Results split right vs left reaction time and accuracy.",
+  description: "120 seconds from the hexagon: PURPLE = RIGHT hand, TEAL = LEFT hand. THRESHOLD LADDER: three clean catches in a row confirm a speed and push faster; a miss drops back only to the last confirmed speed, never to the start. Right vs left RT and accuracy are split out.",
   purpose: "Adaptive whole-arm choice interception ceiling.",
   interaction: "touch",
   responseMode: "strike",
@@ -248,8 +333,9 @@ export const GrossMotorChoiceRT: DrillDefinition = {
   ],
   controlsHint: "120s - PURPLE=RIGHT TEAL=LEFT - SPEED CLIMBS WITH YOUR STREAK",
   levels: STANDARD({ speed: 4.0, size: 0.09, choice: true }),
-  buildTrials: (params, rng) => buildGrossTrials(params as never, rng, "gmc"),
-  onSpawnAdapt: (spec, snapshot) => grossAdapt(spec, snapshot),
+  buildTrials: (params, rng) => { Object.assign(gmcStair, makeRtStair()); return buildGrossTrials(params as never, rng, "gmc"); },
+  onSpawnAdapt: (spec, snapshot) => grossAdapt(spec, gmcStair, snapshot),
+  analyze: () => [stairThreshold(gmcStair, 4.0, Math.abs(LAUNCH_Z) + 0.35)],
   durationMs: () => 122000,
 };
 
