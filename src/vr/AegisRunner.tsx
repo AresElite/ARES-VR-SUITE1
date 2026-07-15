@@ -43,47 +43,49 @@ function geometryFor(shape: string, scale: number): THREE.BufferGeometry {
   }
 }
 
-/** the contrast stripes that mark a NO-GO sphere — apparent early, subtle later. */
-function NoGoStripes({ scale, apparent }: { scale: number; apparent: number }) {
-  const bands = [-0.5, 0, 0.5];
-  return (
-    <>
-      {bands.map((f, i) => {
-        const y = f * scale;
-        const major = Math.sqrt(Math.max(0.0001, scale * scale - y * y)) * 1.0;
-        const minor = scale * (0.10 + 0.14 * apparent);
-        return (
-          <mesh key={i} position={[0, y, 0]} rotation={[Math.PI / 2, 0, 0]}>
-            <torusGeometry args={[major, minor, 8, 24]} />
-            <meshStandardMaterial
-              color="#0B0F2A"
-              emissive="#0B0F2A"
-              emissiveIntensity={0.05}
-              metalness={0.2}
-              roughness={0.6}
-            />
-          </mesh>
-        );
-      })}
-    </>
-  );
+/**
+ * A NO-GO wears dark stripes FLUSH ON the sphere surface — a striped texture, not rings that
+ * stick out. Same sphere as a stimulus, just banded. The stripes are bold at Beginner (high
+ * apparent) and faint at GOAT.
+ */
+function makeStripeTexture(base: string, apparent: number): THREE.CanvasTexture {
+  const cv = document.createElement("canvas");
+  cv.width = 64; cv.height = 64;
+  const ctx = cv.getContext("2d")!;
+  ctx.fillStyle = base;
+  ctx.fillRect(0, 0, 64, 64);
+  const bands = 5;
+  const cell = 64 / bands;
+  const stripeH = cell * (0.34 + 0.34 * apparent);   // thicker stripe = more apparent
+  ctx.fillStyle = "#0B0F2A";
+  ctx.globalAlpha = 0.45 + 0.5 * apparent;            // darker stripe = more apparent
+  for (let i = 0; i < bands; i++) ctx.fillRect(0, i * cell, 64, stripeH);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.needsUpdate = true;
+  return tex;
 }
 
 /** the visible rail — a faint tube along the marker's path, so the athlete can see the route
  *  the assigned hand must ride. Coloured by the rail's hand. */
 function RailPath({ obj }: { obj: AegisObject }) {
+  // Shown only once the start ball is ACQUIRED and the ride begins — it traces the rideP0->P1
+  // path the hand must follow. Before that, the object is just the coloured start ball flying in.
+  const p0 = obj.rideP0, cc = obj.rideCtrl, p1 = obj.rideP1;
   const geo = useMemo(() => {
+    if (!p0 || !cc || !p1) return null;
     const curve = new THREE.QuadraticBezierCurve3(
-      new THREE.Vector3(obj.p0[0], obj.p0[1], obj.p0[2]),
-      new THREE.Vector3(obj.ctrl[0], obj.ctrl[1], obj.ctrl[2]),
-      new THREE.Vector3(obj.p1[0], obj.p1[1], obj.p1[2]),
+      new THREE.Vector3(p0[0], p0[1], p0[2]),
+      new THREE.Vector3(cc[0], cc[1], cc[2]),
+      new THREE.Vector3(p1[0], p1[1], p1[2]),
     );
-    return new THREE.TubeGeometry(curve, 26, Math.max(0.01, obj.scale * 0.3), 8, false);
-  }, [obj.p0, obj.ctrl, obj.p1, obj.scale]);
+    return new THREE.TubeGeometry(curve, 26, Math.max(0.012, obj.scale * 0.32), 8, false);
+  }, [p0, cc, p1, obj.scale]);
+  useEffect(() => () => { geo?.dispose(); }, [geo]);
+  if (!geo) return null;
   const color = obj.color ?? "#8B5CF6";
   return (
     <mesh geometry={geo}>
-      <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.35} transparent opacity={0.32} />
+      <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.4} transparent opacity={0.4} />
     </mesh>
   );
 }
@@ -107,18 +109,23 @@ function AegisObjectMesh({ obj, pos, feedback }: { obj: AegisObject; pos: [numbe
   });
 
   const isThreat = obj.cat === "bomb" || obj.cat === "nogo";
+  const stripeTex = useMemo(
+    () => (obj.cat === "nogo" ? makeStripeTexture(color, obj.stripes ?? 1) : null),
+    [obj.cat, color, obj.stripes],
+  );
+  useEffect(() => () => { stripeTex?.dispose(); }, [stripeTex]);
   return (
     <group ref={grp}>
       <mesh geometry={geo}>
         <meshStandardMaterial
-          color={color}
+          map={stripeTex ?? undefined}
+          color={stripeTex ? "#FFFFFF" : color}
           emissive={color}
-          emissiveIntensity={isThreat ? 0.35 : 0.55 + feedback * 0.25}
+          emissiveIntensity={obj.cat === "nogo" ? 0.14 : isThreat ? 0.35 : 0.55 + feedback * 0.25}
           metalness={0.35}
           roughness={obj.cat === "bomb" ? 0.85 : 0.28}
         />
       </mesh>
-      {obj.cat === "nogo" && <NoGoStripes scale={obj.scale} apparent={obj.stripes ?? 1} />}
     </group>
   );
 }
@@ -272,7 +279,7 @@ export function AegisRunner({
         const p = o.heldBy ? hands.current[o.heldBy].pos : (snap.positions[o.id] ?? o.p0);
         return (
           <group key={o.id}>
-            {o.cat === "rail" && <RailPath obj={o} />}
+            {o.cat === "rail" && o.riding && <RailPath obj={o} />}
             <AegisObjectMesh obj={o} pos={p} feedback={streakEnergy} />
           </group>
         );

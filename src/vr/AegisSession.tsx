@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useAppStore } from "@/app/providers/appStore";
 import { AegisRunner } from "@/vr/AegisRunner";
 import { SpatialPanel, PanelText, PanelButton } from "@/vr/SpatialPanel";
@@ -9,11 +10,13 @@ import { ARES_COLORS } from "@/ares/colors";
 export function AegisSession() {
   const settings = useAppStore((s) => s.aegis);
   const finishAegis = useAppStore((s) => s.finishAegis);
+  // one fresh random seed PER session mount — different every run, stable during the run
+  const [seed] = useState(() => (Date.now() ^ Math.floor(Math.random() * 2147483647)) % 2147483647);
   return (
     <group>
       <AegisRunner
         settings={settings}
-        seed={Date.now() % 2147483647}
+        seed={seed}
         onComplete={(m) => finishAegis(m)}
         onExit={() => useAppStore.setState({ arenaMode: "aegisSetup" })}
       />

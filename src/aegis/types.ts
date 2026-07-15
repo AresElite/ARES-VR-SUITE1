@@ -100,6 +100,13 @@ export interface AegisObject {
   needsBothHands?: boolean;
   /** rail: ms the assigned hand has stayed ON the moving marker (drives success) */
   onRailMs?: number;
+  /** rail phase 2: once the start ball is ACQUIRED, the rail extends and the hand rides it */
+  riding?: boolean;
+  rideStartT?: number;
+  rideMs?: number;
+  rideP0?: [number, number, number];
+  rideCtrl?: [number, number, number];
+  rideP1?: [number, number, number];
 
   resolved: boolean;
   /** set once resolved — drives scoring and the event log */

@@ -70,6 +70,7 @@ export class AegisEngine {
   readonly settings: AegisSettings;
   readonly tune: AegisTuning;
   private rng: () => number;
+  private activeRailHand: HandId | null = null; // a rail in progress suppresses its hand's targets
 
   private t = 0;
   private acc = 0;
@@ -292,17 +293,28 @@ export class AegisEngine {
     if (r < bombR + t.nogoRate) return "nogo";
     let cum = bombR + t.nogoRate + t.bonusRate;
     if (r < cum + t.bonusRate * 0) return "bonus"; // (bonus already handled above)
-    // RIDE THE RAIL: a marker the assigned hand must follow along a short path. Both hands get
-    // rails, so it applies under every hand rule.
-    if (t.railRate > 0 && r < cum + t.railRate) return "rail";
+    // RIDE THE RAIL: a marker the assigned hand must follow. Only one rail at a time — never
+    // start another while one is being ridden.
+    if (t.railRate > 0 && this.activeRailHand === null && r < cum + t.railRate) return "rail";
     cum += t.railRate;
     // TOGETHER (asymmetric only): a dark-blue sphere taken with BOTH hands brought together.
     if (this.settings.handRule !== "symmetric" && t.togetherRate > 0 && r < cum + t.togetherRate) return "together";
     cum += t.togetherRate;
     // standard target: which hand?
+    //
+    // SYMMETRIC: every target is "either" (a purple sphere, taken with either hand).
+    // ASYMMETRIC / ADAPTIVE: the whole point is HAND SELECTION, so targets are hand-specific
+    // and BALANCED 50/50 — teal for the left, purple for the right. The tier's high eitherRate
+    // is a symmetric-mode setting; applying it here is what made an asymmetric run ~90% purple
+    // (either was purple AND right was purple). A small slice of "either" keeps some variety.
     if (this.settings.handRule === "symmetric") return "either";
-    if (this.rng() < t.eitherRate) return "either";
-    return this.rng() < 0.5 ? "left" : "right";
+    if (this.rng() < 0.10) return "either";
+    // suppress the hand that is currently riding a rail — its colour must not reappear until the
+    // ride completes. Force the opposite hand.
+    let h: AegisCategory = this.rng() < 0.5 ? "left" : "right";
+    if (this.activeRailHand === "left" && h === "left") h = "right";
+    else if (this.activeRailHand === "right" && h === "right") h = "left";
+    return h;
   }
 
   private handFor(cat: AegisCategory): RequiredHand {
@@ -375,6 +387,11 @@ export class AegisEngine {
   /** World position of an object right now. */
   posOf(o: AegisObject): Vec3 {
     if (o.heldBy) return o.p1; // held objects follow the hand (renderer overrides)
+    // RAIL RIDE: after the start ball is acquired, the marker travels the extended rail path.
+    if (o.riding && o.rideStartT !== undefined && o.rideP0 && o.rideCtrl && o.rideP1) {
+      const f = Math.min(1, Math.max(0, (this.t - o.rideStartT) / Math.max(1, o.rideMs ?? 1200)));
+      return bezier(o.rideP0, o.rideCtrl, o.rideP1, f);
+    }
     const flight = o.arriveT - o.spawnT;
     const p = Math.min(1.35, Math.max(0, (this.t - o.spawnT) / Math.max(1, flight)));
     return bezier(o.p0, o.ctrl, o.p1, p);
@@ -486,14 +503,39 @@ export class AegisEngine {
       const hand = o.requiredHand === "left" || o.requiredHand === "right" ? o.requiredHand : "right";
       const hs = hands[hand];
       const p = this.posOf(o);
-      if (this.t >= o.actionableT && this.t < o.arriveT && hs) {
+
+      if (!o.riding) {
+        // PHASE 1 — ACQUIRE. The start BALL flies in; the correct hand must reach it. On contact
+        // the rail extends from that point and the ride begins. (An unacquired ball expires as a
+        // miss via the failure plane.)
+        if (hs && this.t >= o.actionableT) {
+          const d = Math.hypot(p[0] - hs.pos[0], p[1] - hs.pos[1], p[2] - hs.pos[2]);
+          if (d <= o.scale + 0.12) {
+            o.riding = true;
+            o.rideStartT = this.t;
+            o.rideMs = this.tune.timingWindowMs * 4 + 900;   // a short/medium ride window
+            o.rideP0 = [...p] as Vec3;
+            const side = hand === "left" ? -1 : 1;
+            // a reachable sweep out to the hand's side and back — the hand must ride the marker
+            o.rideCtrl = [p[0] + side * 0.34, p[1] + 0.22, p[2] + 0.04];
+            o.rideP1 = [p[0] + side * 0.14, p[1] - 0.16, p[2]];
+            o.onRailMs = 0;
+            this.activeRailHand = hand;   // suppress this hand's other targets during the ride
+          }
+        }
+        continue;
+      }
+
+      // PHASE 2 — RIDE. Tally the time the hand stays ON the marker across the ride window.
+      const end = (o.rideStartT ?? this.t) + (o.rideMs ?? 1200);
+      if (this.t < end && hs) {
         const d = Math.hypot(p[0] - hs.pos[0], p[1] - hs.pos[1], p[2] - hs.pos[2]);
         if (d <= o.scale + 0.16) o.onRailMs = (o.onRailMs ?? 0) + STEP_MS;
       }
-      if (this.t >= o.arriveT) {
-        const window = Math.max(1, o.arriveT - o.actionableT);
-        const frac = (o.onRailMs ?? 0) / window;
+      if (this.t >= end) {
+        const frac = (o.onRailMs ?? 0) / Math.max(1, o.rideMs ?? 1200);
         this.resolve(o, frac >= 0.6 ? "blocked" : "miss", hand, p, hs);
+        if (this.activeRailHand === hand) this.activeRailHand = null;
       }
     }
   }
@@ -531,6 +573,7 @@ export class AegisEngine {
   private expire(): void {
     for (const o of this.objects) {
       if (o.resolved || o.heldBy) continue;
+      if (o.cat === "rail" && o.riding) continue; // a rail being ridden resolves on its own clock
       if (this.t < o.failT) continue;
       // A bomb or no-go that crossed the plane untouched is a SUCCESS.
       if (o.cat === "bomb" || o.cat === "nogo") { this.resolve(o, "avoided", undefined, this.posOf(o)); continue; }
