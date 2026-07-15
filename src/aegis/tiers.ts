@@ -23,8 +23,8 @@ import type { AegisTier, AegisTuning, AegisMode, HandRule } from "./types";
  */
 export const TIER_TUNING: Record<AegisTier, AegisTuning> = {
   beginner: {
-    speed: 3.0, targetSize: 0.14, spawnIntervalMs: 1500, maxSimultaneous: 1,
-    bombRate: 0.0, nogoRate: 0.0, bonusRate: 0.05, eitherRate: 0.8,
+    speed: 3.0, targetSize: 0.105, spawnIntervalMs: 1500, maxSimultaneous: 1,
+    bombRate: 0.0, nogoRate: 0.0, bonusRate: 0.05, togetherRate: 0.0, railRate: 0.0, eitherRate: 0.8,
     curveAmount: 0, lateVectorChange: 0, timingWindowMs: 420,
     minBlockSpeed: 0, requireDirection: false, retentionMs: 120, requireRelease: false,
     slowdownMs: 6000, slowdownFactor: 0.6, recoveryStreak: 3,
@@ -32,8 +32,8 @@ export const TIER_TUNING: Record<AegisTier, AegisTuning> = {
     feedbackIntensity: 1.0, hapticIntensity: 1.0, durationMs: 300_000,
   },
   intermediate: {
-    speed: 4.0, targetSize: 0.12, spawnIntervalMs: 1150, maxSimultaneous: 2,
-    bombRate: 0.08, nogoRate: 0.07, bonusRate: 0.07, eitherRate: 0.4,
+    speed: 4.0, targetSize: 0.09, spawnIntervalMs: 1150, maxSimultaneous: 2,
+    bombRate: 0.08, nogoRate: 0.07, bonusRate: 0.07, togetherRate: 0.09, railRate: 0.07, eitherRate: 0.4,
     curveAmount: 0.15, lateVectorChange: 0, timingWindowMs: 340,
     minBlockSpeed: 0, requireDirection: false, retentionMs: 180, requireRelease: false,
     slowdownMs: 5500, slowdownFactor: 0.65, recoveryStreak: 3,
@@ -41,8 +41,8 @@ export const TIER_TUNING: Record<AegisTier, AegisTuning> = {
     feedbackIntensity: 0.8, hapticIntensity: 0.8, durationMs: 300_000,
   },
   advanced: {
-    speed: 5.0, targetSize: 0.10, spawnIntervalMs: 900, maxSimultaneous: 3,
-    bombRate: 0.11, nogoRate: 0.10, bonusRate: 0.08, eitherRate: 0.28,
+    speed: 5.0, targetSize: 0.075, spawnIntervalMs: 900, maxSimultaneous: 3,
+    bombRate: 0.11, nogoRate: 0.10, bonusRate: 0.08, togetherRate: 0.10, railRate: 0.08, eitherRate: 0.28,
     curveAmount: 0.4, lateVectorChange: 0.05, timingWindowMs: 280,
     minBlockSpeed: 0.6, requireDirection: true, retentionMs: 250, requireRelease: false,
     slowdownMs: 5000, slowdownFactor: 0.7, recoveryStreak: 4,
@@ -50,8 +50,8 @@ export const TIER_TUNING: Record<AegisTier, AegisTuning> = {
     feedbackIntensity: 0.6, hapticIntensity: 0.6, durationMs: 300_000,
   },
   pro: {
-    speed: 6.1, targetSize: 0.085, spawnIntervalMs: 720, maxSimultaneous: 4,
-    bombRate: 0.13, nogoRate: 0.12, bonusRate: 0.09, eitherRate: 0.22,
+    speed: 6.1, targetSize: 0.0638, spawnIntervalMs: 720, maxSimultaneous: 4,
+    bombRate: 0.13, nogoRate: 0.12, bonusRate: 0.09, togetherRate: 0.12, railRate: 0.09, eitherRate: 0.22,
     curveAmount: 0.7, lateVectorChange: 0.18, timingWindowMs: 230,
     minBlockSpeed: 1.1, requireDirection: true, retentionMs: 320, requireRelease: true,
     slowdownMs: 4000, slowdownFactor: 0.75, recoveryStreak: 4,
@@ -59,8 +59,8 @@ export const TIER_TUNING: Record<AegisTier, AegisTuning> = {
     feedbackIntensity: 0.35, hapticIntensity: 0.35, durationMs: 300_000,
   },
   goat: {
-    speed: 7.3, targetSize: 0.07, spawnIntervalMs: 560, maxSimultaneous: 6,
-    bombRate: 0.15, nogoRate: 0.14, bonusRate: 0.10, eitherRate: 0.18,
+    speed: 7.3, targetSize: 0.0525, spawnIntervalMs: 560, maxSimultaneous: 6,
+    bombRate: 0.15, nogoRate: 0.14, bonusRate: 0.10, togetherRate: 0.14, railRate: 0.10, eitherRate: 0.18,
     curveAmount: 1.0, lateVectorChange: 0.32, timingWindowMs: 185,
     minBlockSpeed: 1.5, requireDirection: true, retentionMs: 380, requireRelease: true,
     slowdownMs: 3000, slowdownFactor: 0.8, recoveryStreak: 5,

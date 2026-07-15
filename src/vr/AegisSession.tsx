@@ -133,27 +133,23 @@ export function AegisResultsPanel() {
         text={`${a.tier.toUpperCase()} · ${a.mode.toUpperCase()} · ${a.handRule.toUpperCase()}${a.custom ? " · CUSTOM (UNRANKED)" : ""}`}
         size={0.03} color={ARES_COLORS.softGray} />
 
-      {row(0.6, "COMPOSITE RATING", a.custom ? "UNRANKED" : m.compositeRating.toLocaleString(), ARES_COLORS.electricTeal)}
-      {row(0.52, "MAIN / BONUS", `${m.mainScore.toLocaleString()}  /  ${m.bonusScore.toLocaleString()}`)}
-      {row(0.44, "ACCURACY", `${m.accuracyPct}%`)}
-      {row(0.36, "REACTION (avg / best)", `${m.avgRT}ms  /  ${m.fastestRT}ms`)}
-      {row(0.28, "LEFT vs RIGHT RT", `${m.leftRT}ms  vs  ${m.rightRT}ms`)}
-      {row(0.2, "BOMB AVOIDANCE", `${m.bombAvoidPct}%  (${m.bombContacts} contacts)`,
+      {row(0.6, "SCORE", m.performanceScore.toLocaleString(), ARES_COLORS.electricTeal)}
+      {row(0.52, "TOTAL HITS  ·  LONGEST STREAK", `${m.totalHits}  ·  ${m.longestStreak}`)}
+      {row(0.44, "PERFECT · GOOD · POOR", `${m.precision.perfectPct}%  ·  ${m.precision.goodPct}%  ·  ${m.precision.poorPct}%`,
+        m.precision.perfectPct >= 40 ? ARES_COLORS.electricTeal : m.precision.perfectPct >= 20 ? ARES_COLORS.white : "#FF9F1C")}
+      {row(0.36, "COMPOSITE RATING", a.custom ? "UNRANKED" : m.compositeRating.toLocaleString())}
+      {row(0.28, "ACCURACY", `${m.accuracyPct}%`)}
+      {row(0.2, "REACTION (avg / best)", `${m.avgRT}ms  /  ${m.fastestRT}ms`)}
+      {row(0.12, "LEFT vs RIGHT RT", `${m.leftRT}ms  vs  ${m.rightRT}ms`)}
+      {row(0.04, "BOMB AVOIDANCE", `${m.bombAvoidPct}%  (${m.bombContacts} contacts)`,
         m.bombContacts === 0 ? ARES_COLORS.electricTeal : "#FF4D6D")}
-      {row(0.12, "NO-GO INHIBITION", `${m.nogoAvoidPct}%  (${m.nogoContacts} contacts)`)}
-      {row(0.04, "WRONG HAND", String(m.wrongHand), m.wrongHand === 0 ? ARES_COLORS.electricTeal : "#FF9F1C")}
-      {row(-0.04, "LONGEST STREAK", String(m.longestStreak))}
-      {row(-0.12, "PEAK TRACKING LOAD", `${m.trackingLoadCapacity} objects`)}
-      {row(-0.2, "BONUS DEPTH", m.bonusStage > 0
+      {row(-0.04, "NO-GO INHIBITION", `${m.nogoAvoidPct}%  (${m.nogoContacts} contacts)`)}
+      {row(-0.12, "WRONG HAND", String(m.wrongHand), m.wrongHand === 0 ? ARES_COLORS.electricTeal : "#FF9F1C")}
+      {row(-0.2, "PEAK TRACKING LOAD", `${m.trackingLoadCapacity} objects`)}
+      {row(-0.28, "BONUS DEPTH", m.bonusStage > 0
         ? `stage ${m.bonusStage} · ${(m.bonusDurationMs / 1000).toFixed(0)}s · ${m.failCause ?? ""}`
         : "not reached")}
-      {row(-0.28, "BREAKDOWN POINT", m.eliteBreakdownPoint ? `bonus stage ${m.eliteBreakdownPoint}` : "never broke")}
-
-      {/* HAND LOCALIZATION — where on the target the hand actually landed. */}
-      {row(-0.36, "LOCALIZATION",
-        `PERFECT ${m.precision.perfectPct}%  ·  GOOD ${m.precision.goodPct}%  ·  POOR ${m.precision.poorPct}%`,
-        m.precision.localizationIndex >= 70 ? ARES_COLORS.electricTeal
-          : m.precision.localizationIndex >= 50 ? ARES_COLORS.white : "#FF9F1C")}
+      {row(-0.36, "BREAKDOWN POINT", m.eliteBreakdownPoint ? `bonus stage ${m.eliteBreakdownPoint}` : "never broke")}
 
       {/* Derived indices — stated plainly, never as clinical claims. */}
       {idx(-0.78, -0.46, "DECISION", m.decisionEfficiency)}

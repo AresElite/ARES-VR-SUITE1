@@ -59,6 +59,13 @@ export interface AegisMetrics {
 
   // ---- session
   score: number; mainScore: number; bonusScore: number;
+  /**
+   * PERFORMANCE SCORE — the athlete-facing number, built ONLY from what the athlete controls:
+   * how many they hit, how CENTRED those hits were (perfect/good/poor share), and how long
+   * their best streak ran. It is deliberately separate from the leaderboard compositeRating.
+   */
+  performanceScore: number;
+  totalHits: number;
   longestStreak: number;
   peakSimultaneous: number; peakSpeed: number;
   bonusStage: number; bonusDurationMs: number; failCause?: string;
@@ -300,7 +307,14 @@ export function computeAegisMetrics(engine: AegisEngine, settings: AegisSettings
       bonusDepth,
     ));
 
+  // ---- PERFORMANCE SCORE (athlete-facing)
+  const totalHits = valid;
+  const centringQuality = (precision.perfectPct * 1.0 + precision.goodPct * 0.5 + precision.poorPct * 0.1) / 100; // 0..1
+  const streakFactor = 1 + Math.min(1.5, engine.longestStreak / 40); // longest streak, up to 2.5x
+  const performanceScore = Math.round(totalHits * centringQuality * streakFactor * 10);
+
   return {
+    performanceScore, totalHits,
     precision, advanceReady: gate.ready, advanceReason: gate.reason,
     valid, blocked, caught, released, missed, wrongHand, wrongAction,
     retentionFails, zoneFails, accuracyPct,

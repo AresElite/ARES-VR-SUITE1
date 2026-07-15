@@ -24,7 +24,9 @@ export type AegisCategory =
   | "either" // WHITE  · SPHERE    · either hand; efficient selection rewarded
   | "bomb"   // BLACK  · SPIKED    · avoid with head/torso. Never touch.
   | "bonus"  // GOLD-PURPLE · STAR · optional; faster, smaller, more peripheral
-  | "nogo";  // GRAY   · HOLLOW RING · salient but inert. Do not touch.
+  | "together" // DARK BLUE · SPHERE · take with BOTH hands brought close together
+  | "rail"   // a guided PATH one hand must ride for a short window
+  | "nogo";  // a stimulus-coloured SPHERE wearing contrast stripes. Do not touch.
 
 export type AegisAction = "block" | "catch";
 export type AegisMode = "block" | "catch" | "mixed";
@@ -51,12 +53,19 @@ export type RequiredHand = "left" | "right" | "either";
  * No category is dramatically more salient than another (§7).
  */
 export const CATEGORY_VISUAL: Record<AegisCategory, { color: string; shape: string; label: string }> = {
-  left:   { color: "#2998AA", shape: "box",      label: "LEFT" },
-  right:  { color: "#8B5CF6", shape: "diamond",  label: "RIGHT" },
-  either: { color: "#E8E9F0", shape: "sphere",   label: "EITHER" },
-  bomb:   { color: "#14161F", shape: "cone",     label: "BOMB" },
-  bonus:  { color: "#C9A6FF", shape: "pyramid",  label: "BONUS" },
-  nogo:   { color: "#6A7086", shape: "ring",     label: "NO-GO" },
+  // Hit targets are all SPHERES, told apart by COLOUR: teal = left hand, purple = right/either.
+  left:     { color: "#2998AA", shape: "sphere", label: "LEFT" },
+  right:    { color: "#8B5CF6", shape: "sphere", label: "RIGHT" },
+  either:   { color: "#8B5CF6", shape: "sphere", label: "EITHER" },
+  // Bombs are GRAY CUBES to be dodged.
+  bomb:     { color: "#8A90A6", shape: "box",    label: "BOMB" },
+  bonus:    { color: "#C9A6FF", shape: "pyramid", label: "BONUS" },
+  // Bring BOTH hands together for the dark-blue sphere.
+  together: { color: "#2563EB", shape: "sphere", label: "TOGETHER" },
+  // Ride the rail: a marker the assigned hand must FOLLOW along a short path.
+  rail:     { color: "#8B5CF6", shape: "sphere", label: "RAIL" },
+  // A stimulus-coloured sphere wearing contrast stripes — salient, but do NOT take it.
+  nogo:     { color: "#8B5CF6", shape: "sphere", label: "NO-GO" },
 };
 
 /** A live object in flight. */
@@ -82,6 +91,15 @@ export interface AegisObject {
   heldBy?: "left" | "right";
   heldSince?: number;
   releaseZone?: [number, number, number];
+
+  /** per-object colour override (no-go borrows a stimulus colour; together is dark blue) */
+  color?: string;
+  /** contrast-stripe apparentness for no-go, 0..1 — very apparent early, subtle later */
+  stripes?: number;
+  /** together: the object is only taken when BOTH hands are on it, close together */
+  needsBothHands?: boolean;
+  /** rail: ms the assigned hand has stayed ON the moving marker (drives success) */
+  onRailMs?: number;
 
   resolved: boolean;
   /** set once resolved — drives scoring and the event log */
@@ -167,6 +185,8 @@ export interface AegisTuning {
   bombRate: number;
   nogoRate: number;
   bonusRate: number;
+  togetherRate: number;      // dark-blue both-hands targets (asymmetric only)
+  railRate: number;          // "ride the rail" follow-the-path segments
   eitherRate: number;
   curveAmount: number;        // 0 = straight lanes, 1 = full 3D adaptive
   lateVectorChange: number;   // probability of a deceptive late course change

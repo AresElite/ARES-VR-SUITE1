@@ -223,6 +223,7 @@ export class AegisEngine {
 
     // ---- resolve contacts and failures
     this.resolveContacts(hands, headPos);
+    this.resolveRails(hands);
     this.resolveHeld(hands);
     this.expire();
 
@@ -278,13 +279,26 @@ export class AegisEngine {
   }
 
   // ---------------------------------------------------------------- spawning
+  /** contrast-stripe apparentness for no-go: unmistakable at Beginner, subtle at GOAT. */
+  private stripeApparent(): number {
+    const byTier: Record<string, number> = { beginner: 1.0, intermediate: 0.85, advanced: 0.62, pro: 0.42, goat: 0.28 };
+    return byTier[this.settings.tier] ?? 0.7;
+  }
   private pickCategory(): AegisCategory {
     const r = this.rng();
     const t = this.tune;
     const bombR = t.bombRate * (this.phase === "bonus" ? 1 + this.bonusStage * 0.05 : 1);
     if (r < bombR) return "bomb";
     if (r < bombR + t.nogoRate) return "nogo";
-    if (r < bombR + t.nogoRate + t.bonusRate) return "bonus";
+    let cum = bombR + t.nogoRate + t.bonusRate;
+    if (r < cum + t.bonusRate * 0) return "bonus"; // (bonus already handled above)
+    // RIDE THE RAIL: a marker the assigned hand must follow along a short path. Both hands get
+    // rails, so it applies under every hand rule.
+    if (t.railRate > 0 && r < cum + t.railRate) return "rail";
+    cum += t.railRate;
+    // TOGETHER (asymmetric only): a dark-blue sphere taken with BOTH hands brought together.
+    if (this.settings.handRule !== "symmetric" && t.togetherRate > 0 && r < cum + t.togetherRate) return "together";
+    cum += t.togetherRate;
     // standard target: which hand?
     if (this.settings.handRule === "symmetric") return "either";
     if (this.rng() < t.eitherRate) return "either";
@@ -292,8 +306,9 @@ export class AegisEngine {
   }
 
   private handFor(cat: AegisCategory): RequiredHand {
+    if (cat === "rail") return this.rng() < 0.5 ? "left" : "right";
     if (cat === "either" || cat === "bonus") return "either";
-    if (cat === "bomb" || cat === "nogo") return "either";
+    if (cat === "bomb" || cat === "nogo" || cat === "together") return "either";
     const base: RequiredHand = cat === "left" ? "left" : "right";
     if (!this.handRuleFlipped) return base;
     return base === "left" ? "right" : "left"; // the adaptive rule switch
@@ -345,8 +360,16 @@ export class AegisEngine {
       scale: size,
       releaseZone: this.tune.requireRelease && action === "catch"
         ? [this.rng() < 0.5 ? -0.55 : 0.55, 1.05 + this.rng() * 0.2, -0.45] : undefined,
+      // NO-GO wears a stimulus colour + contrast stripes; TOGETHER needs both hands.
+      ...(cat === "nogo" ? { color: this.rng() < 0.5 ? "#8B5CF6" : "#2998AA", stripes: this.stripeApparent() } : {}),
+      ...(cat === "together" ? { needsBothHands: true } : {}),
       resolved: false,
     });
+    if (cat === "rail") {
+      const o = this.objects[this.objects.length - 1];
+      o.color = o.requiredHand === "left" ? "#2998AA" : "#8B5CF6"; // rail carries its hand's colour
+      o.onRailMs = 0;
+    }
   }
 
   /** World position of an object right now. */
@@ -365,12 +388,29 @@ export class AegisEngine {
   private resolveContacts(hands: Record<HandId, HandState>, headPos: Vec3): void {
     for (const o of this.objects) {
       if (o.resolved || o.heldBy) continue;
+      if (o.cat === "rail") continue; // rails are scored by follow-time, not by contact
       const p = this.posOf(o);
 
       // ---- BOMB: head / upper-torso collision is a critical error (§6)
       if (o.cat === "bomb") {
         const headHit = Math.hypot(p[0] - headPos[0], p[1] - headPos[1], p[2] - headPos[2]) < o.scale + 0.16;
         if (headHit) { this.resolve(o, "bombContact", undefined, p); continue; }
+      }
+
+      // ---- TOGETHER: taken only when BOTH hands are on it AND close together. A single hand
+      // touching it does nothing (no error), so the athlete must bring the hands in as a pair.
+      if (o.needsBothHands) {
+        const L = hands.left, R = hands.right;
+        if (L && R && this.t >= o.actionableT) {
+          const dL = Math.hypot(p[0] - L.pos[0], p[1] - L.pos[1], p[2] - L.pos[2]);
+          const dR = Math.hypot(p[0] - R.pos[0], p[1] - R.pos[1], p[2] - R.pos[2]);
+          const sep = Math.hypot(L.pos[0] - R.pos[0], L.pos[1] - R.pos[1], L.pos[2] - R.pos[2]);
+          if (dL <= o.scale + 0.11 && dR <= o.scale + 0.11 && sep <= o.scale * 2.6) {
+            // score against the nearer hand's kinematics
+            this.resolve(o, "blocked", dL <= dR ? "left" : "right", p, dL <= dR ? L : R);
+          }
+        }
+        continue; // never resolve a together object through the single-hand path
       }
 
       for (const h of ["left", "right"] as HandId[]) {
@@ -434,6 +474,30 @@ export class AegisEngine {
     }
   }
 
+  /**
+   * RIDE THE RAIL. A rail marker travels its path; the ASSIGNED hand must stay on it. We tally
+   * the time the hand is on the marker across the actionable window, and at the end of the path
+   * a good-enough share of on-rail time is a success — following the whole thing is the skill,
+   * not a single touch.
+   */
+  private resolveRails(hands: Record<HandId, HandState>): void {
+    for (const o of this.objects) {
+      if (o.resolved || o.cat !== "rail") continue;
+      const hand = o.requiredHand === "left" || o.requiredHand === "right" ? o.requiredHand : "right";
+      const hs = hands[hand];
+      const p = this.posOf(o);
+      if (this.t >= o.actionableT && this.t < o.arriveT && hs) {
+        const d = Math.hypot(p[0] - hs.pos[0], p[1] - hs.pos[1], p[2] - hs.pos[2]);
+        if (d <= o.scale + 0.16) o.onRailMs = (o.onRailMs ?? 0) + STEP_MS;
+      }
+      if (this.t >= o.arriveT) {
+        const window = Math.max(1, o.arriveT - o.actionableT);
+        const frac = (o.onRailMs ?? 0) / window;
+        this.resolve(o, frac >= 0.6 ? "blocked" : "miss", hand, p, hs);
+      }
+    }
+  }
+
   /** Retention and release for objects currently held (§11). */
   private resolveHeld(hands: Record<HandId, HandState>): void {
     for (const o of this.objects) {
@@ -490,13 +554,39 @@ export class AegisEngine {
     const reactionMs = good && scored ? Math.max(0, this.t - o.actionableT) : undefined;
     const speed = hs ? Math.hypot(hs.vel[0], hs.vel[1], hs.vel[2]) : undefined;
     const objPos = at ?? this.posOf(o);
-    const precisionM = hs ? Math.hypot(objPos[0] - hs.pos[0], objPos[1] - hs.pos[1], objPos[2] - hs.pos[2]) : undefined;
-    // The contact radius is the object's own scale plus the hand's tolerance —
-    // the same figure the contact test used, so the zones are honest.
-    const radiusM = o.scale + 0.09;
-    const offX = hs ? hs.pos[0] - objPos[0] : undefined;
-    const offY = hs ? hs.pos[1] - objPos[1] : undefined;
-    const offZ = hs ? hs.pos[2] - objPos[2] : undefined;
+    /**
+     * SPATIAL PRECISION — the CLOSEST APPROACH, not the entry point.
+     *
+     * Contact triggers the instant the hand crosses into the contact zone, i.e. at its EDGE,
+     * so the raw hand-to-centre distance at that frame is always ~the zone radius — which made
+     * EVERY hit read POOR, even one driven dead through the middle. A driven strike travels in
+     * a straight line, so the hand's true closest approach to the centre is the PERPENDICULAR
+     * distance from the centre to the hand's velocity line. That is what "how centred was the
+     * hit" actually means, and a swing straight through the centre yields ~0 (PERFECT).
+     */
+    let precisionM: number | undefined;
+    let offX: number | undefined, offY: number | undefined, offZ: number | undefined;
+    if (hs) {
+      const rel: Vec3 = [objPos[0] - hs.pos[0], objPos[1] - hs.pos[1], objPos[2] - hs.pos[2]]; // centre - hand
+      const sp = Math.hypot(hs.vel[0], hs.vel[1], hs.vel[2]);
+      if (sp > 0.3) {
+        const vd: Vec3 = [hs.vel[0] / sp, hs.vel[1] / sp, hs.vel[2] / sp];
+        const along = rel[0] * vd[0] + rel[1] * vd[1] + rel[2] * vd[2];
+        if (along > 0) {
+          // perpendicular component of (centre - hand) = the miss vector at closest approach
+          const perp: Vec3 = [rel[0] - along * vd[0], rel[1] - along * vd[1], rel[2] - along * vd[2]];
+          precisionM = Math.hypot(perp[0], perp[1], perp[2]);
+          offX = -perp[0]; offY = -perp[1]; offZ = -perp[2]; // hand-minus-centre at closest approach
+        }
+      }
+      if (precisionM === undefined) { // slow/receding hand (e.g. a catch grip): use the contact point
+        precisionM = Math.hypot(rel[0], rel[1], rel[2]);
+        offX = -rel[0]; offY = -rel[1]; offZ = -rel[2];
+      }
+    }
+    // Precision is normalized to the object's VISUAL radius (its scale): "within the middle
+    // 25% of the ball" means 25% of the ball, not of the ball-plus-hand-tolerance.
+    const radiusM = o.scale;
     const precisionZone = precisionM !== undefined ? classifyPrecision(precisionM, radiusM) : undefined;
 
     let dirQ: number | undefined;
@@ -608,7 +698,7 @@ export class AegisEngine {
      * the points. PERFECT is worth more than twice GOOD.
      */
     if (precisionM !== undefined) {
-      const zone = classifyPrecision(precisionM, radiusM ?? o.scale + 0.09);
+      const zone = classifyPrecision(precisionM, radiusM ?? o.scale);
       s += zone === "perfect" ? 55 : zone === "good" ? 22 : 4;
     }
     // DIRECTIONAL QUALITY — did you drive INTO it (advanced+)

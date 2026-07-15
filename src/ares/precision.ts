@@ -12,9 +12,9 @@
  * miss on a small one are not the same error, and normalizing is what makes the
  * measure comparable across tiers, drills, and target sizes.
  *
- *   PERFECT   r <= 0.10    the middle 10%. Dead centre.
- *   GOOD      0.10 < r <= 0.70
- *   POOR      r > 0.70     the outer 30%. Caught it, but barely.
+ *   PERFECT   r <= 0.25    the middle 25%. Dead centre.
+ *   GOOD      0.25 < r <= 0.75  solidly on the target.
+ *   POOR      r > 0.75     the outer 25%. Caught it, but barely.
  *
  * This is a spatial-localization measure, not a timing one. It is deliberately
  * scored SEPARATELY from accuracy so that neither can hide the other.
@@ -22,8 +22,8 @@
 
 export type PrecisionZone = "perfect" | "good" | "poor";
 
-export const PERFECT_R = 0.10;
-export const GOOD_R = 0.70;
+export const PERFECT_R = 0.25;   // the middle 25% of the target — "dead centre"
+export const GOOD_R = 0.75;      // 26%-75% — solidly on it
 
 /**
  * @param distM   hand-to-target-centre distance at contact, metres

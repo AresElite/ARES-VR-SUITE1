@@ -43,36 +43,83 @@ function geometryFor(shape: string, scale: number): THREE.BufferGeometry {
   }
 }
 
+/** the contrast stripes that mark a NO-GO sphere — apparent early, subtle later. */
+function NoGoStripes({ scale, apparent }: { scale: number; apparent: number }) {
+  const bands = [-0.5, 0, 0.5];
+  return (
+    <>
+      {bands.map((f, i) => {
+        const y = f * scale;
+        const major = Math.sqrt(Math.max(0.0001, scale * scale - y * y)) * 1.0;
+        const minor = scale * (0.10 + 0.14 * apparent);
+        return (
+          <mesh key={i} position={[0, y, 0]} rotation={[Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[major, minor, 8, 24]} />
+            <meshStandardMaterial
+              color="#0B0F2A"
+              emissive="#0B0F2A"
+              emissiveIntensity={0.05}
+              metalness={0.2}
+              roughness={0.6}
+            />
+          </mesh>
+        );
+      })}
+    </>
+  );
+}
+
+/** the visible rail — a faint tube along the marker's path, so the athlete can see the route
+ *  the assigned hand must ride. Coloured by the rail's hand. */
+function RailPath({ obj }: { obj: AegisObject }) {
+  const geo = useMemo(() => {
+    const curve = new THREE.QuadraticBezierCurve3(
+      new THREE.Vector3(obj.p0[0], obj.p0[1], obj.p0[2]),
+      new THREE.Vector3(obj.ctrl[0], obj.ctrl[1], obj.ctrl[2]),
+      new THREE.Vector3(obj.p1[0], obj.p1[1], obj.p1[2]),
+    );
+    return new THREE.TubeGeometry(curve, 26, Math.max(0.01, obj.scale * 0.3), 8, false);
+  }, [obj.p0, obj.ctrl, obj.p1, obj.scale]);
+  const color = obj.color ?? "#8B5CF6";
+  return (
+    <mesh geometry={geo}>
+      <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.35} transparent opacity={0.32} />
+    </mesh>
+  );
+}
+
 function AegisObjectMesh({ obj, pos, feedback }: { obj: AegisObject; pos: [number, number, number]; feedback: number }) {
   const v = CATEGORY_VISUAL[obj.cat];
-  const mesh = useRef<THREE.Mesh>(null);
-  const geo = useMemo(() => geometryFor(v.shape, obj.scale), [v.shape, obj.scale]);
+  const grp = useRef<THREE.Group>(null);
+  const shape = v.shape;
+  const geo = useMemo(() => geometryFor(shape, obj.scale), [shape, obj.scale]);
+  const color = obj.color ?? v.color;   // no-go borrows a stimulus colour; together is dark blue
 
   useFrame((_, dt) => {
-    const m = mesh.current;
-    if (!m) return;
-    m.position.set(pos[0], pos[1], pos[2]);
-    // A slow, constant tumble. It is deliberately IDENTICAL for every category:
-    // if bombs spun faster, rotation would become a free identity cue and the
-    // shape-and-colour system we just built would be doing no work.
-    m.rotation.x += dt * 0.8;
-    m.rotation.y += dt * 1.1;
+    const g = grp.current;
+    if (!g) return;
+    g.position.set(pos[0], pos[1], pos[2]);
+    // A slow, constant tumble — deliberately IDENTICAL for every category, so rotation is
+    // never a free identity cue. (A no-go's stripes are fixed to the sphere, so they tumble
+    // with it, which is the point — you must read the stripes, not a static orientation.)
+    g.rotation.x += dt * 0.8;
+    g.rotation.y += dt * 1.1;
   });
 
   const isThreat = obj.cat === "bomb" || obj.cat === "nogo";
   return (
-    <mesh ref={mesh} geometry={geo}>
-      <meshStandardMaterial
-        color={v.color}
-        emissive={v.color}
-        emissiveIntensity={isThreat ? 0.25 : 0.55 + feedback * 0.25}
-        metalness={0.35}
-        roughness={obj.cat === "bomb" ? 0.85 : 0.28}
-        // The no-go is deliberately SALIENT but hollow — it must attract the hand
-        // in order to test the athlete's ability to refuse it (§6).
-        wireframe={obj.cat === "nogo"}
-      />
-    </mesh>
+    <group ref={grp}>
+      <mesh geometry={geo}>
+        <meshStandardMaterial
+          color={color}
+          emissive={color}
+          emissiveIntensity={isThreat ? 0.35 : 0.55 + feedback * 0.25}
+          metalness={0.35}
+          roughness={obj.cat === "bomb" ? 0.85 : 0.28}
+        />
+      </mesh>
+      {obj.cat === "nogo" && <NoGoStripes scale={obj.scale} apparent={obj.stripes ?? 1} />}
+    </group>
   );
 }
 
@@ -223,7 +270,12 @@ export function AegisRunner({
 
       {snap.objects.map((o) => {
         const p = o.heldBy ? hands.current[o.heldBy].pos : (snap.positions[o.id] ?? o.p0);
-        return <AegisObjectMesh key={o.id} obj={o} pos={p} feedback={streakEnergy} />;
+        return (
+          <group key={o.id}>
+            {o.cat === "rail" && <RailPath obj={o} />}
+            <AegisObjectMesh obj={o} pos={p} feedback={streakEnergy} />
+          </group>
+        );
       })}
 
       {held?.releaseZone && <ReleaseZone at={held.releaseZone} />}
