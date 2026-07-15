@@ -434,21 +434,29 @@ function TargetMesh({
     if (demCursor && spec.groupMode === "ordered" && spec.meta?.dem && mat.current && group.current) {
       const expected = spec.groupId ? engine.expectedSeq(spec.groupId) : demCursor.seq;
       const isCurrent = (spec.seq ?? 0) === expected;
-      if (isCurrent) {
+      const done = (spec.seq ?? 0) < expected;
+      /**
+       * DEM I & II (demHighlight === false): the CURRENT arrow is NOT called out — no gold, no
+       * halo, no enlargement. The athlete must find the next arrow by following the zig-zag
+       * themselves. Only ANSWERED arrows dim, as a trail of where they have been — that is
+       * progress feedback, not a pointer to the target.
+       */
+      const showCursor = spec.meta?.demHighlight !== false;
+      if (showCursor && isCurrent) {
         mat.current.emissive.set(ARES_COLORS.warningGold);
         mat.current.color.set(ARES_COLORS.warningGold);
         mat.current.emissiveIntensity = 1.6 + Math.sin(age * 0.012) * 0.5;
         group.current.scale.setScalar(1.55 + Math.sin(age * 0.012) * 0.1);
       } else {
-        const done = (spec.seq ?? 0) < (spec.groupId ? engine.expectedSeq(spec.groupId) : demCursor.seq);
         mat.current.emissive.set(done ? "#1A6B78" : "#9FA8D6");
         mat.current.color.set(done ? "#1A6B78" : "#9FA8D6");
-        mat.current.emissiveIntensity = done ? 0.55 : 0.4;
+        mat.current.emissiveIntensity = done ? 0.5 : 0.4;
         group.current.scale.setScalar(1);
       }
       if (demRing.current) {
-        demRing.current.visible = isCurrent;
-        if (isCurrent) demRing.current.rotation.z = age * 0.003;
+        const ring = showCursor && isCurrent;
+        demRing.current.visible = ring;
+        if (ring) demRing.current.rotation.z = age * 0.003;
       }
     }
     // head-velocity gate (Gaze Stabilization): the optotype is a faint ghost

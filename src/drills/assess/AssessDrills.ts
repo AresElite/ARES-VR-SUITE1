@@ -593,11 +593,12 @@ export const ContrastSensitivityAssessment: DrillDefinition = {
 const DEM_DIRS = ["up", "down", "left", "right"] as const;
 const DEM_FIRST_SPAWN = 600;
 
-function demArrows(mode: "vertical" | "grid", rows: number, cols: number, scale: number, salt: number, rng: () => number): TrialSpec[] {
+function demArrows(mode: "serpentine" | "grid", rows: number, cols: number, scale: number, salt: number, rng: () => number): TrialSpec[] {
   const trials: TrialSpec[] = [];
   // decorrelate DEM I from DEM II even on an identical session seed
   for (let b = 0; b < salt * 13; b++) rng();
 
+  const highlight = mode !== "serpentine";   // DEM I & II hide the cursor; III keeps it
   const push = (seq: number, x: number, y: number) => {
     const dir = pick(rng, DEM_DIRS);
     trials.push({
@@ -606,20 +607,30 @@ function demArrows(mode: "vertical" | "grid", rows: number, cols: number, scale:
       requiredDirection: dir,
       color: "#9FA8D6", emissive: "#9FA8D6", shape: "arrow", scale,
       groupId: "dem", groupMode: "ordered", seq,
-      meta: { pointDir: dir, dem: true },
+      meta: { pointDir: dir, dem: true, demHighlight: highlight },
     });
   };
 
-  if (mode === "vertical") {
-    // DEM I & II: TWO COLUMNS of `rows`, evenly spaced top-to-bottom.
-    // Read DOWN column 1, then DOWN column 2 (the classic vertical DEM).
-    const top = 2.02;
-    const bottom = 0.92;
-    const step = (top - bottom) / (rows - 1);
-    const colX = [-0.30, 0.30];
+  if (mode === "serpentine") {
+    /**
+     * DEM I & II: a ZIG-ZAG (boustrophedon) grid. The athlete reads row 0 LEFT to RIGHT, row 1
+     * RIGHT to LEFT, row 2 left to right again — snaking down the whole board. Nothing is
+     * highlighted, so the athlete must FIND the next arrow by holding the zig-zag path, make the
+     * saccade to it, read which way it points, and only then flick. Losing the thread costs you
+     * — which is exactly the oculomotor tracking this measures.
+     */
+    const top = 2.04;
+    const bottom = 0.90;
+    const rowStep = (top - bottom) / (rows - 1);
+    const xL = -0.62, xR = 0.62;
+    const colStep = (xR - xL) / (cols - 1);
     let seq = 0;
-    for (let c = 0; c < 2; c++) {
-      for (let r = 0; r < rows; r++) push(seq++, colX[c], top - r * step);
+    for (let r = 0; r < rows; r++) {
+      const leftToRight = r % 2 === 0;
+      for (let k = 0; k < cols; k++) {
+        const c = leftToRight ? k : cols - 1 - k;   // snake direction alternates each row
+        push(seq++, xL + c * colStep, top - r * rowStep);
+      }
     }
     return trials;
   }
@@ -646,7 +657,7 @@ export const DEMArrows: DrillDefinition = {
   name: "DEM (Arrows)",
   shortName: "DEM Arrows",
   phase: "Assess",
-  description: "Timed oculomotor protocol. DEM I & II present TWO COLUMNS of 20 arrows (40 total) — read straight DOWN column one, then down column two. DEM III is the dense 80-arrow grid. Flick the joystick to match each glowing arrow; the clock stops the instant the last one is answered. Every run is freshly randomized, and DEM II is always a different set from DEM I. Records total time, accuracy, average / fastest / slowest per-arrow time, and post-error slowing.",
+  description: "Timed oculomotor protocol. DEM I & II present a ZIG-ZAG grid of 40 arrows — read row by row, LEFT to RIGHT, then RIGHT to LEFT, snaking all the way down. Nothing is highlighted: you must find the next arrow yourself, make the saccade, read its direction, and flick. DEM III is the dense 80-arrow grid. The clock stops the instant the last arrow is answered. Every run is freshly randomized, and DEM II is always a different set from DEM I. Records total time, accuracy, average / fastest / slowest per-arrow time, and post-error slowing.",
   purpose: "Oculomotor function: saccadic accuracy, automaticity, completion speed.",
   interaction: "touch",
   responseMode: "joystick",
@@ -665,20 +676,20 @@ export const DEMArrows: DrillDefinition = {
       values: [ { id: "right", label: "Right" }, { id: "left", label: "Left" } ] },
   ],
   instructions: [
-    "1. The GLOWING GOLD arrow is always your current target - it advances on its own.",
-    "2. On GO the stopwatch starts. FLICK the joystick in the direction that arrow POINTS.",
-    "3. DEM I & II: work straight DOWN the left column of 20, then DOWN the right column.",
-    "4. DEM III: the dense grid - left to right, row by row.",
-    "5. Let the stick return to centre between flicks. The clock stops on the final arrow.",
+    "1. DEM I & II: NOTHING is highlighted. Read the grid in a ZIG-ZAG - row 1 left to right, row 2 right to left, and so on down.",
+    "2. FIND the next arrow yourself, jump your eyes to it, read which way it POINTS, then FLICK the joystick that way.",
+    "3. Answered arrows dim behind you so you can see how far you have come - the next one is never marked.",
+    "4. DEM III: the dense grid, and the current arrow DOES glow gold to guide you.",
+    "5. Let the stick return to centre between flicks. On GO the clock starts; it stops on the final arrow.",
   ],
-  controlsHint: "FLICK THE WAY THE GOLD ARROW POINTS - DOWN COLUMN 1, THEN COLUMN 2",
+  controlsHint: "ZIG-ZAG THE GRID - FIND EACH ARROW, THEN FLICK THE WAY IT POINTS",
   levels: STANDARD({}),
   buildTrials: (params, rng) => {
     const sub = (params as { subtest?: string }).subtest ?? "dem-1";
     // DEM III: 80-arrow grid. DEM I & II: two columns of 20 (= 40), and DEM II
     // is salted differently so it is never the same set as DEM I.
     if (sub === "dem-3") return demArrows("grid", 10, 8, 0.042, 3, rng);
-    return demArrows("vertical", 20, 2, 0.05, sub === "dem-2" ? 2 : 1, rng);
+    return demArrows("serpentine", 8, 5, 0.05, sub === "dem-2" ? 2 : 1, rng);
   },
   analyze: (events: RawEvent[]) => {
     const scored = events.filter((e) => e.errorType !== "correctRejection");

@@ -1,4 +1,4 @@
-import type { DrillDefinition, TrialSpec } from "@/ares/drillTypes";
+import type { DrillDefinition, TrialSpec, SliceDirection } from "@/ares/drillTypes";
 import { pick } from "@/utils/rng";
 
 /**
@@ -279,6 +279,8 @@ const UFOV_EXP_FAST = 60;
 interface UfovRec { eye: "right" | "left"; sector: number; eccDeg: number; expMs: number }
 const ufovPlan: UfovRec[] = [];
 const degOf = (r: number) => Math.round((Math.atan(r / Math.abs(UFOV_Z)) * 180) / Math.PI);
+/** the eight sectors, as joystick-flick directions (sector 0 = right, going counter-clockwise). */
+const UFOV_OCT: SliceDirection[] = ["right", "upRight", "up", "upLeft", "left", "downLeft", "down", "downRight"];
 
 export const UsefulFieldOfView: DrillDefinition = {
   id: "assess-ufov",
@@ -286,10 +288,11 @@ export const UsefulFieldOfView: DrillDefinition = {
   shortName: "Useful Field",
   phase: "Assess",
   description:
-    "MONOCULAR field test. One eye is blacked out while the other is tested — left eye covered first (right eye tested), then swapped. Hold central fixation; a target flashes somewhere in the periphery, then point + trigger where it was. The flashes move further out and get faster as you go. 15 trials per eye; every field sector is probed.",
+    "MONOCULAR field test. One eye is blacked out while the other is tested — left eye covered first (right eye tested), then swapped. Hold central fixation; a target flashes somewhere in the periphery, then FLICK the joystick toward where it was. The flashes move further out and get faster as you go. 15 trials per eye; every field sector is probed.",
   purpose: "Monocular useful field of view — how far out, and how fast, each eye can localize.",
-  interaction: "ray",
-  responseMode: "pointer",
+  interaction: "touch",
+  responseMode: "joystick",
+  eightWay: true,
   environment: "arena",
   mvp: true,
   assessment: true,
@@ -298,10 +301,14 @@ export const UsefulFieldOfView: DrillDefinition = {
     "1. ONE EYE IS COVERED. A banner tells you which eye is being tested.",
     "2. Keep your eyes locked on the CENTER cue - do not look around the field.",
     "3. A target FLASHES briefly out in your periphery, then vanishes.",
-    "4. POINT at the ring where it flashed and pull the TRIGGER.",
+    "4. FLICK the joystick toward WHERE it flashed - the eight faint rings show the directions.",
     "5. It moves further out and flashes faster as you go. 15 trials per eye, then eyes swap.",
   ],
-  controlsHint: "HOLD CENTER - POINT + TRIGGER WHERE IT FLASHED",
+  controlsHint: "HOLD CENTER - FLICK THE STICK TOWARD WHERE IT FLASHED",
+  options: [
+    { id: "dominantHand", label: "Joystick hand", defaultValue: "right",
+      values: [ { id: "right", label: "Right" }, { id: "left", label: "Left" } ] },
+  ],
   levels: STANDARD({ trialsPerEye: UFOV_TRIALS_PER_EYE }),
   buildTrials: (params, rng) => {
     const p = params as { trialsPerEye: number };
@@ -356,18 +363,37 @@ export const UsefulFieldOfView: DrillDefinition = {
           color: WHITE, emissive: WHITE, shape: "sphere", scale: 0.035,
           groupId, meta: { blockEye: blk.blocked },
         });
-        // response rings at every sector on THIS trial's eccentricity
+        // RESPONSE = an 8-way joystick FLICK toward the sector where the flash was. Pointing at
+        // a thin response ring was unreliable — the ray slips through the hole and misses the
+        // torus tube. A flick has no such aiming problem: the athlete simply pushes the stick
+        // the way they saw it, and the sector maps 1:1 onto the eight octant directions.
+        const respAt = t + 260 + expMs + 60;
+        // faint sector rings, DECOR only, so the athlete can calibrate the eight directions
         for (let k = 0; k < UFOV_SECTORS; k++) {
           const a = (k / UFOV_SECTORS) * Math.PI * 2;
           trials.push({
-            id: `${groupId}-r${k}`, spawnAt: t + 260 + expMs + 60, duration: 2400,
-            kind: k === sector ? "go" : "distractor",
+            id: `${groupId}-guide${k}`, spawnAt: respAt, duration: 2400, kind: "distractor", decor: true,
             zone: "center",
             position: [Math.cos(a) * r, 1.45 + Math.sin(a) * r * 0.78, UFOV_Z],
-            color: "#38406B", emissive: PURPLE, shape: "ring", scale: 0.05,
-            groupId, meta: { blockEye: blk.blocked },
+            color: "#2A3050", emissive: "#38406B", shape: "ring", scale: 0.045,
+            groupId, meta: { blockEye: blk.blocked, decor: true },
           });
         }
+        // the single flick target — invisible at centre, answered by flicking toward the sector
+        trials.push({
+          id: `${groupId}-flick`, spawnAt: respAt, duration: 2400, kind: "go",
+          zone: "center", position: [0, 1.45, UFOV_Z],
+          requiredDirection: UFOV_OCT[sector],
+          color: PURPLE, emissive: PURPLE, shape: "ring", scale: 0.001,
+          groupId, meta: { blockEye: blk.blocked, axes: 8, prompt: true },
+        });
+        // a central "WHERE?" prompt ring so the athlete knows the response window is open
+        trials.push({
+          id: `${groupId}-cue`, spawnAt: respAt, duration: 2400, kind: "distractor", decor: true,
+          zone: "center", position: [0, 1.45, UFOV_Z],
+          color: TEAL, emissive: TEAL, shape: "ring", scale: 0.03,
+          groupId, meta: { blockEye: blk.blocked, decor: true },
+        });
         t += 260 + expMs + 2400 + 700;
       }
     }
