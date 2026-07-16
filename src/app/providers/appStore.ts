@@ -34,7 +34,7 @@ import { detectHeadset, detectBrowser } from "@/utils/questDetection";
 import { EMPTY_XR_SUPPORT, type XRSupportInfo } from "@/utils/xrSupport";
 import { PERF_MODES, defaultPerfMode, type PerfModeId } from "@/utils/performance";
 
-export type ArenaMode = "home" | "setup" | "calibration" | "drill" | "results" | "aegisSetup" | "aegis" | "aegisResults" | "seqSetup" | "sequence" | "seqResults" | "keySetup" | "keystone" | "keyResults";
+export type ArenaMode = "home" | "setup" | "calibration" | "drill" | "results" | "aegisSetup" | "aegis" | "aegisResults" | "seqSetup" | "sequence" | "seqResults" | "keySetup" | "keystone" | "keyResults" | "gauntletSetup" | "gauntlet" | "gauntletResults";
 
 interface AppState {
   // device & support
@@ -48,6 +48,8 @@ interface AppState {
   /** AEGIS — the flagship eye-hand drill runs on its own continuous engine */
   aegis: import("@/aegis/types").AegisSettings;
   aegisResult: import("@/aegis/metrics").AegisMetrics | null;
+  gauntlet: import("@/gauntlet/engine").GauntletSettings;
+  gauntletResult: import("@/gauntlet/engine").GauntletMetrics | null;
   /** SEQUENCE COMMAND — peripheral intake -> central decision -> bilateral execution */
   sequence: import("@/sequence/types").SeqSettings;
   sequenceResult: import("@/sequence/metrics").SeqMetrics | null;
@@ -79,6 +81,9 @@ interface AppState {
   setAegis(p: Partial<import("@/aegis/types").AegisSettings>): void;
   startAegis(): void;
   finishAegis(m: import("@/aegis/metrics").AegisMetrics): void;
+  setGauntlet(p: Partial<import("@/gauntlet/engine").GauntletSettings>): void;
+  startGauntlet(): void;
+  finishGauntlet(m: import("@/gauntlet/engine").GauntletMetrics): void;
   setSequence(p: Partial<import("@/sequence/types").SeqSettings>): void;
   startSequence(): void;
   finishSequence(m: import("@/sequence/metrics").SeqMetrics): void;
@@ -131,6 +136,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   tierUnlocks: loadTierUnlocks(),
   aegis: { tier: "intermediate", mode: "block", handRule: "asymmetric", bonusEnabled: true },
   aegisResult: null,
+  gauntlet: { tier: "intermediate", handRule: "asymmetric", bonusEnabled: true },
+  gauntletResult: null,
   sequence: { tier: "intermediate", mode: "training", bonusEnabled: true },
   sequenceResult: null,
   keystone: { tier: "intermediate", mode: "training", bonusEnabled: true },
@@ -159,6 +166,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   startAegis: () => set({ arenaMode: "aegis", aegisResult: null }),
   finishAegis: (m) => set({ arenaMode: "aegisResults", aegisResult: m }),
+
+  setGauntlet: (p) => set({ gauntlet: { ...get().gauntlet, ...p } }),
+  startGauntlet: () => set({ arenaMode: "gauntlet", gauntletResult: null }),
+  finishGauntlet: (m) => set({ arenaMode: "gauntletResults", gauntletResult: m }),
 
   setSequence: (p) => {
     const next = { ...get().sequence, ...p };

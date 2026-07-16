@@ -4,6 +4,7 @@ import { OrbitControls } from "@react-three/drei";
 import { XR, XROrigin, createXRStore, useXR } from "@react-three/xr";
 import { useAppStore } from "@/app/providers/appStore";
 import { AegisSession, AegisSetup, AegisResultsPanel } from "@/vr/AegisSession";
+import { GauntletSession, GauntletSetup, GauntletResultsPanel } from "@/vr/GauntletSession";
 import { SequenceSession, SequenceSetup, SequenceResultsPanel } from "@/vr/SequenceSession";
 import { KeystoneSession, KeystoneSetup, KeystoneResultsPanel } from "@/vr/KeystoneSession";
 import { drillById } from "@/drills/registry";
@@ -83,6 +84,9 @@ function SceneContent() {
       {arenaMode === "aegisSetup" && <AegisSetup />}
       {arenaMode === "aegis" && <AegisSession />}
       {arenaMode === "aegisResults" && <AegisResultsPanel />}
+      {arenaMode === "gauntletSetup" && <GauntletSetup />}
+      {arenaMode === "gauntlet" && <GauntletSession />}
+      {arenaMode === "gauntletResults" && <GauntletResultsPanel />}
       {arenaMode === "results" && <PostDrillPanel />}
     </>
   );
