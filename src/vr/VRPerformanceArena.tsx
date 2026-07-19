@@ -6,7 +6,8 @@ import { ARES_COLORS } from "@/ares/colors";
 import { ARES_PHASES, PHASE_META, ARENA_GROUPS, type ArenaGroup } from "@/ares/phases";
 import { APP_NAME, APP_VERSION } from "@/ares/constants";
 import { useAppStore } from "@/app/providers/appStore";
-import { SpatialPanel, PanelText } from "./SpatialPanel";
+import { SpatialPanel, PanelText, PanelButton } from "./SpatialPanel";
+import { ENVIRONMENT_LABEL } from "@/ares/environments";
 import { TodaysPlanPanel } from "./TodaysPlanPanel";
 import { sfx } from "@/utils/audio";
 
@@ -197,6 +198,8 @@ function GroupPortal({ group }: { group: ArenaGroup }) {
 export function VRPerformanceArena() {
   const athlete = useAppStore((s) => s.athlete);
   const sessions = useAppStore((s) => s.sessions);
+  const envPref = useAppStore((s) => s.environmentPref);
+  const openEnvironmentSelect = useAppStore((s) => s.openEnvironmentSelect);
 
   return (
     <group>
@@ -235,6 +238,14 @@ export function VRPerformanceArena() {
           color="#6B749C"
           maxWidth={1.25}
           mono
+        />
+        {/* Change venue without leaving the arena. */}
+        <PanelButton
+          position={[0.44, -0.17, 0]}
+          label={ENVIRONMENT_LABEL[envPref] ?? "ENVIRONMENT"}
+          onClick={openEnvironmentSelect}
+          width={0.44}
+          height={0.09}
         />
       </SpatialPanel>
     </group>

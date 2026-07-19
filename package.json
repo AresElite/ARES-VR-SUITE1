@@ -1,8 +1,8 @@
 {
   "name": "ares-vr-performance-suite",
   "private": true,
-  "version": "0.62.0",
-  "description": "A.R.E.S. VR Performance Suite — immersive WebXR sports vision & neuro-performance training for Meta Quest (Acquire. Route. Execute. Synchronize.)",
+  "version": "0.63.0",
+  "description": "A.R.E.S. VR Performance Suite \u2014 immersive WebXR sports vision & neuro-performance training for Meta Quest (Acquire. Route. Execute. Synchronize.)",
   "type": "module",
   "scripts": {
     "dev": "vite --host",
@@ -10,7 +10,8 @@
     "preview": "vite preview --host",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "simulate": "tsx scripts/simulate.ts"
+    "simulate": "tsx scripts/simulate.ts",
+    "envcheck": "tsx scripts/envcheck.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.0",

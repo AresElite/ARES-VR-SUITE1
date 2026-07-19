@@ -12,6 +12,7 @@ import { buildSessionResult, type FinishedDrill } from "@/drills/shared/DrillRes
 import { levelFor } from "@/drills/shared/ProgressionEngine";
 import { PERFORM_TIERS, TIER_GATE_ACCURACY, UNGATED_TIERS } from "@/perform/tiers";
 import { modeAllowed, handRuleAllowed } from "@/aegis/tiers";
+import { resolveEnvironment } from "@/ares/environments";
 
 const TIER_KEY = "ares.perform.tierUnlocks.v1";
 function loadTierUnlocks(): Record<string, number> {
@@ -29,18 +30,40 @@ function saveTierUnlocks(t: Record<string, number>): void {
     /* storage unavailable — unlocks stay session-local */
   }
 }
+
+const ENV_KEY = "ares.environment.v1";
+function loadEnvPref(): import("@/ares/drillTypes").EnvironmentId {
+  try {
+    const raw = localStorage.getItem(ENV_KEY);
+    return (raw as import("@/ares/drillTypes").EnvironmentId) || "arena";
+  } catch {
+    return "arena";
+  }
+}
+function saveEnvPref(id: import("@/ares/drillTypes").EnvironmentId): void {
+  try {
+    localStorage.setItem(ENV_KEY, id);
+  } catch {
+    /* storage unavailable — the choice stays session-local */
+  }
+}
 import type { DrillEngine, DrillSnapshot } from "@/drills/shared/DrillEngine";
 import { detectHeadset, detectBrowser } from "@/utils/questDetection";
 import { EMPTY_XR_SUPPORT, type XRSupportInfo } from "@/utils/xrSupport";
 import { PERF_MODES, defaultPerfMode, type PerfModeId } from "@/utils/performance";
 
-export type ArenaMode = "home" | "setup" | "calibration" | "drill" | "results" | "aegisSetup" | "aegis" | "aegisResults" | "seqSetup" | "sequence" | "seqResults" | "keySetup" | "keystone" | "keyResults" | "gauntletSetup" | "gauntlet" | "gauntletResults";
+export type ArenaMode = "envSelect" | "home" | "setup" | "calibration" | "drill" | "results" | "aegisSetup" | "aegis" | "aegisResults" | "seqSetup" | "sequence" | "seqResults" | "keySetup" | "keystone" | "keyResults" | "gauntletSetup" | "gauntlet" | "gauntletResults";
 
 interface AppState {
   // device & support
   xrSupport: XRSupportInfo;
   perfModeId: PerfModeId;
   seated: boolean;
+  /**
+   * Athlete's chosen surround venue. Applies to every drill that is not
+   * environment-locked (see @/ares/environments). Persisted across sessions.
+   */
+  environmentPref: import("@/ares/drillTypes").EnvironmentId;
   strobeLevel: number;
   orgUnlocked: boolean;
   /** highest PERFORM tier unlocked per drill (earned, persisted) */
@@ -75,6 +98,8 @@ interface AppState {
   setXRSupport(info: XRSupportInfo): void;
   setPerfMode(id: PerfModeId): void;
   setSeated(seated: boolean): void;
+  setEnvironmentPref(id: import("@/ares/drillTypes").EnvironmentId): void;
+  openEnvironmentSelect(): void;
   setStrobeLevel(level: number): void;
   unlockOrg(pin: string): boolean;
   unlockedTier(drillId: string): number;
@@ -125,6 +150,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   xrSupport: EMPTY_XR_SUPPORT,
   perfModeId: defaultPerfMode(),
   seated: false,
+  environmentPref: loadEnvPref(),
   strobeLevel: 0,
   orgUnlocked: false,
   athlete: MOCK_ATHLETES[0],
@@ -143,7 +169,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   keystone: { tier: "intermediate", mode: "training", bonusEnabled: true },
   keystoneResult: null,
   drillOptions: {},
-  arenaMode: "home",
+  arenaMode: "envSelect",
   engine: null,
   snapshot: null,
   lastFinished: null,
@@ -153,6 +179,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   setXRSupport: (info) => set({ xrSupport: info }),
   setPerfMode: (id) => set({ perfModeId: id }),
   setSeated: (seated) => set({ seated }),
+  setEnvironmentPref: (id) => {
+    saveEnvPref(id);
+    set({ environmentPref: id });
+  },
+  openEnvironmentSelect: () => set({ arenaMode: "envSelect" }),
   setStrobeLevel: (level) => set({ strobeLevel: Math.max(0, Math.min(5, level)) }),
   unlockedTier: (drillId) => Math.max(UNGATED_TIERS, get().tierUnlocks[drillId] ?? UNGATED_TIERS),
 
@@ -283,9 +314,15 @@ export const useAppStore = create<AppState>((set, get) => ({
       levelLabel: lvl.label,
       device: deviceInfo(xrSupport),
     });
+    /**
+     * Stamp the environment onto the record. Two runs of the same drill in
+     * different venues are not automatically comparable, and the results view
+     * needs to be able to say so rather than trending them silently.
+     */
     finished.result.progression.parameters = {
       ...finished.result.progression.parameters,
       strobeLevel: get().strobeLevel,
+      environment: resolveEnvironment(def, get().environmentPref),
     };
 
     // PERFORM TIER GATE — clearing a tier at >=85% accuracy unlocks the next

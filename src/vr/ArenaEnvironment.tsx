@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, type ReactElement } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
@@ -92,6 +92,8 @@ import { PHASE_META, ARES_PHASES, type ARESPhase } from "@/ares/phases";
 import { PERF_MODES } from "@/utils/performance";
 import { useAppStore } from "@/app/providers/appStore";
 import type { EnvironmentId } from "@/ares/drillTypes";
+import { BackdropScrim, CORE_R } from "./VenueKit";
+import { SoccerStadium, FootballField, HockeyRink, BaseballDiamond, Speedway } from "./Venues";
 
 /**
  * The A.R.E.S. Neural Arena — 360° performance environment.
@@ -222,7 +224,31 @@ function SportProps({ environment }: { environment: EnvironmentId }) {
   return null;
 }
 
-export function ArenaEnvironment({ environment = "arena" }: { environment?: EnvironmentId }) {
+/** Which venue component, if any, this environment renders. */
+const VENUES: Partial<Record<EnvironmentId, () => ReactElement>> = {
+  soccer: SoccerStadium,
+  football: FootballField,
+  hockey: HockeyRink,
+  baseball: BaseballDiamond,
+  racing: Speedway,
+};
+
+/** Enclosed or daylight venues have no visible starfield. */
+const NO_STARS = new Set<EnvironmentId>(["hockey", "racing"]);
+
+export function ArenaEnvironment({
+  environment = "arena",
+  authored = false,
+}: {
+  environment?: EnvironmentId;
+  /**
+   * true when the running drill itself declared this environment. Sport props
+   * (home plate, strike-zone frame, light tree) are drill task furniture that
+   * sits INSIDE the action volume, so they may only appear when the drill asked
+   * for them — never because an athlete picked that venue as a backdrop.
+   */
+  authored?: boolean;
+}) {
   const phase = useAppStore((s) => s.phase);
 
   /**
@@ -240,28 +266,45 @@ export function ArenaEnvironment({ environment = "arena" }: { environment?: Envi
     );
   }
 
+  const Venue = VENUES[environment];
+
   return (
     <group>
       <color attach="background" args={[ARES_COLORS.nearBlack]} />
-      <fog attach="fog" args={[ARES_COLORS.nearBlack, 14, 44]} />
+      <fog attach="fog" args={[ARES_COLORS.nearBlack, Venue ? 26 : 14, Venue ? 90 : 44]} />
       <ambientLight intensity={0.8} />
       <directionalLight position={[3, 6, 2]} intensity={0.55} />
 
-      <SkyDome />
+      {!Venue && <SkyDome />}
+
+      {/*
+       * CONTROLLED CORE — identical in every environment. The energy floor, the
+       * guide rings and the performance loop are the athlete's immediate visual
+       * world, and they do not change when the venue does. That is what keeps
+       * two sessions of the same drill comparable across environments.
+       */}
       <EnergyFloor tint={environment === "baseball" ? "#101828" : "#EAF0FF"} />
-      {/* concentric guide rings */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
         <ringGeometry args={[1.15, 1.18, 40]} />
         <meshBasicMaterial color={ARES_COLORS.royalPurple} transparent opacity={0.8} />
       </mesh>
       <PerformanceLoopFloor activePhase={phase} />
-      {/* horizon ring */}
-      <mesh position={[0, 2.6, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[13, 0.05, 6, 48]} />
-        <meshBasicMaterial color={ARES_COLORS.deepPurple} transparent opacity={0.75} />
-      </mesh>
-      <Starfield />
-      <SportProps environment={environment} />
+      {!Venue && (
+        <mesh position={[0, 2.6, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[13, 0.05, 6, 48]} />
+          <meshBasicMaterial color={ARES_COLORS.deepPurple} transparent opacity={0.75} />
+        </mesh>
+      )}
+      {!NO_STARS.has(environment) && <Starfield />}
+
+      {/* SURROUND — venue geometry, all of it outside CORE_R */}
+      {Venue && <Venue />}
+      {Venue && <BackdropScrim />}
+
+      {authored && <SportProps environment={environment} />}
     </group>
   );
 }
+
+/** Exposed for the environment verification harness. */
+export const CONTROLLED_CORE_RADIUS = CORE_R;

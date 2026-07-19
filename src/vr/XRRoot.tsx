@@ -11,6 +11,8 @@ import { drillById } from "@/drills/registry";
 import { PERF_MODES, defaultPerfMode } from "@/utils/performance";
 import { pointerStoreOptions } from "./InteractionRay";
 import { ArenaEnvironment } from "./ArenaEnvironment";
+import { EnvironmentSelect } from "./EnvironmentSelect";
+import { resolveEnvironment, environmentLocked } from "@/ares/environments";
 import { VRPerformanceArena } from "./VRPerformanceArena";
 import { TrainerControlDock } from "./TrainerControlDock";
 import { SafetyBoundary } from "./SafetyBoundary";
@@ -58,14 +60,25 @@ function SceneContent() {
   const arenaMode = useAppStore((s) => s.arenaMode);
   const drillId = useAppStore((s) => s.drillId);
   const seated = useAppStore((s) => s.seated);
+  const envPref = useAppStore((s) => s.environmentPref);
   const def = drillId ? drillById(drillId) : undefined;
-  const environment = (arenaMode === "drill" || arenaMode === "calibration") && def ? def.environment : "arena";
+  const inDrill = arenaMode === "drill" || arenaMode === "calibration";
+
+  /**
+   * Locked drills always render their authored environment; everything else
+   * renders the athlete's chosen venue — including the menus, so the choice is
+   * visible from the moment it is made.
+   */
+  const environment = inDrill && def ? resolveEnvironment(def, envPref) : envPref;
+  /** Sport props are drill furniture, so they only appear on the authoring drill. */
+  const authored = Boolean(inDrill && def && (environmentLocked(def) || def.environment === environment));
 
   return (
     <>
       <XROrigin position={[0, seated ? 0.45 : 0, 0]} />
       <HandTrackingLayer />
-      <ArenaEnvironment environment={environment} />
+      <ArenaEnvironment environment={environment} authored={authored} />
+      {arenaMode === "envSelect" && <EnvironmentSelect />}
       {arenaMode === "home" && <VRPerformanceArena />}
       {arenaMode === "setup" && <TrainerControlDock />}
       {arenaMode === "calibration" && <SafetyBoundary />}
