@@ -1,6 +1,6 @@
 # A.R.E.S. VR — Environment System Scope
 
-**Status:** proposal, not built. Requested venues: soccer stadium, hockey rink, football field, baseball diamond, Indianapolis-style speedway from the start/finish bricks.
+**Status:** BUILT and shipped in v0.63.0. Requested venues: soccer stadium, hockey rink, football field, baseball diamond, Indianapolis-style speedway from the start/finish bricks.
 
 ---
 
@@ -131,9 +131,30 @@ Phase 8 is the one that makes this defensible rather than decorative.
 
 ---
 
-## 7. Open decisions
+## 7. Decisions taken
 
-1. **Backdrop shell visibility** — fully opaque panel (maximum control, slightly breaks immersion) vs. a dark gradient scrim that lets venue depth show through at heavily reduced contrast (better feel, needs the phase-8 verification to pass). *Recommend the scrim, gated on verification.*
-2. **Crowd animation** — static stipple (free) vs. slow subtle motion (more alive, adds peripheral motion that could interfere with peripheral-detection drills). *Recommend static, or motion suppressed for Acquire-phase drills.*
-3. **IMS fidelity** — generic superspeedway vs. pursue licensing.
-4. **Basketball / racquet / tactical** — already in the type union but unrequested. Build now for completeness, or leave stubbed?
+1. **Backdrop shell** — dark scrim at 88% opacity (`BackdropScrim`, `src/vr/VenueKit.tsx`), spanning the frontal cone at `CORE_R = 9`. Venue depth reads as a suggestion; the half behind the athlete stays fully immersive because it never carries task stimuli.
+2. **Crowd** — static stipple. Animated peripheral motion would contaminate the Acquire-phase peripheral-detection drills.
+3. **Speedway** — generic superspeedway with a procedural brick start/finish stripe. No pagoda, no wordmark, no identifiable venue. The bricks sit at z = +1.4, just behind the stance line, so they are underfoot and in peripheral view but never behind a target.
+4. **Basketball / racquet / tactical** — left stubbed. Not offered in the picker.
+
+## 8. What shipped
+
+| File | Role |
+|---|---|
+| `src/vr/VenueKit.tsx` | `CORE_R`, `clampLuma()`, `BackdropScrim`, `Bowl`, `CrowdBand`, `FloodMast`, `TrussRoof`, `VenueGround`, `GroundLines`, `GroundArc` |
+| `src/vr/Venues.tsx` | `SoccerStadium`, `FootballField`, `HockeyRink`, `BaseballDiamond`, `Speedway` |
+| `src/ares/environments.ts` | `SELECTABLE_ENVIRONMENTS`, `environmentLocked()`, `resolveEnvironment()`, `lockReason()` |
+| `src/vr/EnvironmentSelect.tsx` | Suite-entry picker with live preview |
+| `src/vr/ArenaEnvironment.tsx` | Venue routing, controlled core, `authored` gate on sport props |
+| `scripts/envcheck.ts` | Verification harness — `npm run envcheck` |
+
+**Enforced invariants** (all proven by `scripts/envcheck.ts`):
+
+- No locked drill can be overridden — checked across every venue x drill pair (0 leaks over 14 locked drills).
+- Every unlocked drill follows the preference — 42 of 42.
+- Every origin-centred venue radius clears `CORE_R`; painted arcs are checked by *nearest approach*, not radius, so offset faceoff circles pass honestly.
+- The only geometry inside `CORE_R` is the speedway floor decal, and it must sit at z >= 0.
+- No material in `Venues.tsx` sets an unclamped colour; 28 colours route through `clampLuma`.
+
+**Not yet done:** phase-7 on-device perf pass (72 fps floor per venue) and phase-8 photometric verification (sampling rendered backdrop luminance in the action cone and asserting cross-venue variance is under threshold). Both need a headset and a render harness; the structural guarantees above are what stands in for them today.
